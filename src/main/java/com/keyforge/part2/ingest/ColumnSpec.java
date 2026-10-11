@@ -11,6 +11,7 @@ public final class ColumnSpec {
     public enum Kind {
         TEXT("text", "?"),
         BOOLEAN("boolean", "?"),
+        INTEGER("integer", "?"),
         JSONB("jsonb", "?::jsonb"),
         TIMESTAMPTZ("timestamp with time zone", "?::timestamptz");
 
@@ -33,6 +34,7 @@ public final class ColumnSpec {
 
     public static ColumnSpec text(String name) { return new ColumnSpec(name, Kind.TEXT); }
     public static ColumnSpec bool(String name) { return new ColumnSpec(name, Kind.BOOLEAN); }
+    public static ColumnSpec integer(String name) { return new ColumnSpec(name, Kind.INTEGER); }
     public static ColumnSpec jsonb(String name) { return new ColumnSpec(name, Kind.JSONB); }
     public static ColumnSpec timestamptz(String name) { return new ColumnSpec(name, Kind.TIMESTAMPTZ); }
 }

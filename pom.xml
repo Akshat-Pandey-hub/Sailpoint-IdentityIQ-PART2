@@ -55,6 +55,13 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
+                <configuration>
+                    <!-- Tests run an in-process mock KF Agent (HttpServer). On Windows the JDK's NIO selector
+                         opens an AF_UNIX loopback pipe under the temp dir, which fails on some user temp
+                         paths ("Unable to establish loopback connection"); use the build dir instead
+                         (same approach as Part 1's surefire tmpdir). Test-only; no effect on the jar. -->
+                    <argLine>-Djdk.net.unixdomain.tmpdir=${project.build.directory}</argLine>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

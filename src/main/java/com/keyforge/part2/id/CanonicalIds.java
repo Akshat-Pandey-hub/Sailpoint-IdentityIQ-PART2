@@ -62,4 +62,47 @@ public final class CanonicalIds {
         }
         return userid;
     }
+
+    /**
+     * The Entitlement primary key, matching Part 1's
+     * {@code NativeManagedAttributeRepository.canonicalEntitlementId}: {@code canonicalUuid(source_id)},
+     * falling back to {@code deterministicUuid("native-managedattribute|"+id)}. Note Part 1 falls back to
+     * {@code name} only when source_id is {@code null} (not merely blank) — reproduced as-is.
+     */
+    public static String entitlementId(String sourceId, String name) {
+        String id = canonicalUuid(sourceId);
+        if (id == null) {
+            id = deterministicUuid("native-managedattribute|" + (sourceId == null ? name : sourceId));
+        }
+        return id;
+    }
+
+    /**
+     * The Application primary key, matching Part 1's {@code NativeApplicationRepository.canonicalApplicationId}:
+     * {@code canonicalUuid(source_id)}, falling back to {@code deterministicUuid("native-application|"+id)}
+     * ({@code name} only when source_id is {@code null}).
+     */
+    public static String applicationId(String sourceId, String name) {
+        String id = canonicalUuid(sourceId);
+        if (id == null) {
+            id = deterministicUuid("native-application|" + (sourceId == null ? name : sourceId));
+        }
+        return id;
+    }
+
+    /**
+     * The Account (Link) primary key, matching Part 1's {@code NativeLinkRepository.canonicalAccountId}:
+     * {@code canonicalUuid(source_id)}, falling back to
+     * {@code deterministicUuid("native-link|" + application_name + "|" + native_identity)} when source_id is
+     * {@code null} (Java string concatenation, so a null part becomes the text "null" — reproduced as-is), or
+     * {@code "native-link|" + source_id} when source_id is present but not a GUID.
+     */
+    public static String accountId(String sourceId, String applicationName, String nativeIdentity) {
+        String id = canonicalUuid(sourceId);
+        if (id == null) {
+            id = deterministicUuid("native-link|"
+                    + (sourceId == null ? (applicationName + "|" + nativeIdentity) : sourceId));
+        }
+        return id;
+    }
 }
