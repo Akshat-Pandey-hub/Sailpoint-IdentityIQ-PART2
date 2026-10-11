@@ -4,6 +4,7 @@ import com.keyforge.part2.config.AppConfig;
 import com.keyforge.part2.config.ConfigException;
 import com.keyforge.part2.db.PostgresConnection;
 import com.keyforge.part2.http.KfAgentClient;
+import com.keyforge.part2.ingest.AccountEntitlementTable;
 import com.keyforge.part2.ingest.AccountTable;
 import com.keyforge.part2.ingest.ApplicationTable;
 import com.keyforge.part2.ingest.EntitlementTable;
@@ -11,9 +12,13 @@ import com.keyforge.part2.ingest.EntityImportService;
 import com.keyforge.part2.ingest.EntityRepository;
 import com.keyforge.part2.ingest.EntitySpec;
 import com.keyforge.part2.ingest.IdentityImportService;
+import com.keyforge.part2.ingest.IdentityRequestTable;
 import com.keyforge.part2.ingest.IdentityRepository;
 import com.keyforge.part2.ingest.IdentityEntitlementTable;
 import com.keyforge.part2.ingest.IdentityRoleTable;
+import com.keyforge.part2.ingest.EntityWriter;
+import com.keyforge.part2.ingest.RoleEntitlementRepository;
+import com.keyforge.part2.ingest.RoleHierarchyRepository;
 import com.keyforge.part2.ingest.RoleTable;
 import com.keyforge.part2.ingest.WorkgroupTable;
 import com.keyforge.part2.ingest.ImportResult;
@@ -21,6 +26,7 @@ import com.keyforge.part2.ingest.ImportResult;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.UUID;
+import java.util.function.Function;
 
 /**
  * Part 2 CLI entry point. Commands:
@@ -33,7 +39,16 @@ import java.util.UUID;
  *  import-role          Fetch GET /kfagent/roles        and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_role
  *  import-identity-role Fetch GET /kfagent/identity-roles and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_identity_role
  *  import-identity-entitlement
- *                       Fetch GET /kfagent/identity-entitlements and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_identity_entitlement</pre>
+ *                       Fetch GET /kfagent/identity-entitlements and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_identity_entitlement
+ *  import-account-entitlement
+ *                       Fetch GET /kfagent/account-entitlements and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_account_entitlement
+ *  import-role-entitlement
+ *                       Fetch GET /kfagent/role-entitlements and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_role_entitlement
+ *                       (needs kf_entitlement in the same schema: run import-entitlement first)
+ *  import-role-hierarchy
+ *                       Fetch GET /kfagent/role-hierarchy and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_role_hierarchy
+ *  import-identity-request
+ *                       Fetch GET /kfagent/identity-requests and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_identity_request</pre>
  *
  * Configuration is entirely external (environment variables / -D system properties) — see {@link AppConfig}.
  * Exit codes: 0 ok, 2 usage, 3 config error, 4 HTTP/source error, 5 PostgreSQL error, 6 completed with row
@@ -55,6 +70,10 @@ public final class Main {
             case "import-role" -> System.exit(runImport(RoleTable.SPEC));
             case "import-identity-role" -> System.exit(runImport(IdentityRoleTable.SPEC));
             case "import-identity-entitlement" -> System.exit(runImport(IdentityEntitlementTable.SPEC));
+            case "import-account-entitlement" -> System.exit(runImport(AccountEntitlementTable.SPEC));
+            case "import-role-entitlement" -> System.exit(runImport(RoleEntitlementRepository::new));
+            case "import-role-hierarchy" -> System.exit(runImport(RoleHierarchyRepository::new));
+            case "import-identity-request" -> System.exit(runImport(IdentityRequestTable.SPEC));
             default -> {
                 printUsage();
                 System.exit("".equals(command) ? 2 : 2);
@@ -96,6 +115,11 @@ public final class Main {
 
     /** Runs a generic {@link EntitySpec} import with the same config, summary and exit codes as Identity. */
     private static int runImport(EntitySpec spec) {
+        return runImport(schema -> new EntityRepository(schema, spec));
+    }
+
+    /** Runs an import through the writer built for the configured destination schema. */
+    private static int runImport(Function<String, EntityWriter> writerForSchema) {
         try {
             AppConfig config = AppConfig.load();
             String runId = UUID.randomUUID().toString();
@@ -103,8 +127,8 @@ public final class Main {
             System.out.println("extraction_run_id: " + runId);
 
             KfAgentClient client = new KfAgentClient(config);
-            EntityRepository repository = new EntityRepository(config.pgSchema(), spec);
-            EntityImportService service = new EntityImportService(client, repository, config.pageSize());
+            EntityWriter writer = writerForSchema.apply(config.pgSchema());
+            EntityImportService service = new EntityImportService(client, writer, config.pageSize());
 
             try (Connection conn = PostgresConnection.open(config)) {
                 ImportResult result = service.run(conn, runId);
@@ -141,6 +165,15 @@ public final class Main {
         System.out.println("  import-identity-role Fetch GET /kfagent/identity-roles and upsert into <PG_DEST_SCHEMA>.kf_identity_role");
         System.out.println("  import-identity-entitlement");
         System.out.println("                       Fetch GET /kfagent/identity-entitlements and upsert into <PG_DEST_SCHEMA>.kf_identity_entitlement");
+        System.out.println("  import-account-entitlement");
+        System.out.println("                       Fetch GET /kfagent/account-entitlements and upsert into <PG_DEST_SCHEMA>.kf_account_entitlement");
+        System.out.println("  import-role-entitlement");
+        System.out.println("                       Fetch GET /kfagent/role-entitlements and upsert into <PG_DEST_SCHEMA>.kf_role_entitlement");
+        System.out.println("                       (needs kf_entitlement in the same schema: run import-entitlement first)");
+        System.out.println("  import-role-hierarchy");
+        System.out.println("                       Fetch GET /kfagent/role-hierarchy and upsert into <PG_DEST_SCHEMA>.kf_role_hierarchy");
+        System.out.println("  import-identity-request");
+        System.out.println("                       Fetch GET /kfagent/identity-requests and upsert into <PG_DEST_SCHEMA>.kf_identity_request");
         System.out.println();
         System.out.println("Required env: KFAGENT_BASE_URL, PG_HOST, PG_DATABASE, PG_USERNAME, PG_PASSWORD");
         System.out.println("Optional env: PG_PORT (5432), PG_DEST_SCHEMA (iiq_native_part2), KFAGENT_PAGE_SIZE (500),");

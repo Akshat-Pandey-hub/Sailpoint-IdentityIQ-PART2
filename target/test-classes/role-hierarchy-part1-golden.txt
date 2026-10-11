@@ -1,0 +1,12 @@
+REST={"source_role_id":"7f0001019fbf1a17819fc7e6276a0ee5","role_name":"HR Employee","related_role_source_id":"7f000101a0cf1f4c81a111f0f19b5712","related_role_name":"hritrole","relationship_type":"INHERITANCE"}
+NK=32:7f0001019fbf1a17819fc7e6276a0ee511:INHERITANCE32:7f000101a0cf1f4c81a111f0f19b5712
+HASH=5828b3965474b51eead07430046aeb622c3005b0074c3fa843c81f2f0d3de833
+ID=0b2af2ee-5648-3d1f-918e-dd63cd6da132
+REST={"source_role_id":"7f0001019fbf1a17819fc7e6276a0ee5","role_name":"HR Employee – café ✓","related_role_source_id":"7f000101a0cf1f4c81a111f0f19b5712","related_role_name":"hritrole","relationship_type":"REQUIREMENT"}
+NK=32:7f0001019fbf1a17819fc7e6276a0ee511:REQUIREMENT32:7f000101a0cf1f4c81a111f0f19b5712
+HASH=950d2de035dd3956979dc4db523fdcb873ad19ebc0b7eb6e890f904821cb4fa1
+ID=c5fa89df-9304-3549-ac9a-a3b804dc04d5
+REST={"source_role_id":"not-a-guid","role_name":null,"related_role_source_id":"also-not-a-guid","related_role_name":null,"relationship_type":"PERMIT"}
+NK=10:not-a-guid6:PERMIT15:also-not-a-guid
+HASH=174c50447c4cfd09ddcf62e3e2618a6a3f7c808565bc99ff16ebddb315eb5317
+ID=b8b45684-b733-38be-adc6-87a8c6b4fd63

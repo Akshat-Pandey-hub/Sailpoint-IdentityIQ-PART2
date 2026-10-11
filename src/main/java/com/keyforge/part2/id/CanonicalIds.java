@@ -160,4 +160,40 @@ public final class CanonicalIds {
         }
         return id;
     }
+
+    /**
+     * The Account-Entitlement edge primary key, matching Part 1's
+     * {@code NativeAccountEntitlementRepository.canonicalEdgeId}. Always name-based (an edge has no IIQ id), and the
+     * formula depends on the edge type ({@code null} type counts as ATTRIBUTE):
+     * <ul>
+     *   <li>ATTRIBUTE: {@code "native-account-entitlement|" + link_id|attribute_name|attribute_value}</li>
+     *   <li>otherwise (PERMISSION / TARGET_PERMISSION):
+     *       {@code "native-account-entitlement|" + link_id|type|permission_target|permission_rights|permission_annotation}</li>
+     * </ul>
+     * A null part is concatenated as the text "null", exactly like Part 1.
+     */
+    public static String accountEntitlementId(String linkId, String type, String attributeName, String attributeValue,
+                                              String permissionTarget, String permissionRights,
+                                              String permissionAnnotation) {
+        String t = type == null ? "ATTRIBUTE" : type;
+        if ("ATTRIBUTE".equals(t)) {
+            return deterministicUuid("native-account-entitlement|" + linkId + "|" + attributeName + "|" + attributeValue);
+        }
+        return deterministicUuid("native-account-entitlement|" + linkId + "|" + t
+                + "|" + permissionTarget + "|" + permissionRights + "|" + permissionAnnotation);
+    }
+
+    /**
+     * The IdentityRequest primary key, matching Part 1's {@code NativeIdentityRequestRepository.canonicalRequestId}:
+     * {@code canonicalUuid(source_id)} with NO fallback — Part 1 refuses a request without a usable IIQ id
+     * ("source id is required for deterministic identity"), so the row fails instead of getting an invented key.
+     */
+    public static String identityRequestId(String sourceId) {
+        String id = canonicalUuid(sourceId);
+        if (id == null) {
+            throw new IllegalArgumentException("IdentityRequest source id is required for deterministic identity (got "
+                    + (sourceId == null ? "null" : "'" + sourceId + "'") + ")");
+        }
+        return id;
+    }
 }

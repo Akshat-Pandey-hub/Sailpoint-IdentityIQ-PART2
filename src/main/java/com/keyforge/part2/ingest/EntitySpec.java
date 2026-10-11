@@ -25,6 +25,9 @@ import java.util.function.Function;
  * @param trailing         further response-provided columns that iiq_native places AFTER {@code deleted_at}
  *                         (Part 1 added them later with {@code ALTER TABLE … ADD COLUMN}); empty for most tables.
  *                         They are bound, hashed and returned like {@code business}; only the DDL position differs.
+ * @param objectTypeFn     optional per-row {@code source_object_type} (for tables where Part 1 stamps a different
+ *                         object type per row, e.g. account-entitlement edge kinds); {@code null} = always
+ *                         {@code sourceObjectType}
  */
 public record EntitySpec(
         String entity,
@@ -38,7 +41,8 @@ public record EntitySpec(
         String sourceSystem,
         String sourceInterface,
         String sourceObjectType,
-        List<ColumnSpec> trailing) {
+        List<ColumnSpec> trailing,
+        Function<JsonNode, String> objectTypeFn) {
 
     /** Spec for a table whose business columns all precede the lineage columns (no trailing columns). */
     public EntitySpec(String entity, String resource, String table, String pkColumn, List<ColumnSpec> business,
@@ -46,7 +50,21 @@ public record EntitySpec(
                       Function<JsonNode, String> refFn, String sourceSystem, String sourceInterface,
                       String sourceObjectType) {
         this(entity, resource, table, pkColumn, business, keyFn, recordHashFn, refFn,
-                sourceSystem, sourceInterface, sourceObjectType, List.of());
+                sourceSystem, sourceInterface, sourceObjectType, List.of(), null);
+    }
+
+    /** Spec with trailing columns and a constant {@code source_object_type}. */
+    public EntitySpec(String entity, String resource, String table, String pkColumn, List<ColumnSpec> business,
+                      Function<JsonNode, String> keyFn, Function<JsonNode, String> recordHashFn,
+                      Function<JsonNode, String> refFn, String sourceSystem, String sourceInterface,
+                      String sourceObjectType, List<ColumnSpec> trailing) {
+        this(entity, resource, table, pkColumn, business, keyFn, recordHashFn, refFn,
+                sourceSystem, sourceInterface, sourceObjectType, trailing, null);
+    }
+
+    /** The {@code source_object_type} to stamp on this row. */
+    public String sourceObjectTypeFor(JsonNode row) {
+        return objectTypeFn == null ? sourceObjectType : objectTypeFn.apply(row);
     }
 
     /** Every response-provided column: {@code business} then {@code trailing} (= response field order). */

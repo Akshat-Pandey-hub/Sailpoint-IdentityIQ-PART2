@@ -1,0 +1,12 @@
+REST={"link_id":"7f0001019f061fdc819f34b0ac345122","identity_id":"7f00010198421229819849ebca230c82","identity_name":"Alexander Bailey","application_id":"7f00010198421229819849f1427b0d58","application_name":"EntraTarget","native_identity":"abailey@corp.com","instance":null,"type":"ATTRIBUTE","attribute_name":"groups","attribute_value":"Ops – café ✓","permission_target":null,"permission_rights":null,"permission_rights_list":[],"permission_annotation":null,"permission_aggregation_source":null,"permission_attributes":null}
+HASH=6b6418733483b4f93ffa8e729ff613cf377d565630b527f83449857a864f179a
+ID=09398d99-4195-331d-be57-009bda2a455d
+REST={"link_id":"7f0001019f061fdc819f34b0ac345122","identity_id":"7f00010198421229819849ebca230c82","identity_name":"Alexander Bailey","application_id":"7f00010198421229819849f1427b0d58","application_name":"EntraTarget","native_identity":"abailey@corp.com","instance":null,"type":"PERMISSION","attribute_name":null,"attribute_value":null,"permission_target":"db1.payroll","permission_rights":"read,write","permission_rights_list":["read","write"],"permission_annotation":"direct","permission_aggregation_source":"agg","permission_attributes":{"n":1.5,"z":null}}
+HASH=50bad71e694f4fa3be1efa2c47de31cbd4fbaba08fded94bac9c620a1f81229d
+ID=c4229099-4aff-3b05-aa26-025b257c8d92
+REST={"link_id":"7f0001019f061fdc819f34b0ac345199","identity_id":null,"identity_name":null,"application_id":null,"application_name":null,"native_identity":null,"instance":null,"type":"TARGET_PERMISSION","attribute_name":null,"attribute_value":null,"permission_target":"\\share\fin","permission_rights":"read","permission_rights_list":["read"],"permission_annotation":null,"permission_aggregation_source":null,"permission_attributes":{}}
+HASH=d91ea10210c03862f7da79b030465dc108ba5a8504c24cd941ff6d26d135a721
+ID=f1518383-9991-32c6-98e6-dc8dcc88786e
+REST={"link_id":null,"identity_id":null,"identity_name":null,"application_id":null,"application_name":null,"native_identity":null,"instance":null,"type":null,"attribute_name":null,"attribute_value":null,"permission_target":null,"permission_rights":null,"permission_rights_list":null,"permission_annotation":null,"permission_aggregation_source":null,"permission_attributes":null}
+HASH=fdb5266ae59fedf9e9754e10e94f4b344d8d773ea25c413b901c982e601199fa
+ID=6b3ef08a-a613-3a71-8bb3-bf3d0833c08d

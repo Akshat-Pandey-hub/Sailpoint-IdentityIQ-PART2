@@ -27,20 +27,25 @@ public final class RecordingJdbc {
     public final List<Map<Integer, Object>> executions = new ArrayList<>();
     public final List<String> ddl = new ArrayList<>();
     public final List<String> preparedSql = new ArrayList<>();
+    /** Bound parameters of every SELECT (lookups / precondition checks), in order. */
+    public final List<Map<Integer, Object>> selects = new ArrayList<>();
+    /** Answers a SELECT: (sql, bound params) -> column-1 values of the result rows. Default: no rows. */
+    public java.util.function.BiFunction<String, Map<Integer, Object>, List<String>> selectAnswer =
+            (sql, params) -> List.of();
 
     public Connection connection() {
         return (Connection) Proxy.newProxyInstance(getClass().getClassLoader(), new Class<?>[]{Connection.class},
                 (proxy, m, args) -> switch (m.getName()) {
                     case "prepareStatement" -> {
                         preparedSql.add((String) args[0]);
-                        yield preparedStatement();
+                        yield preparedStatement((String) args[0]);
                     }
                     case "createStatement" -> statement();
                     default -> defaultFor(m);
                 });
     }
 
-    private PreparedStatement preparedStatement() {
+    private PreparedStatement preparedStatement(String sql) {
         Map<Integer, Object> bound = new LinkedHashMap<>();
         return (PreparedStatement) Proxy.newProxyInstance(getClass().getClassLoader(),
                 new Class<?>[]{PreparedStatement.class}, (proxy, m, args) -> {
@@ -48,6 +53,10 @@ public final class RecordingJdbc {
                         case "setString", "setBoolean", "setInt" -> bound.put((Integer) args[0], args[1]);
                         case "setNull" -> bound.put((Integer) args[0], NULL);
                         case "executeQuery" -> {
+                            if (sql.startsWith("SELECT")) {
+                                selects.add(new LinkedHashMap<>(bound));
+                                return rows(selectAnswer.apply(sql, bound));
+                            }
                             if (bound.containsValue(FAIL_ON)) {
                                 throw new SQLException("simulated constraint failure");
                             }
@@ -68,6 +77,17 @@ public final class RecordingJdbc {
                         return Boolean.FALSE;
                     }
                     return defaultFor(m);
+                });
+    }
+
+    /** Result set whose column 1 yields the given values, one row each. */
+    private ResultSet rows(List<String> values) {
+        int[] pos = {-1};
+        return (ResultSet) Proxy.newProxyInstance(getClass().getClassLoader(), new Class<?>[]{ResultSet.class},
+                (proxy, m, args) -> switch (m.getName()) {
+                    case "next" -> ++pos[0] < values.size();
+                    case "getString" -> values.get(pos[0]);
+                    default -> defaultFor(m);
                 });
     }
 

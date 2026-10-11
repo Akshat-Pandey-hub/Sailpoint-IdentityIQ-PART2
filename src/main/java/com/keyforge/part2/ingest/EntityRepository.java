@@ -26,7 +26,7 @@ import java.util.StringJoiner;
  * every write sets {@code is_deleted=false, deleted_at=null} (same as Identity; there is no sweep yet).
  * All values are bound parameters; the schema identifier is validated, table/column names come from code.
  */
-public final class EntityRepository {
+public final class EntityRepository implements EntityWriter {
 
     public enum Outcome { INSERTED, UPDATED }
 
@@ -51,11 +51,28 @@ public final class EntityRepository {
         return spec;
     }
 
+    @Override
+    public String entity() {
+        return spec.entity();
+    }
+
+    @Override
+    public String resource() {
+        return spec.resource();
+    }
+
+    @Override
+    public String ref(JsonNode row) {
+        return spec.refFn().apply(row);
+    }
+
+    @Override
     public String targetTable() {
         return table;
     }
 
     /** Create the destination schema + table if absent (never alters an existing table or its data). */
+    @Override
     public void ensureSchemaAndTable(Connection conn) throws SQLException {
         try (Statement st = conn.createStatement()) {
             st.execute("CREATE SCHEMA IF NOT EXISTS " + schema);
@@ -64,6 +81,7 @@ public final class EntityRepository {
     }
 
     /** Upsert one JSON row. Returns whether a new row was inserted or an existing one updated. */
+    @Override
     public Outcome upsert(Connection conn, JsonNode row, String extractionRunId) throws SQLException {
         String key = spec.keyFn().apply(row);
         if (key == null) {
@@ -80,7 +98,7 @@ public final class EntityRepository {
             }
             ps.setString(i++, spec.sourceSystem());
             ps.setString(i++, spec.sourceInterface());
-            ps.setString(i++, spec.sourceObjectType());
+            ps.setString(i++, spec.sourceObjectTypeFor(row));
             ps.setString(i, extractionRunId);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() && rs.getBoolean(1) ? Outcome.INSERTED : Outcome.UPDATED;

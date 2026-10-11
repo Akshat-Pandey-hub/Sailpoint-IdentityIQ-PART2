@@ -1,0 +1,25 @@
+REST={"source_role_id":"7f000101a0cf1f4c81a111f0f19b5712","role_name":"hritrole","entitlement_type":"PROFILE_CONSTRAINT","application_id":"7f0001019eb91d3c819f01f0c4127efb","application_name":"corp directory-LDAP-Target","profile_ordinal":0,"constraint_path":"0","filter_expression":"posixgroups.containsAll({\"cn=hr,ou=rocktar,dc=moli,dc=org\"})","filter_value":["cn=hr,ou=rocktar,dc=moli,dc=org"],"filter_operation":"CONTAINS_ALL","attribute_name":"posixgroups","attribute_value":null,"permission_target":null,"permission_rights":null,"permission_rights_list":[],"permission_annotation":null}
+ENT=
+NK=32:7f000101a0cf1f4c81a111f0f19b57121:018:PROFILE_CONSTRAINT1:032:7f0001019eb91d3c819f01f0c4127efb11:posixgroups12:CONTAINS_ALL53:[48:java.lang.String:cn=hr,ou=rocktar,dc=moli,dc=org]-1:-1:2:[]-1:
+HASH=b62841ae7d20a74cf1f2e528bc90b69f6864ff59023f1cdbac6b24e6c1b6812d
+ID=ff233151-36b9-3ba1-a2b2-16bd811a5533
+REST={"source_role_id":"7f0001019f061fdc819f34b0ac3452bb","role_name":"Finance Analyst – café ✓","entitlement_type":"PROFILE_CONSTRAINT","application_id":"7f00010198421229819849f1427b0d58","application_name":"EntraTarget","profile_ordinal":1,"constraint_path":"0.1","filter_expression":"(groups == \"ops\" && dept == \"fin\")","filter_value":"ops","filter_operation":"EQ","attribute_name":"groups","attribute_value":"ops","permission_target":null,"permission_rights":null,"permission_rights_list":[],"permission_annotation":null}
+ENT=0b4c64f4-6b4f-3f0b-9a51-2a2c9a51b0aa
+NK=32:7f0001019f061fdc819f34b0ac3452bb1:118:PROFILE_CONSTRAINT3:0.132:7f00010198421229819849f1427b0d586:groups2:EQ20:java.lang.String:ops-1:-1:2:[]-1:
+HASH=2ce9d2ef8bda0a4d48527889ca435037e838aa91cdf677dd30f6a070b52667d9
+ID=73ec65dd-760a-39f4-a875-370468d0898d
+REST={"source_role_id":"7f0001019f061fdc819f34b0ac3452bb","role_name":"Finance Analyst","entitlement_type":"PROFILE_CONSTRAINT","application_id":null,"application_name":null,"profile_ordinal":0,"constraint_path":"1","filter_expression":"x","filter_value":{"zeta":[1,2.5,true],"alpha":{"b":null,"a":"s"}},"filter_operation":"IN","attribute_name":"x","attribute_value":null,"permission_target":null,"permission_rights":null,"permission_rights_list":[],"permission_annotation":null}
+ENT=
+NK=32:7f0001019f061fdc819f34b0ac3452bb1:018:PROFILE_CONSTRAINT1:1-1:1:x2:IN128:{5:alpha35:{1:a18:java.lang.String:s1:b4:null}4:zeta72:[19:java.lang.Integer:120:java.lang.Double:2.522:java.lang.Boolean:true]}-1:-1:2:[]-1:
+HASH=1912ba61df3727550c2499dddfb8ae5e0f5667e6ff630aca8a868363798d21da
+ID=361f33a2-6297-374d-8600-7dad06b69e6a
+REST={"source_role_id":"7f0001019f061fdc819f34b0ac3452bb","role_name":"Finance Analyst","entitlement_type":"PROFILE_PERMISSION","application_id":"7f00010198421229819849f1427b0d58","application_name":"EntraTarget","profile_ordinal":0,"constraint_path":"permission:0","filter_expression":null,"filter_value":null,"filter_operation":null,"attribute_name":null,"attribute_value":null,"permission_target":"db1.payroll","permission_rights":"read,write","permission_rights_list":["read","write"],"permission_annotation":"direct"}
+ENT=
+NK=32:7f0001019f061fdc819f34b0ac3452bb1:018:PROFILE_PERMISSION12:permission:032:7f00010198421229819849f1427b0d58-1:-1:4:null11:db1.payroll10:read,write51:[21:java.lang.String:read22:java.lang.String:write]6:direct
+HASH=49d77d2ebadf6bdf516ca0b9611f920fa35e07ff17c941d185ca5a8dbc59867f
+ID=ed6f016f-8eec-335a-abd4-4ea9d4a9c728
+REST={"source_role_id":"not-a-guid","role_name":"Odd","entitlement_type":"PROFILE_CONSTRAINT","application_id":null,"application_name":null,"profile_ordinal":3,"constraint_path":"2","filter_expression":null,"filter_value":null,"filter_operation":"ISNULL","attribute_name":"flag","attribute_value":null,"permission_target":null,"permission_rights":null,"permission_rights_list":[],"permission_annotation":null}
+ENT=
+NK=10:not-a-guid1:318:PROFILE_CONSTRAINT1:2-1:4:flag6:ISNULL4:null-1:-1:2:[]-1:
+HASH=4883c7e7f24d74be14c7acf18f18bcfeca0e659a32e042175eeb0b9d5c10352e
+ID=bf344316-18c1-3d32-8cdf-2f107faa0558

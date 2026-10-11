@@ -19,6 +19,10 @@ Implemented entities:
 | `import-role` | `GET /kfagent/roles` | `kf_role` | `roleid` | `sailpoint.object.Bundle` | SHA-256 over all 33 fields |
 | `import-identity-role` | `GET /kfagent/identity-roles` | `kf_identity_role` | `identityroleid` (composite edge key) | `sailpoint.object.Identity.roles` | 18 of 19 fields (not `identity_name`) |
 | `import-identity-entitlement` | `GET /kfagent/identity-entitlements` | `kf_identity_entitlement` | `entitlementid` (IdentityEntitlement id) | `sailpoint.object.IdentityEntitlement` | 30 of 33 fields |
+| `import-account-entitlement` | `GET /kfagent/account-entitlements` | `kf_account_entitlement` | `accountentitlementid` (type-dependent edge key) | `sailpoint.object.Link.entitlementAttributes` / `.permissions` / `.targetPermissions` (per row) | 14 of 16 fields |
+| `import-role-entitlement` | `GET /kfagent/role-entitlements` | `kf_role_entitlement` | `roleentitlementid` (from derived natural key) | `sailpoint.object.Bundle` | Part 1's 17-field hash incl. resolved `entitlement_id` |
+| `import-role-hierarchy` | `GET /kfagent/role-hierarchy` | `kf_role_hierarchy` | `rolehierarchyid` (from derived natural key) | `sailpoint.object.Bundle` | Part 1's 5-field hash (own key names) |
+| `import-identity-request` | `GET /kfagent/identity-requests` | `kf_identity_request` | `identityrequestid` (no fallback) | `sailpoint.object.IdentityRequest` | SHA-256 over all 34 business fields |
 
 ## How identity rows are keyed (the "two ids" explained)
 `userid` (the uuid primary key) is **not** a new/random id — it is `source_id` rewritten in canonical UUID
@@ -120,6 +124,74 @@ The identity-to-entitlement relationship with provenance (IIQ `IdentityEntitleme
 - `record_hash` = Part 1's **30-field** subset: every field except `identity_name`, `application_id` and `display_name`.
 - Lineage: `IdentityIQ` / `native_iiq_java_api` / `sailpoint.object.IdentityEntitlement`.
 
+## Account-Entitlement (`kf_account_entitlement`)
+Entitlement values and permissions literally present on an account (Link). Part 1 rules from
+`NativeAccountEntitlementRepository` / `NativeAccountEntitlementMapper`:
+- `type` names the edge kind: `ATTRIBUTE` (an entitlement attribute value), `PERMISSION`, or `TARGET_PERMISSION`.
+- There is no `source_id`. `accountentitlementid` is name-based, and **the formula depends on the type** (a null
+  type counts as ATTRIBUTE; a null part becomes the text `null`):
+  - ATTRIBUTE: `deterministicUuid("native-account-entitlement|" + link_id + "|" + attribute_name + "|" + attribute_value)`
+  - PERMISSION / TARGET_PERMISSION: `deterministicUuid("native-account-entitlement|" + link_id + "|" + type + "|"
+    + permission_target + "|" + permission_rights + "|" + permission_annotation)`
+- `source_object_type` is **per row**, as Part 1's mapper stamps it: `sailpoint.object.Link.entitlementAttributes`,
+  `sailpoint.object.Link.permissions` or `sailpoint.object.Link.targetPermissions`. A type Part 1 never produces fails
+  that row with a clear message, so no lineage value is guessed.
+- 16 response fields, all text except `permission_rights_list` / `permission_attributes` (`jsonb`), and no
+  timestamps. `type` and the 6 `permission_*` columns sit after `deleted_at`, as in iiq_native (`EntitySpec.trailing`).
+- `record_hash` = Part 1's **14-field** subset: every field except `identity_name` and `application_id`.
+
+## Role-Entitlement (`kf_role_entitlement`)
+What each role grants: Bundle profile constraints (`PROFILE_CONSTRAINT`) and permissions (`PROFILE_PERMISSION`).
+This is a **non-1:1** table. Part 1 persists columns the KF Agent response leaves out, so Part 2 **derives** them
+exactly as Part 1 does (`NativeRoleEntitlementRepository` + `NativeRoleRelationshipMapper.naturalKey`). It uses a
+dedicated `RoleEntitlementRepository` (an `EntityWriter`), not a generic spec.
+- `src_natural_key` = Part 1's length-prefixed key over source_role_id, profile_ordinal, entitlement_type,
+  constraint_path, application_id, attribute_name, filter_operation, filter_value, permission_target,
+  permission_rights, permission_rights_list and permission_annotation.
+- `roleentitlementid` = `deterministicUuid("native-role-entitlement|" + src_natural_key)`. Upsert `ON CONFLICT (roleentitlementid)`.
+- `role_id` = canonical(`source_role_id`), with fallback `deterministicUuid("native-role|" + id)`. `src_object_id` = `source_role_id`.
+- `entitlement_id` is linked **only** for a `PROFILE_CONSTRAINT` with an `EQ` filter whose (application, attribute, value)
+  matches **exactly one** row of `<PG_DEST_SCHEMA>.kf_entitlement`. Otherwise it is NULL (Part 1: "do not guess").
+  **Run `import-entitlement` first**: the command refuses to start if `kf_entitlement` is missing from the schema.
+- `record_hash` = Part 1's 17-field hash. It includes the linked `entitlement_id`, so the hash changes if the link
+  changes, and it renders `filter_value` / `permission_rights_list` the way Part 1 does.
+- As in Part 1, a null `filter_value` is stored as JSON `null` and `permission_rights_list` is never NULL (`[]`).
+- Checked against real data: the one live row reproduces the row Part 1 stored in `iiq_native` exactly (key, natural
+  key, hash). One limit: the natural key includes each scalar filter value's Java class, computed inside IIQ before
+  JSON. An IIQ filter value held as `Long`, `Float` or `BigDecimal` would come back as `Integer` / `Double`, giving a
+  different key from Part 1's. Strings, booleans, integers, doubles, lists and maps (the normal cases) are exact,
+  and no current row has a numeric filter value.
+
+## Role-Hierarchy (`kf_role_hierarchy`)
+Role-to-role edges: `INHERITANCE`, `REQUIREMENT`, `PERMIT`. This is also **non-1:1**. The response carries only 5 text
+fields, and Part 2 derives the rest as Part 1 does (`NativeRoleHierarchyRepository` + the mapper's `addHierarchy`),
+using a dedicated `RoleHierarchyRepository`.
+- **Direction:** the owning role is `source_role_id` / `role_name`; the inherited, required or permitted role is
+  `related_role_source_id` / `related_role_name`. Raw IIQ Bundle ids are stored as-is.
+- `src_natural_key` = `part(source_role_id) + part(relationship_type) + part(related_role_source_id)`, where
+  `part(v)` = `length:value` and null = `-1:`. `rolehierarchyid` = `deterministicUuid("native-role-hierarchy|" + src_natural_key)`.
+  Names are not part of the key, while direction and type are: the same two roles with another type, or the
+  reverse direction, are different edges.
+- `role_id` / `related_role_id` (uuid) = canonical UUID of each Bundle id, with fallback `deterministicUuid("native-role|" + id)`.
+  `src_object_id` = `source_role_id`.
+- `record_hash` = Part 1's 5-field hash with **its own key names**: `source_role_name` for `role_name`, and
+  `related_role_id` holding the **raw** related Bundle id, not the uuid column.
+- Checked against real data: the one live edge reproduces the row Part 1 stored in `iiq_native` exactly (key, natural
+  key, hash, both role uuids).
+
+## Identity-Request (`kf_identity_request`)
+Part 1 rules from `NativeIdentityRequestRepository`:
+- `identityrequestid` = `canonicalUuid(source_id)` with **no fallback**. Part 1 refuses a request without a usable IIQ
+  id, so such a row **fails** with a clear message instead of getting an invented key. `name` is IIQ's request number
+  (e.g. `0000000008`); it stays text and is not the key. Upsert `ON CONFLICT (identityrequestid)`.
+- 34 business columns = the 34 response fields, same names and order. `errors` is the only `jsonb`;
+  `item_count` / `approval_count` are `integer`; 8 booleans and 4 timestamps.
+- `record_hash` = SHA-256 over **all 34** fields. Lineage: `IdentityIQ` / `native_iiq_java_api` / `sailpoint.object.IdentityRequest`.
+- The request's items and approvals are separate entities with their own endpoints and tables; they are not in this
+  response.
+- Checked against real data: for all 45 live requests, Part 2's `identityrequestid` and `record_hash` equal what Part 1
+  stored in `iiq_native` (45/45).
+
 ## Build (Java 17, Maven)
 ```bash
 mvn clean package
@@ -153,6 +225,10 @@ psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_workgro
 psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_role.sql
 psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_identity_role.sql
 psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_identity_entitlement.sql
+psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_account_entitlement.sql
+psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_role_entitlement.sql
+psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_role_hierarchy.sql
+psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_identity_request.sql
 ```
 It writes to a **separate** schema and never alters an existing populated schema.
 
@@ -169,6 +245,10 @@ java -jar target/kfagent-ingest.jar import-workgroup
 java -jar target/kfagent-ingest.jar import-role
 java -jar target/kfagent-ingest.jar import-identity-role
 java -jar target/kfagent-ingest.jar import-identity-entitlement
+java -jar target/kfagent-ingest.jar import-account-entitlement
+java -jar target/kfagent-ingest.jar import-role-entitlement   # after import-entitlement
+java -jar target/kfagent-ingest.jar import-role-hierarchy
+java -jar target/kfagent-ingest.jar import-identity-request
 ```
 Prints a credential-free config line, the run id, and an import summary (pages / fetched / inserted /
 updated / failed, with up to 10 sample failures). Exit codes: `0` ok, `2` usage, `3` config, `4` HTTP/source,
@@ -216,6 +296,15 @@ mvn test
   binding/NULL/invalid handling, lineage params.
 - `AccountTableTest` — `record_hash` + `accountid` parity with Part 1, including both fallback-key cases (natural
   key, and a null application name), every field hashed, DDL order = iiq_native.kf_account, binding, lineage.
+- `IdentityRequestTableTest` — reproduces the stored hash of real request 0000000008, no-fallback key (row fails like Part 1),
+  every field hashed, integers / jsonb / nulls, DDL, binding.
+- `RoleHierarchyRepositoryTest` — reproduces the real Part 1 edge from iiq_native.sql, natural key/id/hash parity,
+  direction and type are part of the key and names are not, non-GUID fallbacks, DDL, binding.
+- `RoleEntitlementRepositoryTest` — reproduces the real Part 1 row from iiq_native.sql, natural key/id/hash parity for
+  CONTAINS_ALL / EQ / map-valued IN / permission / null-value rows, unique-match-only `entitlement_id` linking, Part 1
+  null conventions, DDL with NOT NULLs, refusal without `kf_entitlement`.
+- `AccountEntitlementTableTest` — key + `record_hash` parity with Part 1 for ATTRIBUTE / PERMISSION / TARGET_PERMISSION /
+  null-type edges, type-dependent key formula, per-row object type (unknown type fails), 14-field hash, trailing DDL.
 - `IdentityEntitlementTableTest` — key + `record_hash` parity with Part 1 (canonical id, composite natural-key fallback,
   non-GUID `source_id`), the 3 un-hashed fields, DDL, binding.
 - `IdentityRoleTableTest` — composite edge key + `record_hash` parity with Part 1 (incl. null `assignment_id` and an
@@ -230,7 +319,7 @@ mvn test
   nested JSON → `jsonb`, ISO timestamps, SQL NULL for null/absent fields, metadata params. No live DB needed.
 
 ## Status / next
-Identity, Entitlement, Application, Account, Workgroup, Role, Identity-Role and Identity-Entitlement are done. Entitlement runs on the generic engine (`EntitySpec` + `EntityRepository` +
+Identity, Entitlement, Application, Account, Workgroup, Role, Identity-Role, Identity-Entitlement, Account-Entitlement, Role-Entitlement, Role-Hierarchy and Identity-Request are done. Entitlement runs on the generic engine (`EntitySpec` + `EntityRepository` +
 `EntityImportService`); further current-state entities are added as one `*Table` spec each. Identity is the complete first vertical slice (HTTP → parse → map → metadata → upsert → verification). The
 column-spec + upsert engine is built to extend to the other ~39 endpoints, each with its own table, PK/salt,
 `source_object_type`, `record_hash` behavior (where applicable), nested fields, and current-state vs
