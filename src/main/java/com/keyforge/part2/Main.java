@@ -12,6 +12,10 @@ import com.keyforge.part2.ingest.EntityRepository;
 import com.keyforge.part2.ingest.EntitySpec;
 import com.keyforge.part2.ingest.IdentityImportService;
 import com.keyforge.part2.ingest.IdentityRepository;
+import com.keyforge.part2.ingest.IdentityEntitlementTable;
+import com.keyforge.part2.ingest.IdentityRoleTable;
+import com.keyforge.part2.ingest.RoleTable;
+import com.keyforge.part2.ingest.WorkgroupTable;
 import com.keyforge.part2.ingest.ImportResult;
 
 import java.sql.Connection;
@@ -24,7 +28,12 @@ import java.util.UUID;
  * <pre>  import-identity      Fetch GET /kfagent/identities   and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_identity
  *  import-entitlement   Fetch GET /kfagent/entitlements and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_entitlement
  *  import-application   Fetch GET /kfagent/applications and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_application
- *  import-account       Fetch GET /kfagent/accounts     and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_account</pre>
+ *  import-account       Fetch GET /kfagent/accounts     and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_account
+ *  import-workgroup     Fetch GET /kfagent/workgroups   and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_workgroup
+ *  import-role          Fetch GET /kfagent/roles        and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_role
+ *  import-identity-role Fetch GET /kfagent/identity-roles and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_identity_role
+ *  import-identity-entitlement
+ *                       Fetch GET /kfagent/identity-entitlements and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_identity_entitlement</pre>
  *
  * Configuration is entirely external (environment variables / -D system properties) — see {@link AppConfig}.
  * Exit codes: 0 ok, 2 usage, 3 config error, 4 HTTP/source error, 5 PostgreSQL error, 6 completed with row
@@ -42,6 +51,10 @@ public final class Main {
             case "import-entitlement" -> System.exit(runImport(EntitlementTable.SPEC));
             case "import-application" -> System.exit(runImport(ApplicationTable.SPEC));
             case "import-account" -> System.exit(runImport(AccountTable.SPEC));
+            case "import-workgroup" -> System.exit(runImport(WorkgroupTable.SPEC));
+            case "import-role" -> System.exit(runImport(RoleTable.SPEC));
+            case "import-identity-role" -> System.exit(runImport(IdentityRoleTable.SPEC));
+            case "import-identity-entitlement" -> System.exit(runImport(IdentityEntitlementTable.SPEC));
             default -> {
                 printUsage();
                 System.exit("".equals(command) ? 2 : 2);
@@ -123,6 +136,11 @@ public final class Main {
         System.out.println("  import-entitlement   Fetch GET /kfagent/entitlements and upsert into <PG_DEST_SCHEMA>.kf_entitlement");
         System.out.println("  import-application   Fetch GET /kfagent/applications and upsert into <PG_DEST_SCHEMA>.kf_application");
         System.out.println("  import-account       Fetch GET /kfagent/accounts     and upsert into <PG_DEST_SCHEMA>.kf_account");
+        System.out.println("  import-workgroup     Fetch GET /kfagent/workgroups   and upsert into <PG_DEST_SCHEMA>.kf_workgroup");
+        System.out.println("  import-role          Fetch GET /kfagent/roles        and upsert into <PG_DEST_SCHEMA>.kf_role");
+        System.out.println("  import-identity-role Fetch GET /kfagent/identity-roles and upsert into <PG_DEST_SCHEMA>.kf_identity_role");
+        System.out.println("  import-identity-entitlement");
+        System.out.println("                       Fetch GET /kfagent/identity-entitlements and upsert into <PG_DEST_SCHEMA>.kf_identity_entitlement");
         System.out.println();
         System.out.println("Required env: KFAGENT_BASE_URL, PG_HOST, PG_DATABASE, PG_USERNAME, PG_PASSWORD");
         System.out.println("Optional env: PG_PORT (5432), PG_DEST_SCHEMA (iiq_native_part2), KFAGENT_PAGE_SIZE (500),");

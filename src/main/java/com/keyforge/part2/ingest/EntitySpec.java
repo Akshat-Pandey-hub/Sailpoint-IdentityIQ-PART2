@@ -22,6 +22,9 @@ import java.util.function.Function;
  * @param sourceSystem     {@code source_system} value
  * @param sourceInterface  {@code source_interface} value
  * @param sourceObjectType {@code source_object_type} value
+ * @param trailing         further response-provided columns that iiq_native places AFTER {@code deleted_at}
+ *                         (Part 1 added them later with {@code ALTER TABLE … ADD COLUMN}); empty for most tables.
+ *                         They are bound, hashed and returned like {@code business}; only the DDL position differs.
  */
 public record EntitySpec(
         String entity,
@@ -34,7 +37,27 @@ public record EntitySpec(
         Function<JsonNode, String> refFn,
         String sourceSystem,
         String sourceInterface,
-        String sourceObjectType) {
+        String sourceObjectType,
+        List<ColumnSpec> trailing) {
+
+    /** Spec for a table whose business columns all precede the lineage columns (no trailing columns). */
+    public EntitySpec(String entity, String resource, String table, String pkColumn, List<ColumnSpec> business,
+                      Function<JsonNode, String> keyFn, Function<JsonNode, String> recordHashFn,
+                      Function<JsonNode, String> refFn, String sourceSystem, String sourceInterface,
+                      String sourceObjectType) {
+        this(entity, resource, table, pkColumn, business, keyFn, recordHashFn, refFn,
+                sourceSystem, sourceInterface, sourceObjectType, List.of());
+    }
+
+    /** Every response-provided column: {@code business} then {@code trailing} (= response field order). */
+    public List<ColumnSpec> allBusiness() {
+        if (trailing.isEmpty()) {
+            return business;
+        }
+        List<ColumnSpec> all = new java.util.ArrayList<>(business);
+        all.addAll(trailing);
+        return List.copyOf(all);
+    }
 
     public boolean hasRecordHash() {
         return recordHashFn != null;

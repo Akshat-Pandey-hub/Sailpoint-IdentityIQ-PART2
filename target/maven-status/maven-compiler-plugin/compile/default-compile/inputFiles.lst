@@ -14,9 +14,13 @@ D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\Entitlemen
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\EntityImportService.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\EntityRepository.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\EntitySpec.java
+D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\IdentityEntitlementTable.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\IdentityImportService.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\IdentityRepository.java
+D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\IdentityRoleTable.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\IdentityTable.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\ImportResult.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\JsonColumnBinder.java
+D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\RoleTable.java
+D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\WorkgroupTable.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\Main.java

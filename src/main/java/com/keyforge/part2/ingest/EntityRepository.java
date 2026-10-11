@@ -17,8 +17,9 @@ import java.util.StringJoiner;
  * {@link EntitySpec}, written to a configurable DESTINATION schema.
  *
  * <p>Column layout (matches iiq_native.sql): {@code <pk> uuid PRIMARY KEY}, the business columns,
- * {@code record_hash} (only when the entity has one), then the lineage columns {@code source_system,
- * source_interface, source_object_type, extraction_run_id, extracted_at, is_deleted, deleted_at}.
+ * {@code record_hash} (only when the entity has one), the lineage columns {@code source_system,
+ * source_interface, source_object_type, extraction_run_id, extracted_at, is_deleted, deleted_at}, then any
+ * {@link EntitySpec#trailing() trailing} columns iiq_native appends after them.
  *
  * <p>Write: {@code INSERT … ON CONFLICT (<pk>) DO UPDATE}; the pk comes from the spec's deterministic key
  * function, so a re-run updates in place. A row present in the source is by definition not deleted, so
@@ -71,7 +72,7 @@ public final class EntityRepository {
         try (PreparedStatement ps = conn.prepareStatement(upsertSql)) {
             int i = 1;
             ps.setString(i++, key); // ?::uuid
-            for (ColumnSpec c : spec.business()) {
+            for (ColumnSpec c : spec.allBusiness()) {
                 JsonColumnBinder.bind(ps, i++, c, row.get(c.name));
             }
             if (spec.hasRecordHash()) {
@@ -105,6 +106,9 @@ public final class EntityRepository {
         sb.append(",\n    extracted_at timestamp with time zone NOT NULL DEFAULT now()");
         sb.append(",\n    is_deleted boolean NOT NULL DEFAULT false");
         sb.append(",\n    deleted_at timestamp with time zone");
+        for (ColumnSpec c : spec.trailing()) {
+            sb.append(",\n    ").append(c.name).append(' ').append(c.kind.ddlType);
+        }
         sb.append("\n)");
         return sb.toString();
     }
@@ -116,7 +120,7 @@ public final class EntityRepository {
 
         cols.add(spec.pkColumn());
         vals.add("?::uuid");
-        for (ColumnSpec c : spec.business()) {
+        for (ColumnSpec c : spec.allBusiness()) {
             cols.add(c.name);
             vals.add(c.kind.placeholder);
             set.add(c.name + " = EXCLUDED." + c.name);

@@ -1,4 +1,5 @@
 com\keyforge\part2\ingest\BusinessHash.class
+com\keyforge\part2\ingest\RoleTable.class
 com\keyforge\part2\http\KfAgentClient$KfAgentHttpException.class
 com\keyforge\part2\ingest\ColumnSpec.class
 com\keyforge\part2\db\PostgresConnection.class
@@ -12,11 +13,13 @@ com\keyforge\part2\config\ConfigException.class
 com\keyforge\part2\ingest\AccountTable.class
 com\keyforge\part2\ingest\BusinessHash$1.class
 com\keyforge\part2\ingest\EntityImportService.class
+com\keyforge\part2\ingest\IdentityEntitlementTable.class
 com\keyforge\part2\ingest\IdentityTable.class
 com\keyforge\part2\ingest\EntityRepository$Outcome.class
 com\keyforge\part2\ingest\ColumnSpec$Kind.class
 com\keyforge\part2\ingest\EntityRepository.class
 com\keyforge\part2\ingest\IdentityRepository$1.class
+com\keyforge\part2\ingest\WorkgroupTable.class
 com\keyforge\part2\hash\HashValues.class
 com\keyforge\part2\hash\RecordHash.class
 com\keyforge\part2\ingest\EntitlementTable.class
@@ -26,4 +29,5 @@ com\keyforge\part2\ingest\IdentityRepository$Outcome.class
 com\keyforge\part2\ingest\JsonColumnBinder.class
 com\keyforge\part2\config\SchemaName.class
 com\keyforge\part2\ingest\EntitySpec.class
+com\keyforge\part2\ingest\IdentityRoleTable.class
 com\keyforge\part2\Main.class

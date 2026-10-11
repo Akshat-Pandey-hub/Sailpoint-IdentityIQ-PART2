@@ -1,0 +1,9 @@
+REST={"identity_id":"7f00010198421229819849ebca230c82","identity_name":"Alexander Bailey","role_id":"7f0001019f061fdc819f34b0ac3452bb","role_name":"Finance Analyst – café ✓","relationship_type":"ASSIGNED","assignment_id":"a1b2c3d4e5f6","assigner":"spadmin","assigned_date":"2025-07-27T03:42:26.205Z","start_date":null,"end_date":"2027-01-01T00:00:00Z","source":"LCM","negative":false,"manual":true,"detection_assignment_ids":null,"comments":"approved","future_assignment":false,"promoted_soft_permit":false,"detection_date":null,"targets":[{"application":"EntraTarget","nativeIdentity":"abailey","displayName":"Alexander Bailey","elevatedAccess":false,"n":1.5}]}
+HASH=642b7d124b26cf386dd6e803b287586b558fe5c6dc01e6b05991ce0fd86131f4
+ID=84e3c505-0c1d-3c46-82fc-7f599e1c6d4d
+REST={"identity_id":"7f00010198421229819849ebca230c82","identity_name":"Alexander Bailey","role_id":"7f0001019f061fdc819f34b0ac3452cc","role_name":"IT Role","relationship_type":"DETECTED","assignment_id":null,"assigner":null,"assigned_date":null,"start_date":null,"end_date":null,"source":null,"negative":null,"manual":null,"detection_assignment_ids":"a1b2c3d4e5f6,ffff","comments":null,"future_assignment":null,"promoted_soft_permit":null,"detection_date":"2026-09-30T14:44:40.123456789Z","targets":[]}
+HASH=30c2d1effc766c5e6e8bab3c9d6f318021606d0d3820d102e955271431a64558
+ID=6cbcaaa7-65b6-30c0-9375-049732a5844e
+REST={"identity_id":null,"identity_name":null,"role_id":null,"role_name":null,"relationship_type":null,"assignment_id":null,"assigner":null,"assigned_date":null,"start_date":null,"end_date":null,"source":null,"negative":null,"manual":null,"detection_assignment_ids":null,"comments":null,"future_assignment":null,"promoted_soft_permit":null,"detection_date":null,"targets":null}
+HASH=00088c011fdef70c0d31ddb40fab111d3baa4d658b09a0be1cc78a610119e086
+ID=752f3a45-7a03-3e03-937a-34c1fd1ac205

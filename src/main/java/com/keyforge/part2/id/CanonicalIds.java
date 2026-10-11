@@ -105,4 +105,59 @@ public final class CanonicalIds {
         }
         return id;
     }
+
+    /**
+     * The Workgroup primary key, matching Part 1's {@code NativeWorkgroupRepository.canonicalWorkgroupId}:
+     * {@code canonicalUuid(source_id)}, falling back to {@code deterministicUuid("native-workgroup|"+id)}
+     * ({@code name} only when source_id is {@code null}).
+     */
+    public static String workgroupId(String sourceId, String name) {
+        String id = canonicalUuid(sourceId);
+        if (id == null) {
+            id = deterministicUuid("native-workgroup|" + (sourceId == null ? name : sourceId));
+        }
+        return id;
+    }
+
+    /**
+     * The Role (Bundle) primary key, matching Part 1's {@code NativeRoleRepository.canonicalRoleId}:
+     * {@code canonicalUuid(source_id)}, falling back to {@code deterministicUuid("native-role|"+id)}
+     * ({@code name} only when source_id is {@code null}).
+     */
+    public static String roleId(String sourceId, String name) {
+        String id = canonicalUuid(sourceId);
+        if (id == null) {
+            id = deterministicUuid("native-role|" + (sourceId == null ? name : sourceId));
+        }
+        return id;
+    }
+
+    /**
+     * The Identity-Role edge primary key, matching Part 1's {@code NativeIdentityRoleRepository.canonicalEdgeId}.
+     * An edge has no IIQ object id of its own, so the key is ALWAYS name-based (no canonicalUuid step) over
+     * {@code identity_id|role_id|relationship_type|assignment_id}; a null part is concatenated as the text
+     * "null", exactly like Part 1.
+     */
+    public static String identityRoleId(String identityId, String roleId, String relationshipType,
+                                        String assignmentId) {
+        return deterministicUuid("native-identity-role|" + identityId + "|" + roleId
+                + "|" + relationshipType + "|" + assignmentId);
+    }
+
+    /**
+     * The Identity-Entitlement primary key, matching Part 1's
+     * {@code NativeIdentityEntitlementRepository.canonicalEntitlementId}: {@code canonicalUuid(source_id)} (the
+     * IIQ IdentityEntitlement id); when that is null/blank/not a GUID, the composite natural key
+     * {@code identity_id|application_name|native_identity|attribute_name|attribute_value} (source_id itself is
+     * NOT part of the fallback; a null part is concatenated as the text "null", exactly like Part 1).
+     */
+    public static String identityEntitlementId(String sourceId, String identityId, String applicationName,
+                                               String nativeIdentity, String attributeName, String attributeValue) {
+        String id = canonicalUuid(sourceId);
+        if (id == null) {
+            id = deterministicUuid("native-identity-entitlement|" + identityId + "|" + applicationName + "|"
+                    + nativeIdentity + "|" + attributeName + "|" + attributeValue);
+        }
+        return id;
+    }
 }

@@ -15,6 +15,10 @@ Implemented entities:
 | `import-entitlement` | `GET /kfagent/entitlements` | `kf_entitlement` | `entitlementid` | `sailpoint.object.ManagedAttribute` | Part 1's 33-field SHA-256 |
 | `import-application` | `GET /kfagent/applications` | `kf_application` | `applicationid` | `sailpoint.object.Application` | SHA-256 over all 58 business fields |
 | `import-account` | `GET /kfagent/accounts` | `kf_account` | `accountid` | `sailpoint.object.Link` | SHA-256 over all 29 business fields |
+| `import-workgroup` | `GET /kfagent/workgroups` | `kf_workgroup` | `workgroupid` | `sailpoint.object.Identity` | SHA-256 over all 16 business fields |
+| `import-role` | `GET /kfagent/roles` | `kf_role` | `roleid` | `sailpoint.object.Bundle` | SHA-256 over all 33 fields |
+| `import-identity-role` | `GET /kfagent/identity-roles` | `kf_identity_role` | `identityroleid` (composite edge key) | `sailpoint.object.Identity.roles` | 18 of 19 fields (not `identity_name`) |
+| `import-identity-entitlement` | `GET /kfagent/identity-entitlements` | `kf_identity_entitlement` | `entitlementid` (IdentityEntitlement id) | `sailpoint.object.IdentityEntitlement` | 30 of 33 fields |
 
 ## How identity rows are keyed (the "two ids" explained)
 `userid` (the uuid primary key) is **not** a new/random id — it is `source_id` rewritten in canonical UUID
@@ -68,6 +72,54 @@ Part 1 rules from `NativeLinkRepository`:
   doesn't matter.
 - `record_hash` = SHA-256 over **all 29** business fields. Lineage: `IdentityIQ` / `native_iiq_java_api` / `sailpoint.object.Link`.
 
+## Workgroup (`kf_workgroup`)
+Part 1 rules from `NativeWorkgroupRepository`:
+- `workgroupid` = `canonicalUuid(source_id)`; fallback `deterministicUuid("native-workgroup|"+source_id)`
+  (`+name` only when `source_id` is null). Upsert `ON CONFLICT (workgroupid)`.
+- 16 business columns = the 16 response fields, same names and order: 2 `jsonb` (`capabilities`, `attributes`),
+  2 boolean, 2 timestamps.
+- `source_object_type` is `sailpoint.object.Identity`. In IIQ a workgroup **is** an Identity with
+  `workgroup=true`, and Part 1 stamps it that way. Because of that, a workgroup's `workgroupid` has the same
+  UUID form as an identity `userid` would.
+- `record_hash` = SHA-256 over **all 16** business fields.
+
+## Role (`kf_role`)
+Part 1 rules from `NativeRoleRepository`:
+- `roleid` = `canonicalUuid(source_id)`; fallback `deterministicUuid("native-role|"+source_id)`
+  (`+name` only when `source_id` is null). Upsert `ON CONFLICT (roleid)`.
+- 33 response fields. 27 sit before `record_hash`. 6 (`role_type_definition`, `applications`,
+  `monitored_applications`, `scorecard`, `selector_summary`, `selector`) sit after `deleted_at`, as in
+  iiq_native.kf_role (Part 1 added them with `ALTER TABLE`). `EntitySpec.trailing` reproduces that layout.
+- Only `descriptions`, `attributes` and `selector` are `jsonb`. The other 5 Part 1-coded fields are `text` in
+  Part 1 and stay text here, even when they contain JSON-looking strings. `risk_score_weight` is `integer`.
+- `record_hash` = SHA-256 over **all 33** fields. Lineage: `IdentityIQ` / `native_iiq_java_api` / `sailpoint.object.Bundle`.
+
+## Identity-Role (`kf_identity_role`)
+One row per identity-to-role edge (`relationship_type` ASSIGNED or DETECTED). Part 1 rules from `NativeIdentityRoleRepository`:
+- The response has **no `source_id`**, because an edge is not a standalone IIQ object. The key is **not** the
+  identity id or the role id. `identityroleid` = `deterministicUuid("native-identity-role|" + identity_id + "|" + role_id + "|"
+  + relationship_type + "|" + assignment_id)`, always name-based, with a null part becoming the text `null` as
+  in Part 1. So the same identity and role with a different relationship type or assignment is a different edge.
+  Upsert `ON CONFLICT (identityroleid)`.
+- 19 business columns = the 19 response fields, same names and order. `targets` is the only `jsonb`;
+  `detection_assignment_ids` is text. `identity_id` / `role_id` are raw IIQ ids and there are no foreign keys.
+- `record_hash` = Part 1's **18-field** subset: every field except `identity_name`.
+- Lineage: `IdentityIQ` / `native_iiq_java_api` / `sailpoint.object.Identity.roles`.
+
+## Identity-Entitlement (`kf_identity_entitlement`)
+The identity-to-entitlement relationship with provenance (IIQ `IdentityEntitlement`). Part 1 rules from
+`NativeIdentityEntitlementRepository`. They differ from identity-roles:
+- This edge **is** a real IIQ object, so the response has a `source_id`. The PK column is named `entitlementid`, the
+  same name as in `kf_entitlement`, but here it identifies the IdentityEntitlement row, not the catalog entitlement.
+  It is `canonicalUuid(source_id)`. If `source_id` is null or not a GUID, the fallback is the composite natural key
+  `deterministicUuid("native-identity-entitlement|" + identity_id + "|" + application_name + "|" + native_identity + "|"
+  + attribute_name + "|" + attribute_value)`. `source_id` itself is not part of the fallback, and a null part becomes
+  the text `null`. Upsert `ON CONFLICT (entitlementid)`.
+- 33 business columns = the 33 response fields, same names and order. `value_list` is the only `jsonb`;
+  `source_assignable_roles` / `source_detected_roles` are text.
+- `record_hash` = Part 1's **30-field** subset: every field except `identity_name`, `application_id` and `display_name`.
+- Lineage: `IdentityIQ` / `native_iiq_java_api` / `sailpoint.object.IdentityEntitlement`.
+
 ## Build (Java 17, Maven)
 ```bash
 mvn clean package
@@ -97,6 +149,10 @@ psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_identit
 psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_entitlement.sql
 psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_application.sql
 psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_account.sql
+psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_workgroup.sql
+psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_role.sql
+psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_identity_role.sql
+psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_identity_entitlement.sql
 ```
 It writes to a **separate** schema and never alters an existing populated schema.
 
@@ -109,6 +165,10 @@ java -jar target/kfagent-ingest.jar import-identity
 java -jar target/kfagent-ingest.jar import-entitlement
 java -jar target/kfagent-ingest.jar import-application
 java -jar target/kfagent-ingest.jar import-account
+java -jar target/kfagent-ingest.jar import-workgroup
+java -jar target/kfagent-ingest.jar import-role
+java -jar target/kfagent-ingest.jar import-identity-role
+java -jar target/kfagent-ingest.jar import-identity-entitlement
 ```
 Prints a credential-free config line, the run id, and an import summary (pages / fetched / inserted /
 updated / failed, with up to 10 sample failures). Exit codes: `0` ok, `2` usage, `3` config, `4` HTTP/source,
@@ -156,13 +216,21 @@ mvn test
   binding/NULL/invalid handling, lineage params.
 - `AccountTableTest` — `record_hash` + `accountid` parity with Part 1, including both fallback-key cases (natural
   key, and a null application name), every field hashed, DDL order = iiq_native.kf_account, binding, lineage.
+- `IdentityEntitlementTableTest` — key + `record_hash` parity with Part 1 (canonical id, composite natural-key fallback,
+  non-GUID `source_id`), the 3 un-hashed fields, DDL, binding.
+- `IdentityRoleTableTest` — composite edge key + `record_hash` parity with Part 1 (incl. null `assignment_id` and an
+  all-null key), key is not the identity or role id, `identity_name` excluded from the hash, DDL, binding.
+- `RoleTableTest` — `record_hash` + `roleid` parity with Part 1 (null and non-GUID fallbacks), all 33 fields
+  hashed, DDL order incl. the 6 trailing columns, text-vs-jsonb fields, integer `risk_score_weight`, binding.
+- `WorkgroupTableTest` — `record_hash` + `workgroupid` parity with Part 1 (null and non-GUID `source_id`
+  fallbacks), every field hashed, DDL order = iiq_native.kf_workgroup, binding, Identity object type.
 - `EntityImportServiceTest` — real HTTP against an in-process mock KF Agent: `start`/`limit` paging until a short
   page, per-row failure isolation + reporting, clear error on a non-array/500 response.
 - `IdentityBindingTest` — response→column mapping via a recording JDBC stub: canonical `userid`, text/boolean,
   nested JSON → `jsonb`, ISO timestamps, SQL NULL for null/absent fields, metadata params. No live DB needed.
 
 ## Status / next
-Identity, Entitlement, Application and Account are done. Entitlement runs on the generic engine (`EntitySpec` + `EntityRepository` +
+Identity, Entitlement, Application, Account, Workgroup, Role, Identity-Role and Identity-Entitlement are done. Entitlement runs on the generic engine (`EntitySpec` + `EntityRepository` +
 `EntityImportService`); further current-state entities are added as one `*Table` spec each. Identity is the complete first vertical slice (HTTP → parse → map → metadata → upsert → verification). The
 column-spec + upsert engine is built to extend to the other ~39 endpoints, each with its own table, PK/salt,
 `source_object_type`, `record_hash` behavior (where applicable), nested fields, and current-state vs
