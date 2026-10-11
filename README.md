@@ -23,6 +23,9 @@ Implemented entities:
 | `import-role-entitlement` | `GET /kfagent/role-entitlements` | `kf_role_entitlement` | `roleentitlementid` (from derived natural key) | `sailpoint.object.Bundle` | Part 1's 17-field hash incl. resolved `entitlement_id` |
 | `import-role-hierarchy` | `GET /kfagent/role-hierarchy` | `kf_role_hierarchy` | `rolehierarchyid` (from derived natural key) | `sailpoint.object.Bundle` | Part 1's 5-field hash (own key names) |
 | `import-identity-request` | `GET /kfagent/identity-requests` | `kf_identity_request` | `identityrequestid` (no fallback) | `sailpoint.object.IdentityRequest` | SHA-256 over all 34 business fields |
+| `import-identity-request-item` | `GET /kfagent/identity-request-items` | `kf_identity_request_item` | `identityrequestitemid` (the item's own id) | `sailpoint.object.IdentityRequestItem` | SHA-256 over all 33 business fields |
+| `import-identity-request-approval` | `GET /kfagent/identity-request-approvals` | `kf_identity_request_approval` | `identityrequestapprovalid` (derived: request, work item, owner, index) | `sailpoint.object.WorkflowSummary$ApprovalSummary` | SHA-256 over all 17 business fields |
+| `import-policy` | `GET /kfagent/policies` | `kf_policy` | `policyid` | `sailpoint.object.Policy` | SHA-256 over all 21 fields |
 
 ## How identity rows are keyed (the "two ids" explained)
 `userid` (the uuid primary key) is **not** a new/random id — it is `source_id` rewritten in canonical UUID
@@ -192,6 +195,57 @@ Part 1 rules from `NativeIdentityRequestRepository`:
 - Checked against real data: for all 45 live requests, Part 2's `identityrequestid` and `record_hash` equal what Part 1
   stored in `iiq_native` (45/45).
 
+## Identity-Request-Item (`kf_identity_request_item`)
+Part 1 rules from `NativeIdentityRequestItemRepository` / `NativeIdentityRequestParser.toItem`:
+- `identityrequestitemid` = the **item's own** IIQ id, `canonicalUuid(source_id)`. The fallback is
+  `deterministicUuid("native-identity-request-item|" + source_id)`, and a null id becomes the text `null`, as in Part 1.
+  The parent request is **not** the key: two items of one request have different keys, and an item keeps its key if
+  its parent fields change. Upsert `ON CONFLICT (identityrequestitemid)`.
+- **Parent link:** `request_source_id` (the raw IIQ IdentityRequest id) and `request_name` (the parent request number),
+  both text. Part 1 fills in `request_source_id` from the parent before the response is built, so the response always
+  carries it. There is no foreign key, as in iiq_native. To join to `kf_identity_request`, use
+  `kf_identity_request.source_id = kf_identity_request_item.request_source_id`.
+- 33 business columns = the 33 response fields, same names and order, all scalar (no jsonb). `retries` is `integer`;
+  there are 9 booleans and 4 timestamps.
+- `record_hash` = SHA-256 over **all 33** fields. Lineage: `IdentityIQ` / `native_iiq_java_api` / `sailpoint.object.IdentityRequestItem`.
+- Checked against real data: for all 186 live items, Part 2's key, parent link and `record_hash` equal what Part 1 stored
+  in `iiq_native` (186/186 each).
+
+## Identity-Request-Approval (`kf_identity_request_approval`)
+The approval summaries of a request (`WorkflowSummary$ApprovalSummary`). Part 1 rules from
+`NativeIdentityRequestApprovalRepository` / `NativeIdentityRequestParser.toApproval`:
+- An approval summary has **no IIQ id of its own**, so the key is **not** the parent request id.
+  `identityrequestapprovalid` = `deterministicUuid("native-identity-request-approval|" + request_source_id + "|" + work_item_id
+  + "|" + owner + "|" + approval_index)`, always name-based, with a null part (including a null index) becoming the text
+  `null`, as in Part 1. Changing the decision (state, approved, completer) keeps the key; another index is another approval.
+- **Links:** to the parent **request** via `request_source_id` (Part 1 fills it from the parent before the response is
+  built) and `request_name`; to the approval **work item** via `work_item_id` (raw IIQ WorkItem id). There is **no link
+  to an individual request item**. All links are text with no foreign key, as in iiq_native.
+- 17 business columns = the 17 response fields, same names and order. `comments` and `sign_off` are `jsonb`;
+  `approval_item_count` / `approval_index` are `integer`; `approved` is boolean; there are 2 timestamps.
+- `record_hash` = SHA-256 over **all 17** fields. Lineage: `IdentityIQ` / `native_iiq_java_api` /
+  `sailpoint.object.WorkflowSummary$ApprovalSummary`, the read surface Part 1 names.
+- Checked against real data: all 11 live approvals derive a key that exists in Part 1's `iiq_native` table, with equal
+  `record_hash` and parent link (11/11).
+
+## Policy (`kf_policy`)
+Part 1 rules from `NativePolicyRepository`:
+- `policyid` = `canonicalUuid(source_id)`, with fallback `deterministicUuid("native-policy|" + source_id)` (`+name` only when
+  `source_id` is null). Upsert `ON CONFLICT (policyid)`.
+- 21 response fields. 12 sit before `record_hash`; 9 (`state`, `violation_rule`, `violation_workflow`, `signature`,
+  `certification_actions`, `violation_owner_type`, `violation_owner_rule_id`, `violation_owner_rule_name`, `is_template`)
+  sit after `deleted_at`, as in iiq_native (`EntitySpec.trailing`).
+- `descriptions` is the only `jsonb`. `violation_rule`, `violation_workflow`, `signature` and `certification_actions`
+  are **text** in Part 1 (`certification_actions` is a comma-joined string). `constraint_count` is `integer` and
+  `is_template` is boolean. The violation owner and owner rule stay raw text. A policy's constraints are their own
+  entity (`policy-constraints`); only `constraint_count` is here.
+- `record_hash` = SHA-256 over **all 21** fields. Lineage: `IdentityIQ` / `native_iiq_java_api` / `sailpoint.object.Policy`.
+- Checked against real data: all 7 live policies produce the same `policyid` Part 1 stored (7/7). Their `record_hash`
+  differs from the stored one, for a known reason. The rows in `iiq_native.sql` were written before Part 1's mapper filled
+  `violation_owner_type`, `violation_owner_rule_id`, `violation_owner_rule_name` and `is_template` (added in Part 1 commit
+  `b241b23`), so those 4 columns are NULL there. With those 4 set to NULL, Part 2's hash reproduces all 7 stored hashes
+  exactly, so the hash rule is identical. Part 1 would produce Part 2's hash if it re-ran today.
+
 ## Build (Java 17, Maven)
 ```bash
 mvn clean package
@@ -229,6 +283,9 @@ psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_account
 psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_role_entitlement.sql
 psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_role_hierarchy.sql
 psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_identity_request.sql
+psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_identity_request_item.sql
+psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_identity_request_approval.sql
+psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_policy.sql
 ```
 It writes to a **separate** schema and never alters an existing populated schema.
 
@@ -249,6 +306,9 @@ java -jar target/kfagent-ingest.jar import-account-entitlement
 java -jar target/kfagent-ingest.jar import-role-entitlement   # after import-entitlement
 java -jar target/kfagent-ingest.jar import-role-hierarchy
 java -jar target/kfagent-ingest.jar import-identity-request
+java -jar target/kfagent-ingest.jar import-identity-request-item
+java -jar target/kfagent-ingest.jar import-identity-request-approval
+java -jar target/kfagent-ingest.jar import-policy
 ```
 Prints a credential-free config line, the run id, and an import summary (pages / fetched / inserted /
 updated / failed, with up to 10 sample failures). Exit codes: `0` ok, `2` usage, `3` config, `4` HTTP/source,
@@ -296,6 +356,12 @@ mvn test
   binding/NULL/invalid handling, lineage params.
 - `AccountTableTest` — `record_hash` + `accountid` parity with Part 1, including both fallback-key cases (natural
   key, and a null application name), every field hashed, DDL order = iiq_native.kf_account, binding, lineage.
+- `PolicyTableTest` — key/hash parity with Part 1 incl. fallbacks, reproduces the stored hash of real "SOD Template" (with
+  the 4 later-populated fields as stored), every field hashed, text-vs-jsonb fields, trailing DDL, binding.
+- `IdentityRequestApprovalTableTest` — derived key/hash parity with Part 1 (incl. parent back-fill and null index), key
+  is not the parent id, request + work-item links and no request-item link, jsonb comments/sign_off, DDL, binding.
+- `IdentityRequestItemTableTest` — key/hash parity with Part 1 (incl. its parent back-fill), key is the item's own id
+  and never the parent's, both fallbacks, every field hashed, integer `retries`, DDL, binding.
 - `IdentityRequestTableTest` — reproduces the stored hash of real request 0000000008, no-fallback key (row fails like Part 1),
   every field hashed, integers / jsonb / nulls, DDL, binding.
 - `RoleHierarchyRepositoryTest` — reproduces the real Part 1 edge from iiq_native.sql, natural key/id/hash parity,
@@ -319,7 +385,7 @@ mvn test
   nested JSON → `jsonb`, ISO timestamps, SQL NULL for null/absent fields, metadata params. No live DB needed.
 
 ## Status / next
-Identity, Entitlement, Application, Account, Workgroup, Role, Identity-Role, Identity-Entitlement, Account-Entitlement, Role-Entitlement, Role-Hierarchy and Identity-Request are done. Entitlement runs on the generic engine (`EntitySpec` + `EntityRepository` +
+Identity, Entitlement, Application, Account, Workgroup, Role, Identity-Role, Identity-Entitlement, Account-Entitlement, Role-Entitlement, Role-Hierarchy, Identity-Request, Identity-Request-Item, Identity-Request-Approval and Policy are done. Entitlement runs on the generic engine (`EntitySpec` + `EntityRepository` +
 `EntityImportService`); further current-state entities are added as one `*Table` spec each. Identity is the complete first vertical slice (HTTP → parse → map → metadata → upsert → verification). The
 column-spec + upsert engine is built to extend to the other ~39 endpoints, each with its own table, PK/salt,
 `source_object_type`, `record_hash` behavior (where applicable), nested fields, and current-state vs

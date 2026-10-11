@@ -7,9 +7,12 @@ D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\Entitlemen
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\EntityImportServiceTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\IdentityBindingTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\IdentityEntitlementTableTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\IdentityRequestApprovalTableTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\IdentityRequestItemTableTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\IdentityRequestTableTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\IdentityRoleTableTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\IdentitySqlTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\PolicyTableTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\RoleEntitlementRepositoryTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\RoleHierarchyRepositoryTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\RoleTableTest.java

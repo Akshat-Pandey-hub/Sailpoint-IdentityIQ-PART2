@@ -19,11 +19,14 @@ D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\EntityWrit
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\IdentityEntitlementTable.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\IdentityImportService.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\IdentityRepository.java
+D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\IdentityRequestApprovalTable.java
+D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\IdentityRequestItemTable.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\IdentityRequestTable.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\IdentityRoleTable.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\IdentityTable.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\ImportResult.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\JsonColumnBinder.java
+D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\PolicyTable.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\RoleEntitlementRepository.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\RoleHierarchyRepository.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\RoleTable.java

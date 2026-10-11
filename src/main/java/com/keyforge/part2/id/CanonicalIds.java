@@ -196,4 +196,42 @@ public final class CanonicalIds {
         }
         return id;
     }
+
+    /**
+     * The IdentityRequestItem primary key, matching Part 1's {@code NativeIdentityRequestItemRepository.canonicalItemId}:
+     * the ITEM's own IIQ id ({@code canonicalUuid(source_id)}), else {@code deterministicUuid("native-identity-request-item|"
+     * + source_id)} (a null id becomes the text "null", like Part 1). The parent request id is NOT part of the key.
+     */
+    public static String identityRequestItemId(String sourceId) {
+        String id = canonicalUuid(sourceId);
+        if (id == null) {
+            id = deterministicUuid("native-identity-request-item|" + sourceId);
+        }
+        return id;
+    }
+
+    /**
+     * The IdentityRequest approval primary key, matching Part 1's
+     * {@code NativeIdentityRequestApprovalRepository.canonicalApprovalId}. An approval summary has no IIQ id of its own,
+     * so the key is ALWAYS name-based over {@code request_source_id|work_item_id|owner|approval_index} (a null part,
+     * including a null index, becomes the text "null", exactly like Part 1).
+     */
+    public static String identityRequestApprovalId(String requestSourceId, String workItemId, String owner,
+                                                   Integer approvalIndex) {
+        return deterministicUuid("native-identity-request-approval|" + requestSourceId + "|" + workItemId + "|"
+                + owner + "|" + approvalIndex);
+    }
+
+    /**
+     * The Policy primary key, matching Part 1's {@code NativePolicyRepository.canonicalPolicyId}:
+     * {@code canonicalUuid(source_id)}, falling back to {@code deterministicUuid("native-policy|"+id)}
+     * ({@code name} only when source_id is {@code null}).
+     */
+    public static String policyId(String sourceId, String name) {
+        String id = canonicalUuid(sourceId);
+        if (id == null) {
+            id = deterministicUuid("native-policy|" + (sourceId == null ? name : sourceId));
+        }
+        return id;
+    }
 }

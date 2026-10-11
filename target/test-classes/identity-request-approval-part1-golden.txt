@@ -1,0 +1,9 @@
+REST={"request_source_id":"7f0001019fa71124819fb3e12597174e","request_name":"0000000008","work_item_id":"7f0001019fa71124819fb3e125a2175a","work_item_type":"Approval","owner":"spadmin","owner_id":"7f000101971416688197147684ad00ff","completer":"The Administrator","approved":true,"state":"Finished","state_key":"WorkItemStateFinished","type_key":"WorkItemTypeApproval","start_date":"2026-07-30T16:35:05.100Z","end_date":"2026-07-30T16:36:00.123456789Z","approval_item_count":8,"approval_index":0,"comments":[{"author":"spadmin","comment":"ok – café ✓","date":"2026-07-30T16:36:00Z"}],"sign_off":{"n":1.5,"signer":null}}
+HASH=5aba4e18122c0d3c03b7b953b637607694abea4ee5ba53d2404e62bc82e89ce9
+ID=27eb2668-bad1-3103-9382-882e3ea92dbc
+REST={"request_source_id":"7f0001019fa71124819fb3e12597174e","request_name":"0000000008","work_item_id":null,"work_item_type":null,"owner":null,"owner_id":null,"completer":null,"approved":null,"state":null,"state_key":null,"type_key":null,"start_date":null,"end_date":null,"approval_item_count":null,"approval_index":null,"comments":[],"sign_off":{}}
+HASH=579280990a7e813cb5e30221e06d2cdfae5ee0e1a25ecc1c0b528bbf7f0a1162
+ID=0a34b28f-feeb-333d-85a5-4b9acb0da013
+REST={"request_source_id":"7f0001019fa71124819fb3e12597174e","request_name":null,"work_item_id":"w2","work_item_type":null,"owner":"Ops Approvers","owner_id":null,"completer":null,"approved":null,"state":null,"state_key":null,"type_key":null,"start_date":null,"end_date":null,"approval_item_count":0,"approval_index":1,"comments":null,"sign_off":null}
+HASH=03267b14a31b64f8e5b741d75a2f7ef4307fb8335a141fbed1c3ae6cfe29d17b
+ID=9012008a-fcde-3157-b7a1-d91bc89847b4
