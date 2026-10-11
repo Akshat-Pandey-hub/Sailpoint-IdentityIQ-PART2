@@ -11,6 +11,7 @@ import static com.keyforge.part2.hash.HashValues.bool;
 import static com.keyforge.part2.hash.HashValues.instant;
 import static com.keyforge.part2.hash.HashValues.integer;
 import static com.keyforge.part2.hash.HashValues.json;
+import static com.keyforge.part2.hash.HashValues.jsonText;
 import static com.keyforge.part2.hash.HashValues.text;
 
 /**
@@ -32,6 +33,7 @@ final class BusinessHash {
                 case INTEGER -> integer(row, c.name);
                 case JSONB -> json(row, c.name);
                 case TIMESTAMPTZ -> instant(row, c.name);
+                case JSON_TEXT -> jsonText(row, c.name);
             });
         }
         return RecordHash.of(b);

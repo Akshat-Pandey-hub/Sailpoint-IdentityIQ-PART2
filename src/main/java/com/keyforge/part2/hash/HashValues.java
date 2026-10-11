@@ -42,6 +42,15 @@ public final class HashValues {
         return (n == null || n.isNull()) ? null : n.toString();
     }
 
+    /** A JSON value stored as text: compact JSON text, or the string itself if it arrived as a plain string. */
+    public static String jsonText(JsonNode row, String field) {
+        JsonNode n = row.get(field);
+        if (n == null || n.isNull()) {
+            return null;
+        }
+        return n.isTextual() ? n.asText() : n.toString();
+    }
+
     public static Instant instant(JsonNode row, String field) {
         String s = text(row, field);
         if (s == null || s.isBlank()) {

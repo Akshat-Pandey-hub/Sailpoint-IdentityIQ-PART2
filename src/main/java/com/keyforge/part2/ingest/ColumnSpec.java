@@ -13,7 +13,13 @@ public final class ColumnSpec {
         BOOLEAN("boolean", "?"),
         INTEGER("integer", "?"),
         JSONB("jsonb", "?::jsonb"),
-        TIMESTAMPTZ("timestamp with time zone", "?::timestamptz");
+        TIMESTAMPTZ("timestamp with time zone", "?::timestamptz"),
+        /**
+         * A {@code text} column whose value Part 1 stored as serialized JSON text (e.g. an IIQ JsonHelper array) but
+         * which the KF Agent returns re-hydrated as JSON. Stored and hashed as the compact JSON text; a value that
+         * arrives as a plain string is kept verbatim.
+         */
+        JSON_TEXT("text", "?");
 
         public final String ddlType;
         public final String placeholder;
@@ -37,4 +43,5 @@ public final class ColumnSpec {
     public static ColumnSpec integer(String name) { return new ColumnSpec(name, Kind.INTEGER); }
     public static ColumnSpec jsonb(String name) { return new ColumnSpec(name, Kind.JSONB); }
     public static ColumnSpec timestamptz(String name) { return new ColumnSpec(name, Kind.TIMESTAMPTZ); }
+    public static ColumnSpec jsonText(String name) { return new ColumnSpec(name, Kind.JSON_TEXT); }
 }

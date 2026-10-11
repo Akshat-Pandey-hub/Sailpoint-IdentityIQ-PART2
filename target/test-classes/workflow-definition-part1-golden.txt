@@ -1,0 +1,12 @@
+REST={"source_id":"7f0001019f061fdc819f34b0ac3461cc","name":"LCM Provisioning – café ✓","type":"LCMProvisioning","handler":"sailpoint.api.StandardWorkflowHandler","description":"Approvals and provisioning","task_type":"LCM","definition":{"steps":[{"name":"Approve","approval":{"mode":"serial","owner":"script:..."}}],"variables":[{"name":"plan","n":1.5,"z":null}]},"created_at":"2025-07-27T03:42:26.205Z","modified_at":"2026-09-30T14:44:40.123456789Z"}
+DEF={"steps":[{"name":"Approve","approval":{"mode":"serial","owner":"script:..."}}],"variables":[{"name":"plan","n":1.5,"z":null}]}
+HASH=0b257ab972b92afe16fc8407bb9ab023a2a85cbe1c0eb871b74ecfe2c079e9c6
+ID=7f000101-9f06-1fdc-819f-34b0ac3461cc
+REST={"source_id":"not-a-guid","name":"Odd Workflow","type":null,"handler":null,"description":null,"task_type":null,"definition":null,"created_at":null,"modified_at":null}
+DEF=null
+HASH=ebe1ed51359de85804b4531d44571d32acc59aae214f2c0385717759582e5595
+ID=5300bd87-b4dc-38bb-b58e-42b52b260830
+REST={"source_id":null,"name":"No Id","type":null,"handler":null,"description":null,"task_type":null,"definition":{},"created_at":null,"modified_at":null}
+DEF={}
+HASH=7dd5282987931e68f4250712f18ff47807158008e9ffb4524d082665d6cd3f1e
+ID=7765f0e9-ca7b-333d-88fc-28e9a02b73ab

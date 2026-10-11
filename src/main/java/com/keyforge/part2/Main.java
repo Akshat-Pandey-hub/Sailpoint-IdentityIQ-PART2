@@ -6,6 +6,7 @@ import com.keyforge.part2.db.PostgresConnection;
 import com.keyforge.part2.http.KfAgentClient;
 import com.keyforge.part2.ingest.AccountEntitlementTable;
 import com.keyforge.part2.ingest.AccountTable;
+import com.keyforge.part2.ingest.CertificationTable;
 import com.keyforge.part2.ingest.ApplicationTable;
 import com.keyforge.part2.ingest.EntitlementTable;
 import com.keyforge.part2.ingest.EntityImportService;
@@ -21,9 +22,12 @@ import com.keyforge.part2.ingest.IdentityRoleTable;
 import com.keyforge.part2.ingest.EntityWriter;
 import com.keyforge.part2.ingest.PolicyTable;
 import com.keyforge.part2.ingest.ProvisioningItemRepository;
+import com.keyforge.part2.ingest.ProvisioningTxnTable;
 import com.keyforge.part2.ingest.RoleEntitlementRepository;
 import com.keyforge.part2.ingest.RoleHierarchyRepository;
 import com.keyforge.part2.ingest.RoleTable;
+import com.keyforge.part2.ingest.WorkItemTable;
+import com.keyforge.part2.ingest.WorkflowDefinitionRepository;
 import com.keyforge.part2.ingest.WorkgroupTable;
 import com.keyforge.part2.ingest.ImportResult;
 
@@ -59,7 +63,13 @@ import java.util.function.Function;
  *                       Fetch GET /kfagent/identity-request-approvals and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_identity_request_approval
  *  import-policy        Fetch GET /kfagent/policies     and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_policy
  *  import-provisioning-item
- *                       Fetch GET /kfagent/provisioning-items and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_provisioning_item</pre>
+ *                       Fetch GET /kfagent/provisioning-items and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_provisioning_item
+ *  import-provisioning-transaction
+ *                       Fetch GET /kfagent/provisioning-transactions and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_provisioning_txn
+ *  import-work-item     Fetch GET /kfagent/work-items   and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_workitem
+ *  import-workflow-definition
+ *                       Fetch GET /kfagent/workflow-definitions and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_workflow_definition
+ *  import-certification Fetch GET /kfagent/certifications and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_certification</pre>
  *
  * Configuration is entirely external (environment variables / -D system properties) — see {@link AppConfig}.
  * Exit codes: 0 ok, 2 usage, 3 config error, 4 HTTP/source error, 5 PostgreSQL error, 6 completed with row
@@ -89,6 +99,10 @@ public final class Main {
             case "import-identity-request-approval" -> System.exit(runImport(IdentityRequestApprovalTable.SPEC));
             case "import-policy" -> System.exit(runImport(PolicyTable.SPEC));
             case "import-provisioning-item" -> System.exit(runImport(ProvisioningItemRepository::new));
+            case "import-provisioning-transaction" -> System.exit(runImport(ProvisioningTxnTable.SPEC));
+            case "import-work-item" -> System.exit(runImport(WorkItemTable.SPEC));
+            case "import-workflow-definition" -> System.exit(runImport(WorkflowDefinitionRepository::new));
+            case "import-certification" -> System.exit(runImport(CertificationTable.SPEC));
             default -> {
                 printUsage();
                 System.exit("".equals(command) ? 2 : 2);
@@ -196,6 +210,12 @@ public final class Main {
         System.out.println("  import-policy        Fetch GET /kfagent/policies     and upsert into <PG_DEST_SCHEMA>.kf_policy");
         System.out.println("  import-provisioning-item");
         System.out.println("                       Fetch GET /kfagent/provisioning-items and upsert into <PG_DEST_SCHEMA>.kf_provisioning_item");
+        System.out.println("  import-provisioning-transaction");
+        System.out.println("                       Fetch GET /kfagent/provisioning-transactions and upsert into <PG_DEST_SCHEMA>.kf_provisioning_txn");
+        System.out.println("  import-work-item     Fetch GET /kfagent/work-items   and upsert into <PG_DEST_SCHEMA>.kf_workitem");
+        System.out.println("  import-workflow-definition");
+        System.out.println("                       Fetch GET /kfagent/workflow-definitions and upsert into <PG_DEST_SCHEMA>.kf_workflow_definition");
+        System.out.println("  import-certification Fetch GET /kfagent/certifications and upsert into <PG_DEST_SCHEMA>.kf_certification");
         System.out.println();
         System.out.println("Required env: KFAGENT_BASE_URL, PG_HOST, PG_DATABASE, PG_USERNAME, PG_PASSWORD");
         System.out.println("Optional env: PG_PORT (5432), PG_DEST_SCHEMA (iiq_native_part2), KFAGENT_PAGE_SIZE (500),");

@@ -27,6 +27,10 @@ Implemented entities:
 | `import-identity-request-approval` | `GET /kfagent/identity-request-approvals` | `kf_identity_request_approval` | `identityrequestapprovalid` (derived: request, work item, owner, index) | `sailpoint.object.WorkflowSummary$ApprovalSummary` | SHA-256 over all 17 business fields |
 | `import-policy` | `GET /kfagent/policies` | `kf_policy` | `policyid` | `sailpoint.object.Policy` | SHA-256 over all 21 fields |
 | `import-provisioning-item` | `GET /kfagent/provisioning-items` | `kf_provisioning_item` | `provisioningitemid` (derived per item) | `ProvisioningPlan$AttributeRequest` / `$PermissionRequest` (per row) | 16 of 17 fields (not `instance`) |
+| `import-provisioning-transaction` | `GET /kfagent/provisioning-transactions` | `kf_provisioning_txn` | `provisioningtxnid` | `sailpoint.object.ProvisioningTransaction` | SHA-256 over all 34 business fields |
+| `import-work-item` | `GET /kfagent/work-items` | `kf_workitem` | `workitemid` (no fallback) | `sailpoint.object.WorkItem` | 30 of 41 fields |
+| `import-workflow-definition` | `GET /kfagent/workflow-definitions` | `kf_workflow_definition` | `workflowid` | `sailpoint.object.Workflow` | Part 1 parser's 7-field camelCase hash (no timestamps) |
+| `import-certification` | `GET /kfagent/certifications` | `kf_certification` | `certificationid` | `sailpoint.object.Certification` | 26 of 43 fields |
 
 ## How identity rows are keyed (the "two ids" explained)
 `userid` (the uuid primary key) is **not** a new/random id — it is `source_id` rewritten in canonical UUID
@@ -265,6 +269,84 @@ uses a dedicated `ProvisioningItemRepository`. Part 1 rules from `NativeProvisio
 - Checked against real data: all 251 live items derive a key that exists in Part 1's `iiq_native` table, with equal
   `record_hash`, `source_object_type`, `src_object_id` and `src_natural_key` (251/251 each).
 
+## Provisioning-Transaction (`kf_provisioning_txn`)
+Part 1 rules from `NativeProvisioningTxnRepository` / `NativeProvisioningTxnParser`:
+- `provisioningtxnid` = `canonicalUuid(source_id)`. A present but non-GUID id becomes
+  `deterministicUuid("native-provisioning-txn|" + source_id)`; a null or blank id is **refused** and that row fails (Part 1's
+  parser and repository both reject it). This differs from the items, whose key is always built from their content.
+  Changing a transaction's status or result keeps its key. Upsert `ON CONFLICT (provisioningtxnid)`.
+- **Link to the plan's items:** `kf_provisioning_item.txn_source_id` (also its `src_object_id`) holds this transaction's
+  **raw** `source_id`, not the uuid key. Join on `kf_provisioning_item.txn_source_id = kf_provisioning_txn.source_id`.
+  `item_count` is the number of items Part 1 derived from the plan. The plan itself is not a column; its outcome is in
+  `plan_result_status` / `plan_result_request_id` / `plan_result_errors` and `account_request_operation`.
+- 34 business columns = the 34 response fields, same names and order. `plan_result_errors` is the only `jsonb`;
+  `retry_count` / `item_count` are `integer`; `forced` / `timed_out` / `filtered` are boolean; there are 3 timestamps.
+- `record_hash` = SHA-256 over **all 34** fields. Lineage: `IdentityIQ` / `native_iiq_java_api` /
+  `sailpoint.object.ProvisioningTransaction`. Like Part 1, rows are never deleted.
+- Checked against real data: for all 104 live transactions, the key, `record_hash` and object type equal what Part 1 stored
+  (104/104). All 251 live items link to a live transaction, and every `item_count` equals its number of items (104/104).
+
+## Work-Item (`kf_workitem`)
+Live (open) IIQ WorkItems. Part 1 rules from `NativeWorkItemRepository` / `NativeWorkItemMapper`:
+- `workitemid` = `canonicalUuid(source_id)` with **no fallback**. A work item without a usable IIQ id fails its row, as in
+  Part 1. Upsert `ON CONFLICT (workitemid)`.
+- **Relationships differ by work-item type**, and all are raw text with no foreign keys:
+  - `identity_request_id`: IIQ's `WorkItem.getIdentityRequestId()`, stored verbatim (request-approval items).
+  - `certification_id` / `certification_entity_id` / `certification_item_id` / `entity_type`: certification items.
+  - `workflow_case_id` / `workflow_case_name`: workflow-driven items.
+  - `target_id` / `target_name`: the object being acted on.
+
+  Approvals (`kf_identity_request_approval.work_item_id`) and provisioning transactions (`manual_work_item_id`,
+  `wait_work_item_id`) point **to** work items by raw `source_id`. Once a work item is completed, IIQ moves it to
+  WorkItemArchive (the separate `workitem-archives` entity), so those links usually resolve there. In the current data,
+  none of the 11 approvals or the 1 transaction work item is among the 5 open work items.
+- 41 business columns = the 41 response fields, same names and order: 4 `jsonb` (`comments`, `sign_offs`,
+  `owner_history`, `approval_set_items`), 4 `integer`, 3 boolean, 6 timestamps.
+- `record_hash` = Part 1's **30-field** subset. It leaves out `requester_name`, `assignee_name`, `handler`,
+  `notification_name`, `certification_entity_id`, `certification_item_id`, `entity_type`, `workflow_case_name`,
+  `notification`, `wake_up_date` and `modified_at`. Lineage: `IdentityIQ` / `native_iiq_java_api` / `sailpoint.object.WorkItem`.
+- Checked against real data: for all 5 live work items, the key, `record_hash` and object type equal what Part 1 stored (5/5).
+- Not verifiable with the current data: whether IIQ fills `identity_request_id` with the request number or the request
+  id. No live work item has one. It is stored as received either way.
+
+## Workflow-Definition (`kf_workflow_definition`)
+IIQ **Workflow definitions**: the workflow templates and configuration, not running WorkflowCases and not WorkItems
+(those reference a case through `workflow_case_id`). A dedicated `WorkflowDefinitionRepository`, from Part 1's
+`NativeWorkflowRepository` + `NativeWorkflowParser`:
+- `workflowid` = `canonicalUuid(source_id)`, with fallback `deterministicUuid("native-workflow|" + source_id)`, where a null
+  id becomes `null`. Upsert `ON CONFLICT (workflowid)`.
+- Derived columns the response omits: `src_object_id` = `source_id`, and `src_natural_key` = the workflow **name**. The
+  column order follows iiq_native (`src_*`, `extraction_run_id`, then `created_at` / `modified_at`).
+- `definition` (jsonb) is the whole definition. As in Part 1's parser, it is the compact JSON text, so a JSON-null
+  definition is stored as jsonb `null` (not SQL NULL) and hashed as `"null"`. No current row has one.
+- `record_hash` is computed the way Part 1's **parser** does it: 7 fields under camelCase keys (`sourceId`, `name`,
+  `type`, `handler`, `description`, `taskType`, `definition`). `created_at` / `modified_at` are not hashed.
+- Lineage: `IdentityIQ` / `native_iiq_java_api` / `sailpoint.object.Workflow`.
+- Checked against real data: for all 41 live workflow definitions, the key, `record_hash` (so the full `definition`
+  JSON matches exactly), `src_natural_key` and object type equal what Part 1 stored (41/41).
+
+## Certification (`kf_certification`)
+The certification **header**, one IIQ `Certification` (access review). Part 1 rules from `NativeCertificationRepository`:
+- `certificationid` = `canonicalUuid(source_id)`, with fallback `deterministicUuid("native-certification|" + source_id)`
+  (`+name` only when `source_id` is null). Upsert `ON CONFLICT (certificationid)`.
+- **Header only.** Its child records are separate entities and tables: the certified entities (`certification-entities`)
+  and their decision items (`certification-items`). Certifications that IIQ has archived are the separate
+  `certification-archives` entity. This table holds the counts (`total/completed/open_items`, `total/completed/open_entities`,
+  `percent_complete`) and the raw links: `certification_group_id` / `_name` (the campaign), `certification_definition_id`,
+  `parent_id`, `group_definition_id` / `_name`, `application_id`, `task_schedule_id`, `trigger_id`. Identities appear as
+  names (`certifiers`, `creator`, `manager`, `owner_id` / `owner_name`).
+- 43 response fields. 39 sit before `record_hash`; 4 (`approver_rule`, `automatic_closing_date`, `allowed_statuses`,
+  `tags`) sit after `deleted_at`, as in iiq_native. `certifiers` / `sign_off_history` are `jsonb`. `allowed_statuses` and
+  `tags` are **text** columns holding IIQ's compact JSON array text. The KF Agent returns them as real arrays, and Part 2
+  writes the same compact text back (new column kind `JSON_TEXT`; a non-JSON string is kept verbatim).
+  `automatic_closing_date` is text, not a timestamp.
+- `record_hash` = Part 1's **26-field** subset. It leaves out certification_name, short_name, certification_group_name,
+  group_definition_id / _name, application_id, task_schedule_id, trigger_id, parent_id, continuous, electronically_signed,
+  created_at, modified_at, total / completed / open_entities and owner_name.
+- Lineage: `IdentityIQ` / `native_iiq_java_api` / `sailpoint.object.Certification`.
+- Checked against real data: for both live certifications, the key, `record_hash`, object type and the stored
+  `allowed_statuses` / `tags` text equal what Part 1 stored (2/2).
+
 ## Build (Java 17, Maven)
 ```bash
 mvn clean package
@@ -306,6 +388,10 @@ psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_identit
 psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_identity_request_approval.sql
 psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_policy.sql
 psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_provisioning_item.sql
+psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_provisioning_txn.sql
+psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_workitem.sql
+psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_workflow_definition.sql
+psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_certification.sql
 ```
 It writes to a **separate** schema and never alters an existing populated schema.
 
@@ -330,6 +416,10 @@ java -jar target/kfagent-ingest.jar import-identity-request-item
 java -jar target/kfagent-ingest.jar import-identity-request-approval
 java -jar target/kfagent-ingest.jar import-policy
 java -jar target/kfagent-ingest.jar import-provisioning-item
+java -jar target/kfagent-ingest.jar import-provisioning-transaction
+java -jar target/kfagent-ingest.jar import-work-item
+java -jar target/kfagent-ingest.jar import-workflow-definition
+java -jar target/kfagent-ingest.jar import-certification
 ```
 Prints a credential-free config line, the run id, and an import summary (pages / fetched / inserted /
 updated / failed, with up to 10 sample failures). Exit codes: `0` ok, `2` usage, `3` config, `4` HTTP/source,
@@ -377,6 +467,14 @@ mvn test
   binding/NULL/invalid handling, lineage params.
 - `AccountTableTest` — `record_hash` + `accountid` parity with Part 1, including both fallback-key cases (natural
   key, and a null application name), every field hashed, DDL order = iiq_native.kf_account, binding, lineage.
+- `CertificationTableTest` — key/hash parity with Part 1 (fallbacks), allowed_statuses/tags written back as Part 1's text
+  (incl. a non-JSON string), 17 un-hashed fields, trailing DDL with text columns, binding.
+- `WorkflowDefinitionRepositoryTest` — key/definition-text/hash parity with Part 1's parser (incl. JSON-null definition and
+  fallbacks), camelCase 7-field hash without timestamps, derived src_* columns, DDL, binding.
+- `WorkItemTableTest` — key/hash parity with Part 1 for approval and certification work items, no-fallback key refusal,
+  the 11 un-hashed fields, type-dependent relationship columns, jsonb/integers/booleans, DDL, binding.
+- `ProvisioningTxnTableTest` — key/hash parity with Part 1, txn key rules (canonical / non-GUID fallback / refusal) vs the
+  item rules, items link by the raw id, every field hashed, integers/booleans/jsonb, DDL, binding.
 - `ProvisioningItemRepositoryTest` — derived key / src_natural_key / per-row object type / hash parity with Part 1 (incl.
   txn back-fill and null index), key is not the txn id, `instance` not hashed, DDL, binding.
 - `PolicyTableTest` — key/hash parity with Part 1 incl. fallbacks, reproduces the stored hash of real "SOD Template" (with
@@ -408,7 +506,7 @@ mvn test
   nested JSON → `jsonb`, ISO timestamps, SQL NULL for null/absent fields, metadata params. No live DB needed.
 
 ## Status / next
-Identity, Entitlement, Application, Account, Workgroup, Role, Identity-Role, Identity-Entitlement, Account-Entitlement, Role-Entitlement, Role-Hierarchy, Identity-Request, Identity-Request-Item, Identity-Request-Approval, Policy and Provisioning-Item are done. Entitlement runs on the generic engine (`EntitySpec` + `EntityRepository` +
+Identity, Entitlement, Application, Account, Workgroup, Role, Identity-Role, Identity-Entitlement, Account-Entitlement, Role-Entitlement, Role-Hierarchy, Identity-Request, Identity-Request-Item, Identity-Request-Approval, Policy, Provisioning-Item, Provisioning-Transaction, Work-Item, Workflow-Definition and Certification are done. Entitlement runs on the generic engine (`EntitySpec` + `EntityRepository` +
 `EntityImportService`); further current-state entities are added as one `*Table` spec each. Identity is the complete first vertical slice (HTTP → parse → map → metadata → upsert → verification). The
 column-spec + upsert engine is built to extend to the other ~39 endpoints, each with its own table, PK/salt,
 `source_object_type`, `record_hash` behavior (where applicable), nested fields, and current-state vs

@@ -2,6 +2,7 @@ D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\id\CanonicalIdsTe
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\AccountEntitlementTableTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\AccountTableTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\ApplicationTableTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\CertificationTableTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\EntitlementParityTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\EntitlementRepositoryTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\EntityImportServiceTest.java
@@ -14,8 +15,11 @@ D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\IdentityRo
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\IdentitySqlTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\PolicyTableTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\ProvisioningItemRepositoryTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\ProvisioningTxnTableTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\RoleEntitlementRepositoryTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\RoleHierarchyRepositoryTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\RoleTableTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\WorkflowDefinitionRepositoryTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\WorkgroupTableTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\WorkItemTableTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\testsupport\RecordingJdbc.java

@@ -234,4 +234,46 @@ public final class CanonicalIds {
         }
         return id;
     }
+
+    /**
+     * The ProvisioningTransaction primary key, matching Part 1's {@code NativeProvisioningTxnRepository.canonicalTxnId}:
+     * {@code canonicalUuid(source_id)}; a present but non-GUID id falls back to
+     * {@code deterministicUuid("native-provisioning-txn|"+id)}; a null/blank id is REFUSED (the row fails), as in Part 1.
+     */
+    public static String provisioningTxnId(String sourceId) {
+        String id = canonicalUuid(sourceId);
+        if (id == null) {
+            if (sourceId == null || sourceId.isBlank()) {
+                throw new IllegalArgumentException("ProvisioningTransaction source id is required for deterministic identity");
+            }
+            id = deterministicUuid("native-provisioning-txn|" + sourceId);
+        }
+        return id;
+    }
+
+    /**
+     * The WorkItem primary key, matching Part 1's {@code NativeWorkItemRepository.canonicalWorkItemId}:
+     * {@code canonicalUuid(source_id)} with NO fallback — a work item without a usable IIQ id is refused (row fails).
+     */
+    public static String workItemId(String sourceId) {
+        String id = canonicalUuid(sourceId);
+        if (id == null) {
+            throw new IllegalArgumentException("WorkItem source id is required for deterministic identity (got "
+                    + (sourceId == null ? "null" : "'" + sourceId + "'") + ")");
+        }
+        return id;
+    }
+
+    /**
+     * The Certification primary key, matching Part 1's {@code NativeCertificationRepository.canonicalCertificationId}:
+     * {@code canonicalUuid(source_id)}, falling back to {@code deterministicUuid("native-certification|"+id)}
+     * ({@code name} only when source_id is {@code null}).
+     */
+    public static String certificationId(String sourceId, String name) {
+        String id = canonicalUuid(sourceId);
+        if (id == null) {
+            id = deterministicUuid("native-certification|" + (sourceId == null ? name : sourceId));
+        }
+        return id;
+    }
 }
