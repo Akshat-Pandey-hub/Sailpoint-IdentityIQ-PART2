@@ -1,0 +1,5 @@
+com\keyforge\part2\ingest\IdentityBindingTest$PsHandler.class
+com\keyforge\part2\ingest\IdentityBindingTest$RsHandler.class
+com\keyforge\part2\id\CanonicalIdsTest.class
+com\keyforge\part2\ingest\IdentitySqlTest.class
+com\keyforge\part2\ingest\IdentityBindingTest.class
