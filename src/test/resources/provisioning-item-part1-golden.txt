@@ -1,0 +1,15 @@
+REST={"txn_source_id":"7f0001019fa71124819fb3e125ab1777","identity_name":"Emma Coleman","item_type":"ATTRIBUTE","operation":"Add","application_name":"corp directory-LDAP-Target","native_identity":"uid=ecoleman","instance":null,"account_operation":"Modify","name":"groups","value":"cn=ops – café ✓","value_json":"cn=ops – café ✓","assignment_id":"a1","assignment":true,"permission_target":null,"permission_rights":null,"request_id":"r1","item_index":0}
+OT=sailpoint.object.ProvisioningPlan$AttributeRequest
+NK=7f0001019fa71124819fb3e125ab1777|ATTRIBUTE|0
+HASH=9fb95a9b83720827190d1d248009497aec165ec7d62bbfdc34ad4c9294031c3e
+ID=cb571444-7611-3812-9d59-48ea847173fc
+REST={"txn_source_id":"7f0001019fa71124819fb3e125ab1777","identity_name":"Emma Coleman","item_type":"ATTRIBUTE","operation":"Set","application_name":null,"native_identity":null,"instance":null,"account_operation":null,"name":"memberOf","value":"[a, b]","value_json":["a","b",{"n":1.5}],"assignment_id":null,"assignment":null,"permission_target":null,"permission_rights":null,"request_id":null,"item_index":1}
+OT=sailpoint.object.ProvisioningPlan$AttributeRequest
+NK=7f0001019fa71124819fb3e125ab1777|ATTRIBUTE|1
+HASH=43b934fc8dcd631ca88d4c994fcf4b706321c3d8a916f73df0efea0806208077
+ID=a5240a01-6eba-30bb-8a4c-4b8976e454a9
+REST={"txn_source_id":"7f0001019fa71124819fb3e125ab1777","identity_name":null,"item_type":"PERMISSION","operation":"Add","application_name":null,"native_identity":null,"instance":"i1","account_operation":null,"name":"db1.payroll","value":null,"value_json":null,"assignment_id":null,"assignment":null,"permission_target":"db1.payroll","permission_rights":"read,write","request_id":null,"item_index":null}
+OT=sailpoint.object.ProvisioningPlan$PermissionRequest
+NK=7f0001019fa71124819fb3e125ab1777|PERMISSION|null
+HASH=5a571ff62a022b115f785c9f333bda957b66b3d3f7b0ed51d73a8eca453e7aa4
+ID=be88cb3f-1a8b-3548-9777-97ae74600f2c

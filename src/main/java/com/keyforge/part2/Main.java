@@ -20,6 +20,7 @@ import com.keyforge.part2.ingest.IdentityEntitlementTable;
 import com.keyforge.part2.ingest.IdentityRoleTable;
 import com.keyforge.part2.ingest.EntityWriter;
 import com.keyforge.part2.ingest.PolicyTable;
+import com.keyforge.part2.ingest.ProvisioningItemRepository;
 import com.keyforge.part2.ingest.RoleEntitlementRepository;
 import com.keyforge.part2.ingest.RoleHierarchyRepository;
 import com.keyforge.part2.ingest.RoleTable;
@@ -56,7 +57,9 @@ import java.util.function.Function;
  *                       Fetch GET /kfagent/identity-request-items and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_identity_request_item
  *  import-identity-request-approval
  *                       Fetch GET /kfagent/identity-request-approvals and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_identity_request_approval
- *  import-policy        Fetch GET /kfagent/policies     and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_policy</pre>
+ *  import-policy        Fetch GET /kfagent/policies     and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_policy
+ *  import-provisioning-item
+ *                       Fetch GET /kfagent/provisioning-items and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_provisioning_item</pre>
  *
  * Configuration is entirely external (environment variables / -D system properties) — see {@link AppConfig}.
  * Exit codes: 0 ok, 2 usage, 3 config error, 4 HTTP/source error, 5 PostgreSQL error, 6 completed with row
@@ -85,6 +88,7 @@ public final class Main {
             case "import-identity-request-item" -> System.exit(runImport(IdentityRequestItemTable.SPEC));
             case "import-identity-request-approval" -> System.exit(runImport(IdentityRequestApprovalTable.SPEC));
             case "import-policy" -> System.exit(runImport(PolicyTable.SPEC));
+            case "import-provisioning-item" -> System.exit(runImport(ProvisioningItemRepository::new));
             default -> {
                 printUsage();
                 System.exit("".equals(command) ? 2 : 2);
@@ -190,6 +194,8 @@ public final class Main {
         System.out.println("  import-identity-request-approval");
         System.out.println("                       Fetch GET /kfagent/identity-request-approvals and upsert into <PG_DEST_SCHEMA>.kf_identity_request_approval");
         System.out.println("  import-policy        Fetch GET /kfagent/policies     and upsert into <PG_DEST_SCHEMA>.kf_policy");
+        System.out.println("  import-provisioning-item");
+        System.out.println("                       Fetch GET /kfagent/provisioning-items and upsert into <PG_DEST_SCHEMA>.kf_provisioning_item");
         System.out.println();
         System.out.println("Required env: KFAGENT_BASE_URL, PG_HOST, PG_DATABASE, PG_USERNAME, PG_PASSWORD");
         System.out.println("Optional env: PG_PORT (5432), PG_DEST_SCHEMA (iiq_native_part2), KFAGENT_PAGE_SIZE (500),");

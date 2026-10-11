@@ -2,8 +2,10 @@ com\keyforge\part2\ingest\IdentityRoleTableTest$1.class
 com\keyforge\part2\ingest\RoleHierarchyRepositoryTest$Golden.class
 com\keyforge\part2\ingest\IdentityEntitlementTableTest$1.class
 com\keyforge\part2\ingest\RoleTableTest.class
+com\keyforge\part2\ingest\ProvisioningItemRepositoryTest$1.class
 com\keyforge\part2\ingest\IdentityRequestApprovalTableTest$1.class
 com\keyforge\part2\ingest\IdentityRequestItemTableTest$1.class
+com\keyforge\part2\ingest\ProvisioningItemRepositoryTest.class
 com\keyforge\part2\ingest\RoleTableTest$1.class
 com\keyforge\part2\ingest\IdentityEntitlementTableTest$Golden.class
 com\keyforge\part2\ingest\IdentityBindingTest$PsHandler.class
@@ -17,6 +19,7 @@ com\keyforge\part2\ingest\IdentityRequestItemTableTest.class
 com\keyforge\part2\ingest\IdentityBindingTest.class
 com\keyforge\part2\ingest\PolicyTableTest$1.class
 com\keyforge\part2\ingest\WorkgroupTableTest.class
+com\keyforge\part2\ingest\ProvisioningItemRepositoryTest$Golden.class
 com\keyforge\part2\ingest\IdentityEntitlementTableTest.class
 com\keyforge\part2\ingest\RoleTableTest$Golden.class
 com\keyforge\part2\ingest\RoleEntitlementRepositoryTest.class

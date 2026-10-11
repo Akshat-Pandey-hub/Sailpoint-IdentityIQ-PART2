@@ -26,6 +26,7 @@ Implemented entities:
 | `import-identity-request-item` | `GET /kfagent/identity-request-items` | `kf_identity_request_item` | `identityrequestitemid` (the item's own id) | `sailpoint.object.IdentityRequestItem` | SHA-256 over all 33 business fields |
 | `import-identity-request-approval` | `GET /kfagent/identity-request-approvals` | `kf_identity_request_approval` | `identityrequestapprovalid` (derived: request, work item, owner, index) | `sailpoint.object.WorkflowSummary$ApprovalSummary` | SHA-256 over all 17 business fields |
 | `import-policy` | `GET /kfagent/policies` | `kf_policy` | `policyid` | `sailpoint.object.Policy` | SHA-256 over all 21 fields |
+| `import-provisioning-item` | `GET /kfagent/provisioning-items` | `kf_provisioning_item` | `provisioningitemid` (derived per item) | `ProvisioningPlan$AttributeRequest` / `$PermissionRequest` (per row) | 16 of 17 fields (not `instance`) |
 
 ## How identity rows are keyed (the "two ids" explained)
 `userid` (the uuid primary key) is **not** a new/random id — it is `source_id` rewritten in canonical UUID
@@ -246,6 +247,24 @@ Part 1 rules from `NativePolicyRepository`:
   `b241b23`), so those 4 columns are NULL there. With those 4 set to NULL, Part 2's hash reproduces all 7 stored hashes
   exactly, so the hash rule is identical. Part 1 would produce Part 2's hash if it re-ran today.
 
+## Provisioning-Item (`kf_provisioning_item`)
+The AttributeRequest / PermissionRequest items **derived** from a provisioning transaction's plan. This is non-1:1 and
+uses a dedicated `ProvisioningItemRepository`. Part 1 rules from `NativeProvisioningItemRepository` /
+`NativeProvisioningTxnParser.toItem`:
+- Items have **no IIQ id of their own**, and the key is **not** the transaction id. `provisioningitemid` =
+  `deterministicUuid("native-provisioning-item|" + txn_source_id + "|" + item_type + "|" + operation + "|" + name + "|"
+  + value_json + "|" + value + "|" + item_index)`, where `value_json` is the compact JSON text and a null part becomes `null`.
+- **Parent link:** `txn_source_id` = the raw IIQ ProvisioningTransaction id. Part 1 fills it from the parent before the
+  response is built. Part 2 also derives the two columns the response omits: `src_object_id` = `txn_source_id`, and
+  `src_natural_key` = `txn_source_id|item_type|item_index`, a shorter formula than the PK.
+- `source_object_type` is per row: `PERMISSION` items → `sailpoint.object.ProvisioningPlan$PermissionRequest`, all
+  others → `sailpoint.object.ProvisioningPlan$AttributeRequest`.
+- 17 response fields: `value_json` is the only `jsonb`; `value` / `permission_target` / `permission_rights` are text;
+  `assignment` is boolean; `item_index` is integer.
+- `record_hash` = Part 1's **16-field** subset: every field except `instance`. Like Part 1, rows are never deleted.
+- Checked against real data: all 251 live items derive a key that exists in Part 1's `iiq_native` table, with equal
+  `record_hash`, `source_object_type`, `src_object_id` and `src_natural_key` (251/251 each).
+
 ## Build (Java 17, Maven)
 ```bash
 mvn clean package
@@ -286,6 +305,7 @@ psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_identit
 psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_identity_request_item.sql
 psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_identity_request_approval.sql
 psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_policy.sql
+psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_provisioning_item.sql
 ```
 It writes to a **separate** schema and never alters an existing populated schema.
 
@@ -309,6 +329,7 @@ java -jar target/kfagent-ingest.jar import-identity-request
 java -jar target/kfagent-ingest.jar import-identity-request-item
 java -jar target/kfagent-ingest.jar import-identity-request-approval
 java -jar target/kfagent-ingest.jar import-policy
+java -jar target/kfagent-ingest.jar import-provisioning-item
 ```
 Prints a credential-free config line, the run id, and an import summary (pages / fetched / inserted /
 updated / failed, with up to 10 sample failures). Exit codes: `0` ok, `2` usage, `3` config, `4` HTTP/source,
@@ -356,6 +377,8 @@ mvn test
   binding/NULL/invalid handling, lineage params.
 - `AccountTableTest` — `record_hash` + `accountid` parity with Part 1, including both fallback-key cases (natural
   key, and a null application name), every field hashed, DDL order = iiq_native.kf_account, binding, lineage.
+- `ProvisioningItemRepositoryTest` — derived key / src_natural_key / per-row object type / hash parity with Part 1 (incl.
+  txn back-fill and null index), key is not the txn id, `instance` not hashed, DDL, binding.
 - `PolicyTableTest` — key/hash parity with Part 1 incl. fallbacks, reproduces the stored hash of real "SOD Template" (with
   the 4 later-populated fields as stored), every field hashed, text-vs-jsonb fields, trailing DDL, binding.
 - `IdentityRequestApprovalTableTest` — derived key/hash parity with Part 1 (incl. parent back-fill and null index), key
@@ -385,7 +408,7 @@ mvn test
   nested JSON → `jsonb`, ISO timestamps, SQL NULL for null/absent fields, metadata params. No live DB needed.
 
 ## Status / next
-Identity, Entitlement, Application, Account, Workgroup, Role, Identity-Role, Identity-Entitlement, Account-Entitlement, Role-Entitlement, Role-Hierarchy, Identity-Request, Identity-Request-Item, Identity-Request-Approval and Policy are done. Entitlement runs on the generic engine (`EntitySpec` + `EntityRepository` +
+Identity, Entitlement, Application, Account, Workgroup, Role, Identity-Role, Identity-Entitlement, Account-Entitlement, Role-Entitlement, Role-Hierarchy, Identity-Request, Identity-Request-Item, Identity-Request-Approval, Policy and Provisioning-Item are done. Entitlement runs on the generic engine (`EntitySpec` + `EntityRepository` +
 `EntityImportService`); further current-state entities are added as one `*Table` spec each. Identity is the complete first vertical slice (HTTP → parse → map → metadata → upsert → verification). The
 column-spec + upsert engine is built to extend to the other ~39 endpoints, each with its own table, PK/salt,
 `source_object_type`, `record_hash` behavior (where applicable), nested fields, and current-state vs

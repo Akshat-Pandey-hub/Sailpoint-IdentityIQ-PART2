@@ -9,6 +9,7 @@ com\keyforge\part2\ingest\PolicyTable.class
 com\keyforge\part2\ingest\IdentityImportService.class
 com\keyforge\part2\ingest\ImportResult.class
 com\keyforge\part2\ingest\JsonColumnBinder$1.class
+com\keyforge\part2\ingest\ProvisioningItemRepository.class
 com\keyforge\part2\ingest\ApplicationTable.class
 com\keyforge\part2\config\ConfigException.class
 com\keyforge\part2\ingest\AccountTable.class
