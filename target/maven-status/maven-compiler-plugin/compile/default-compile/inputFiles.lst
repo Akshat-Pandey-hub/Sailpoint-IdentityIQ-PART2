@@ -6,6 +6,7 @@ D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\hash\HashValues.j
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\hash\RecordHash.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\http\KfAgentClient.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\id\CanonicalIds.java
+D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\AccessHistoryEntitlementRepository.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\AccountEntitlementTable.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\AccountTable.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\ApplicationTable.java
@@ -24,6 +25,7 @@ D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\EntityImpo
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\EntityRepository.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\EntitySpec.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\EntityWriter.java
+D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\GroupDefinitionTable.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\IdentityEntitlementTable.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\IdentityImportService.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\IdentityRepository.java
@@ -45,9 +47,11 @@ D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\RoleTable.
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\SqlReportImportService.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\SqlReportRepository.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\TaskResultTable.java
+D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\TaskScheduleTable.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\WorkflowDefinitionRepository.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\WorkgroupMemberRepository.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\WorkgroupMembersReport.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\WorkgroupTable.java
+D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\WorkItemArchiveRepository.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\WorkItemTable.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\Main.java

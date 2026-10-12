@@ -6,6 +6,7 @@ import com.keyforge.part2.db.PostgresConnection;
 import com.keyforge.part2.http.KfAgentClient;
 import com.keyforge.part2.ingest.AccountEntitlementTable;
 import com.keyforge.part2.ingest.AccountTable;
+import com.keyforge.part2.ingest.AccessHistoryEntitlementRepository;
 import com.keyforge.part2.ingest.AuditEventRepository;
 import com.keyforge.part2.ingest.CertificationArchiveRepository;
 import com.keyforge.part2.ingest.CertificationEntityTable;
@@ -27,6 +28,7 @@ import com.keyforge.part2.ingest.IdentityRepository;
 import com.keyforge.part2.ingest.IdentityEntitlementTable;
 import com.keyforge.part2.ingest.IdentityRoleTable;
 import com.keyforge.part2.ingest.EntityWriter;
+import com.keyforge.part2.ingest.GroupDefinitionTable;
 import com.keyforge.part2.ingest.PolicyConstraintTable;
 import com.keyforge.part2.ingest.PolicyTable;
 import com.keyforge.part2.ingest.PolicyViolationTable;
@@ -38,6 +40,8 @@ import com.keyforge.part2.ingest.RoleTable;
 import com.keyforge.part2.ingest.SqlReportImportService;
 import com.keyforge.part2.ingest.SqlReportRepository;
 import com.keyforge.part2.ingest.TaskResultTable;
+import com.keyforge.part2.ingest.TaskScheduleTable;
+import com.keyforge.part2.ingest.WorkItemArchiveRepository;
 import com.keyforge.part2.ingest.WorkItemTable;
 import com.keyforge.part2.ingest.WorkgroupMemberRepository;
 import com.keyforge.part2.ingest.WorkgroupMembersReport;
@@ -108,7 +112,15 @@ import java.util.function.Function;
  *  import-audit-event
  *                       Fetch GET /kfagent/audit-events and append into &lt;PG_DEST_SCHEMA&gt;.kf_audit_event
  *  import-task-result
- *                       Fetch GET /kfagent/task-results and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_task_result</pre>
+ *                       Fetch GET /kfagent/task-results and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_task_result
+ *  import-task-schedule
+ *                       Fetch GET /kfagent/task-schedules and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_task_schedule
+ *  import-workitem-archive
+ *                       Fetch GET /kfagent/workitem-archives and append into &lt;PG_DEST_SCHEMA&gt;.kf_workitem_archive
+ *  import-group-definition
+ *                       Fetch GET /kfagent/group-definitions and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_group_definition
+ *  import-access-history
+ *                       Fetch GET /kfagent/access-history and append into &lt;PG_DEST_SCHEMA&gt;.kf_access_hist_entitlement</pre>
  *
  * Configuration is entirely external (environment variables / -D system properties) — see {@link AppConfig}.
  * Exit codes: 0 ok, 2 usage, 3 config error, 4 HTTP/source error, 5 PostgreSQL error, 6 completed with row
@@ -161,6 +173,10 @@ public final class Main {
                     WorkgroupMembersReport.RESOURCE, WorkgroupMembersReport.TABLE, WorkgroupMembersReport.COLUMNS));
             case "import-audit-event" -> System.exit(runImport(AuditEventRepository::new));
             case "import-task-result" -> System.exit(runImport(TaskResultTable.SPEC));
+            case "import-task-schedule" -> System.exit(runImport(TaskScheduleTable.SPEC));
+            case "import-workitem-archive" -> System.exit(runImport(WorkItemArchiveRepository::new));
+            case "import-group-definition" -> System.exit(runImport(GroupDefinitionTable.SPEC));
+            case "import-access-history" -> System.exit(runImport(AccessHistoryEntitlementRepository::new));
             default -> {
                 printUsage();
                 System.exit("".equals(command) ? 2 : 2);
@@ -337,6 +353,14 @@ public final class Main {
         System.out.println("                       Fetch GET /kfagent/audit-events and append into <PG_DEST_SCHEMA>.kf_audit_event");
         System.out.println("  import-task-result");
         System.out.println("                       Fetch GET /kfagent/task-results and upsert into <PG_DEST_SCHEMA>.kf_task_result");
+        System.out.println("  import-task-schedule");
+        System.out.println("                       Fetch GET /kfagent/task-schedules and upsert into <PG_DEST_SCHEMA>.kf_task_schedule");
+        System.out.println("  import-workitem-archive");
+        System.out.println("                       Fetch GET /kfagent/workitem-archives and append into <PG_DEST_SCHEMA>.kf_workitem_archive");
+        System.out.println("  import-group-definition");
+        System.out.println("                       Fetch GET /kfagent/group-definitions and upsert into <PG_DEST_SCHEMA>.kf_group_definition");
+        System.out.println("  import-access-history");
+        System.out.println("                       Fetch GET /kfagent/access-history and append into <PG_DEST_SCHEMA>.kf_access_hist_entitlement");
         System.out.println();
         System.out.println("Required env: KFAGENT_BASE_URL, PG_HOST, PG_DATABASE, PG_USERNAME, PG_PASSWORD");
         System.out.println("Optional env: PG_PORT (5432), PG_DEST_SCHEMA (iiq_native_part2), KFAGENT_PAGE_SIZE (500),");

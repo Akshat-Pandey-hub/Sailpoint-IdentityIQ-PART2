@@ -1,0 +1,12 @@
+REST={"source_id":"7f0001019f061fdc819f34b0ac35b1c1","name":"Engineering Population – café ✓","type":"POPULATION","factory_id":null,"factory_name":null,"filter_expression":"department == \"Engineering\" && inactive == false","is_private":false,"indexed":false,"null_group":false,"name_unique":true,"owner_id":"7f000101971416688197147684ad00ff","owner_name":"spadmin","last_refresh":null,"created_at":"2026-06-27T02:33:29.128Z","modified_at":"2026-07-01T10:00:00.500Z"}
+HASH=cc7aebf68d5d281d1d395254cf3cb9bce75eefdbcb3535de7fe06dfa1caed810
+ID=7f000101-9f06-1fdc-819f-34b0ac35b1c1
+REST={"source_id":"7f000101-9f06-1fdc-819f-34b0ac35b2c2","name":"Location: Pune","type":"GROUP","factory_id":"7f0001019f061fdc819f34b0ac35a0f0","factory_name":"Location","filter_expression":"location == \"Pune\"","is_private":true,"indexed":true,"null_group":false,"name_unique":false,"owner_id":null,"owner_name":null,"last_refresh":"2026-10-02T15:23:51.988Z","created_at":"2026-10-01T00:00:00Z","modified_at":null}
+HASH=8d44c724f72c4fc14f75b0d9e8538f7c3688d11344894844a3d15d4b1df33e03
+ID=7f000101-9f06-1fdc-819f-34b0ac35b2c2
+REST={"source_id":"group-not-a-guid","name":"Odd Group","type":"GROUP","factory_id":null,"factory_name":null,"filter_expression":null,"is_private":null,"indexed":null,"null_group":true,"name_unique":null,"owner_id":null,"owner_name":null,"last_refresh":null,"created_at":null,"modified_at":null}
+HASH=d51f00e697ef8269cc74ce848d66cb71334033ce4911cc6dcbb8d1b8a717b68b
+ID=2599025e-612e-322b-81eb-866266b17d85
+REST={"source_id":null,"name":"No Id Population","type":"POPULATION","factory_id":null,"factory_name":null,"filter_expression":"type == \"Employee\"","is_private":false,"indexed":false,"null_group":false,"name_unique":true,"owner_id":null,"owner_name":null,"last_refresh":null,"created_at":"2026-07-01T00:00:00Z","modified_at":null}
+HASH=56a47468abdf6835da35d0944e7ff5ceb6166ba511fd67840aa0eef6b831d8a9
+ID=ee0b2c16-a9e8-3671-92d9-c0db55e07576

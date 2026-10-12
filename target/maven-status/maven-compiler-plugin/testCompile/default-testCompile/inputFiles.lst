@@ -1,4 +1,5 @@
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\id\CanonicalIdsTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\AccessHistoryEntitlementRepositoryTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\AccountEntitlementTableTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\AccountTableTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\ApplicationTableTest.java
@@ -13,6 +14,7 @@ D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\Entitlemen
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\EntitlementParityTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\EntitlementRepositoryTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\EntityImportServiceTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\GroupDefinitionTableTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\IdentityBindingTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\IdentityEntitlementTableTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\IdentityRequestApprovalTableTest.java
@@ -29,9 +31,11 @@ D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\RoleEntitl
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\RoleHierarchyRepositoryTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\RoleTableTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\TaskResultTableTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\TaskScheduleTableTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\WorkflowDefinitionRepositoryTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\WorkgroupMemberRepositoryTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\WorkgroupMembersReportTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\WorkgroupTableTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\WorkItemArchiveRepositoryTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\WorkItemTableTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\testsupport\RecordingJdbc.java
