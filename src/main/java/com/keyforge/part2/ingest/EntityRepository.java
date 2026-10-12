@@ -48,6 +48,12 @@ public final class EntityRepository implements EntityWriter {
         this.upsertSql = buildUpsert();
     }
 
+    /** The PK {@link #upsert} writes: the spec's key function. */
+    @Override
+    public String key(JsonNode row) {
+        return spec.keyFn().apply(row);
+    }
+
     public EntitySpec spec() {
         return spec;
     }

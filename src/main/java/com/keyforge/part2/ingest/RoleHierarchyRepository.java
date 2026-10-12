@@ -140,6 +140,12 @@ public final class RoleHierarchyRepository implements EntityWriter {
     }
 
     /** Part 1 {@code NativeRoleHierarchyRepository.id}. */
+    /** The PK {@link #upsert} writes. */
+    @Override
+    public String key(JsonNode row) {
+        return id(row);
+    }
+
     public static String id(JsonNode row) {
         return CanonicalIds.deterministicUuid("native-role-hierarchy|" + naturalKey(row));
     }

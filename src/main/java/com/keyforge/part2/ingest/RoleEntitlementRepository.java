@@ -210,6 +210,12 @@ public final class RoleEntitlementRepository implements EntityWriter {
         }
     }
 
+    /** The PK {@link #upsert} writes ({@code roleentitlementid}). */
+    @Override
+    public String key(JsonNode row) {
+        return Edge.of(row).id();
+    }
+
     @Override
     public String ref(JsonNode row) {
         return "role " + text(row, "source_role_id") + " (" + text(row, "role_name") + ") "

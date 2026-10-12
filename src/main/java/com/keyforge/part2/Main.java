@@ -40,7 +40,10 @@ import com.keyforge.part2.ingest.ProvisioningTxnTable;
 import com.keyforge.part2.ingest.RoleEntitlementRepository;
 import com.keyforge.part2.ingest.RoleHierarchyRepository;
 import com.keyforge.part2.ingest.RoleTable;
+import com.keyforge.part2.ingest.SnapshotSweepImportService;
+import com.keyforge.part2.ingest.SoftDeleteSweeper;
 import com.keyforge.part2.ingest.SqlReportImportService;
+import com.keyforge.part2.ingest.SweepPolicies;
 import com.keyforge.part2.ingest.SqlReportRepository;
 import com.keyforge.part2.ingest.SyslogEventImportService;
 import com.keyforge.part2.ingest.SyslogEventRepository;
@@ -57,6 +60,7 @@ import com.keyforge.part2.ingest.ImportResult;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 
@@ -137,7 +141,8 @@ import java.util.function.Function;
  *
  * Configuration is entirely external (environment variables / -D system properties) — see {@link AppConfig}.
  * Exit codes: 0 ok, 2 usage, 3 config error, 4 HTTP/source error, 5 PostgreSQL error, 6 completed with row
- * failures, 7 scan not confirmed complete (import-syslog-event), 1 unexpected.
+ * failures, 7 scan not confirmed complete (import-syslog-event; or a swept table whose snapshot completeness could
+ * not be proven, so its deletion sweep was skipped), 1 unexpected.
  */
 public final class Main {
 
@@ -251,13 +256,21 @@ public final class Main {
 
             KfAgentClient client = new KfAgentClient(config);
             EntityWriter writer = writerForSchema.apply(config.pgSchema());
-            EntityImportService service = new EntityImportService(client, writer, config.pageSize());
+            Optional<SweepPolicies.SweepConfig> sweep = SweepPolicies.configFor(writer.targetTable());
 
             try (Connection conn = PostgresConnection.open(config)) {
-                ImportResult result = service.run(conn, runId);
+                if (sweep.isEmpty()) {
+                    // not swept: the ordinary paged import, unchanged
+                    ImportResult result = new EntityImportService(client, writer, config.pageSize()).run(conn, runId);
+                    System.out.println();
+                    System.out.println(result.summary());
+                    return result.failed() > 0 ? 6 : 0;
+                }
+                SnapshotSweepImportService.Outcome outcome = new SnapshotSweepImportService(client::fetchSnapshot,
+                        writer, sweep.get(), new SoftDeleteSweeper(config.pgSchema()), false).run(conn, runId);
                 System.out.println();
-                System.out.println(result.summary());
-                return result.failed() > 0 ? 6 : 0;
+                System.out.println(outcome.result().summary());
+                return printSweep(outcome.sweep(), outcome.result().failed());
             }
         } catch (ConfigException e) {
             System.err.println("Configuration error: " + e.getMessage());
@@ -318,6 +331,24 @@ public final class Main {
             System.err.println("Unexpected error: " + e.getMessage());
             return 1;
         }
+    }
+
+    /** Prints the sweep line; exit 7 when completeness could not be proven (the deletion state may be stale). */
+    private static int printSweep(SoftDeleteSweeper.Result sweep, int failedRows) {
+        if (sweep.swept()) {
+            System.out.println("  sweep:     marked deleted " + sweep.marked() + ", revived " + sweep.revived()
+                    + " (keep-set " + sweep.keepCount() + "; " + sweep.note() + ")");
+        } else {
+            System.out.println("  sweep:     " + sweep.status() + " — " + sweep.note()
+                    + " (no row was marked deleted or revived)");
+        }
+        boolean unproven = sweep.status() == SoftDeleteSweeper.Status.SKIPPED_COMPLETENESS_FAILED
+                || sweep.status() == SoftDeleteSweeper.Status.SKIPPED_NOT_VERIFIED;
+        if (unproven) {
+            System.err.println("Deletion sweep skipped: snapshot completeness not proven — " + sweep.note());
+            return 7;
+        }
+        return failedRows > 0 ? 6 : 0;
     }
 
     private static void printSyslogScan(SyslogEventImportService service, String status) {

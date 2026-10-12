@@ -1,3 +1,4 @@
+com\keyforge\part2\ingest\SweepPoliciesTest.class
 com\keyforge\part2\ingest\RoleTableTest.class
 com\keyforge\part2\ingest\ProvisioningItemRepositoryTest$1.class
 com\keyforge\part2\ingest\WorkItemTableTest$1.class
@@ -24,8 +25,10 @@ com\keyforge\part2\ingest\IdentityBindingTest.class
 com\keyforge\part2\ingest\WorkItemArchiveRepositoryTest.class
 com\keyforge\part2\ingest\IdentityEntitlementTableTest.class
 com\keyforge\part2\ingest\ApplicationTableTest$1.class
+com\keyforge\part2\ingest\SnapshotSweepImportServiceTest$Db.class
 com\keyforge\part2\ingest\CertificationEntityTableTest.class
 com\keyforge\part2\ingest\RoleEntitlementRepositoryTest$Golden.class
+com\keyforge\part2\ingest\SnapshotSweepImportServiceTest$Row.class
 com\keyforge\part2\ingest\RoleHierarchyRepositoryTest.class
 com\keyforge\part2\ingest\IdentityRequestTableTest.class
 com\keyforge\part2\ingest\GroupDefinitionTableTest.class
@@ -36,6 +39,7 @@ com\keyforge\part2\ingest\CertificationItemTableTest$Golden.class
 com\keyforge\part2\ingest\AccountTableTest$Golden.class
 com\keyforge\part2\ingest\IdentityRequestItemTableTest$Golden.class
 com\keyforge\part2\ingest\WorkItemTableTest$Golden.class
+com\keyforge\part2\ingest\SnapshotSweepImportServiceTest.class
 com\keyforge\part2\ingest\IdentityRequestTableTest$1.class
 com\keyforge\part2\ingest\IdentityRequestTableTest$Golden.class
 com\keyforge\part2\ingest\AccountTableTest.class
@@ -53,6 +57,7 @@ com\keyforge\part2\ingest\PolicyViolationTableTest$1.class
 com\keyforge\part2\ingest\TaskResultTableTest$1.class
 com\keyforge\part2\ingest\RoleTableTest$1.class
 com\keyforge\part2\ingest\IdentityEntitlementTableTest$Golden.class
+com\keyforge\part2\ingest\SnapshotSweepImportServiceTest$Writer.class
 com\keyforge\part2\ingest\WorkgroupMembersReportTest$Recorder.class
 com\keyforge\part2\ingest\IdentityBindingTest$PsHandler.class
 com\keyforge\part2\ingest\ApplicationTableTest$Golden.class
@@ -63,6 +68,7 @@ com\keyforge\part2\ingest\SoftDeleteSweeperTest$Row.class
 com\keyforge\part2\ingest\AccessHistoryIdentityEventRepositoryTest.class
 com\keyforge\part2\ingest\EntitlementAssignmentReportTest.class
 com\keyforge\part2\ingest\AccessHistoryIdentityEventRepositoryTest$Golden.class
+com\keyforge\part2\ingest\SnapshotSweepImportServiceTest$Scans.class
 com\keyforge\part2\ingest\PolicyTableTest$1.class
 com\keyforge\part2\ingest\WorkgroupTableTest.class
 com\keyforge\part2\ingest\ProvisioningItemRepositoryTest$Golden.class

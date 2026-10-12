@@ -29,4 +29,12 @@ public interface EntityWriter {
 
     /** Short human reference for failure messages. */
     String ref(JsonNode row);
+
+    /**
+     * The primary-key value {@link #upsert} writes for this row (used as the soft-delete sweep's keep-set), or
+     * {@code null} when this writer does not expose it — such a writer can never be swept.
+     */
+    default String key(JsonNode row) {
+        return null;
+    }
 }

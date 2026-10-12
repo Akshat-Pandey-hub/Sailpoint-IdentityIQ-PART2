@@ -160,6 +160,12 @@ public final class ProvisioningItemRepository implements EntityWriter {
     }
 
     /** Part 1 {@code NativeProvisioningItemRepository.canonicalItemId}; value_json as Part 1's compact JSON string. */
+    /** The PK {@link #upsert} writes. */
+    @Override
+    public String key(JsonNode row) {
+        return id(row);
+    }
+
     public static String id(JsonNode row) {
         return CanonicalIds.deterministicUuid("native-provisioning-item|" + text(row, "txn_source_id") + "|"
                 + text(row, "item_type") + "|" + text(row, "operation") + "|" + text(row, "name") + "|"

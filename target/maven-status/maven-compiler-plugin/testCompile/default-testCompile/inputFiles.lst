@@ -33,7 +33,9 @@ D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\Provisioni
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\RoleEntitlementRepositoryTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\RoleHierarchyRepositoryTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\RoleTableTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\SnapshotSweepImportServiceTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\SoftDeleteSweeperTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\SweepPoliciesTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\SyslogEventImportServiceTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\SyslogEventRepositoryTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\TaskResultTableTest.java

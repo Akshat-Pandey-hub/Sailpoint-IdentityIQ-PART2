@@ -53,6 +53,30 @@ public final class KfAgentClient {
     public Page fetch(String resource, int start, int limit) {
         String url = config.kfAgentBaseUrl() + "/kfagent/" + resource
                 + "?start=" + Math.max(0, start) + "&limit=" + limit;
+        HttpResponse<String> resp = get(url);
+        return new Page(resp.body(), sourceCount(resp.headers().firstValue(SOURCE_COUNT_HEADER).orElse(null)));
+    }
+
+    /** A whole-population response: the raw body plus the {@value #VERIFIED_SOURCE_COUNT_HEADER} header (or null). */
+    public record Snapshot(String body, Integer verifiedSourceCount) { }
+
+    /**
+     * Header in which the KF Agent reports that the response came from ONE full internal scan whose complete-scan guard
+     * passed against this IIQ source count (Part 1 {@code KfAgentScanEvidence}).
+     */
+    public static final String VERIFIED_SOURCE_COUNT_HEADER = "X-KF-Verified-Source-Count";
+
+    /**
+     * Fetches the WHOLE population of {@code /kfagent/<resource>} in one request (no {@code start}/{@code limit}), so the
+     * body comes from a single KF Agent scan — one consistent snapshot — together with its verified source count.
+     */
+    public Snapshot fetchSnapshot(String resource) {
+        HttpResponse<String> resp = get(config.kfAgentBaseUrl() + "/kfagent/" + resource);
+        return new Snapshot(resp.body(),
+                sourceCount(resp.headers().firstValue(VERIFIED_SOURCE_COUNT_HEADER).orElse(null)));
+    }
+
+    private HttpResponse<String> get(String url) {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(url))
                 .timeout(Duration.ofSeconds(config.httpTimeoutSeconds()))
                 .header("Accept", "application/json")
@@ -68,7 +92,7 @@ public final class KfAgentClient {
             if (code < 200 || code >= 300) {
                 throw new KfAgentHttpException("GET " + url + " returned HTTP " + code + ": " + snippet(resp.body()));
             }
-            return new Page(resp.body(), sourceCount(resp.headers().firstValue(SOURCE_COUNT_HEADER).orElse(null)));
+            return resp;
         } catch (KfAgentHttpException e) {
             throw e;
         } catch (java.io.IOException | InterruptedException e) {

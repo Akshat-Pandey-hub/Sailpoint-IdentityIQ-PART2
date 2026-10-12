@@ -1,6 +1,7 @@
 com\keyforge\part2\ingest\BusinessHash.class
 com\keyforge\part2\http\KfAgentClient$KfAgentHttpException.class
 com\keyforge\part2\ingest\SoftDeleteSweeper$Target.class
+com\keyforge\part2\ingest\SweepPolicies$Completeness.class
 com\keyforge\part2\db\PostgresConnection.class
 com\keyforge\part2\ingest\AccessHistoryCertificationRepository.class
 com\keyforge\part2\http\KfAgentClient.class
@@ -15,6 +16,8 @@ com\keyforge\part2\ingest\SoftDeleteSweeper$Status.class
 com\keyforge\part2\ingest\AuditEventRepository.class
 com\keyforge\part2\ingest\IdentityTable.class
 com\keyforge\part2\ingest\ColumnSpec$Kind.class
+com\keyforge\part2\ingest\SnapshotSweepImportService$1.class
+com\keyforge\part2\ingest\SweepPolicies$SweepConfig.class
 com\keyforge\part2\ingest\AccessHistoryIdentityEventRepository.class
 com\keyforge\part2\ingest\IdentityRepository$1.class
 com\keyforge\part2\ingest\SqlReportRepository.class
@@ -23,6 +26,7 @@ com\keyforge\part2\ingest\CertificationArchiveRepository.class
 com\keyforge\part2\ingest\CertificationEntityTable.class
 com\keyforge\part2\ingest\SqlReportRepository$Replaced.class
 com\keyforge\part2\ingest\IdentityRequestTable.class
+com\keyforge\part2\ingest\SnapshotSweepImportService$SnapshotFetcher.class
 com\keyforge\part2\ingest\SyslogEventImportService$PageFetcher.class
 com\keyforge\part2\ingest\AccountEntitlementTable.class
 com\keyforge\part2\ingest\EntitlementCertificationStatusReport.class
@@ -58,11 +62,13 @@ com\keyforge\part2\ingest\RoleHierarchyRepository.class
 com\keyforge\part2\ingest\SqlReportImportService.class
 com\keyforge\part2\ingest\IdentityEntitlementTable.class
 com\keyforge\part2\ingest\EntityRepository$Outcome.class
+com\keyforge\part2\ingest\SnapshotSweepImportService$Outcome.class
 com\keyforge\part2\ingest\SyslogEventImportService$IncompleteScanException.class
 com\keyforge\part2\ingest\EntityRepository.class
 com\keyforge\part2\ingest\RoleEntitlementRepository$Edge.class
 com\keyforge\part2\ingest\CertificationTable.class
 com\keyforge\part2\ingest\WorkgroupTable.class
+com\keyforge\part2\ingest\SnapshotSweepImportService.class
 com\keyforge\part2\hash\RecordHash.class
 com\keyforge\part2\ingest\EntitlementTable.class
 com\keyforge\part2\ingest\PolicyConstraintTable.class
@@ -74,6 +80,7 @@ com\keyforge\part2\ingest\WorkflowDefinitionRepository.class
 com\keyforge\part2\ingest\WorkgroupMembersReport.class
 com\keyforge\part2\id\CanonicalIds.class
 com\keyforge\part2\ingest\EntityImportService$1.class
+com\keyforge\part2\http\KfAgentClient$Snapshot.class
 com\keyforge\part2\ingest\SweepEvidence.class
 com\keyforge\part2\ingest\EntityWriter.class
 com\keyforge\part2\ingest\RoleEntitlementRepository.class
