@@ -11,6 +11,8 @@ import com.keyforge.part2.ingest.CertificationEntityTable;
 import com.keyforge.part2.ingest.CertificationItemTable;
 import com.keyforge.part2.ingest.CertificationTable;
 import com.keyforge.part2.ingest.ApplicationTable;
+import com.keyforge.part2.ingest.EntitlementAssignmentReport;
+import com.keyforge.part2.ingest.EntitlementCertificationReport;
 import com.keyforge.part2.ingest.EntitlementTable;
 import com.keyforge.part2.ingest.EntityImportService;
 import com.keyforge.part2.ingest.EntityRepository;
@@ -25,18 +27,23 @@ import com.keyforge.part2.ingest.IdentityRoleTable;
 import com.keyforge.part2.ingest.EntityWriter;
 import com.keyforge.part2.ingest.PolicyConstraintTable;
 import com.keyforge.part2.ingest.PolicyTable;
+import com.keyforge.part2.ingest.PolicyViolationTable;
 import com.keyforge.part2.ingest.ProvisioningItemRepository;
 import com.keyforge.part2.ingest.ProvisioningTxnTable;
 import com.keyforge.part2.ingest.RoleEntitlementRepository;
 import com.keyforge.part2.ingest.RoleHierarchyRepository;
 import com.keyforge.part2.ingest.RoleTable;
+import com.keyforge.part2.ingest.SqlReportImportService;
+import com.keyforge.part2.ingest.SqlReportRepository;
 import com.keyforge.part2.ingest.WorkItemTable;
+import com.keyforge.part2.ingest.WorkgroupMemberRepository;
 import com.keyforge.part2.ingest.WorkflowDefinitionRepository;
 import com.keyforge.part2.ingest.WorkgroupTable;
 import com.keyforge.part2.ingest.ImportResult;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;
 
@@ -81,7 +88,15 @@ import java.util.function.Function;
  *  import-certification-archive
  *                       Fetch GET /kfagent/certification-archives and append into &lt;PG_DEST_SCHEMA&gt;.kf_certification_archive
  *  import-policy-constraint
- *                       Fetch GET /kfagent/policy-constraints and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_policy_constraint</pre>
+ *                       Fetch GET /kfagent/policy-constraints and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_policy_constraint
+ *  import-policy-violation
+ *                       Fetch GET /kfagent/policy-violations and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_violation
+ *  import-entitlement-assignment
+ *                       Fetch GET /kfagent/entitlement-assignment (SQL report) and REPLACE &lt;PG_DEST_SCHEMA&gt;.kf_entitlement_assignment
+ *  import-workgroup-member
+ *                       Fetch GET /kfagent/workgroupmember and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_workgroup_member
+ *  import-entitlement-certification
+ *                       Fetch GET /kfagent/entitlement-certification (SQL report) and REPLACE &lt;PG_DEST_SCHEMA&gt;.kf_entitlement_certification</pre>
  *
  * Configuration is entirely external (environment variables / -D system properties) — see {@link AppConfig}.
  * Exit codes: 0 ok, 2 usage, 3 config error, 4 HTTP/source error, 5 PostgreSQL error, 6 completed with row
@@ -119,6 +134,14 @@ public final class Main {
             case "import-certification-item" -> System.exit(runImport(CertificationItemTable.SPEC));
             case "import-certification-archive" -> System.exit(runImport(CertificationArchiveRepository::new));
             case "import-policy-constraint" -> System.exit(runImport(PolicyConstraintTable.SPEC));
+            case "import-policy-violation" -> System.exit(runImport(PolicyViolationTable.SPEC));
+            case "import-entitlement-assignment" -> System.exit(runSqlReport("EntitlementAssignment",
+                    EntitlementAssignmentReport.RESOURCE, EntitlementAssignmentReport.TABLE,
+                    EntitlementAssignmentReport.COLUMNS));
+            case "import-workgroup-member" -> System.exit(runImport(WorkgroupMemberRepository::new));
+            case "import-entitlement-certification" -> System.exit(runSqlReport("EntitlementCertification",
+                    EntitlementCertificationReport.RESOURCE, EntitlementCertificationReport.TABLE,
+                    EntitlementCertificationReport.COLUMNS));
             default -> {
                 printUsage();
                 System.exit("".equals(command) ? 2 : 2);
@@ -196,6 +219,45 @@ public final class Main {
         }
     }
 
+    /**
+     * Runs a SQL-report import: fetch the whole report, then replace the table in one transaction (Part 1's
+     * replace-all semantics). Same config, exit codes and summary as the entity imports.
+     */
+    private static int runSqlReport(String entity, String resource, String table, List<String> columns) {
+        try {
+            AppConfig config = AppConfig.load();
+            String runId = UUID.randomUUID().toString();
+            System.out.println(config.describe());
+            System.out.println("extraction_run_id: " + runId);
+
+            KfAgentClient client = new KfAgentClient(config);
+            SqlReportRepository repository = new SqlReportRepository(config.pgSchema(), table, columns);
+            SqlReportImportService service =
+                    new SqlReportImportService(client::fetchPage, resource, repository, config.pageSize());
+
+            try (Connection conn = PostgresConnection.open(config)) {
+                ImportResult result = service.run(conn, entity, runId);
+                System.out.println();
+                System.out.println(result.summary());
+                System.out.println("  replaced:  " + service.lastDeleted()
+                        + " previous row(s) (full snapshot, replace-all in one transaction)");
+                return result.failed() > 0 ? 6 : 0;
+            }
+        } catch (ConfigException e) {
+            System.err.println("Configuration error: " + e.getMessage());
+            return 3;
+        } catch (KfAgentClient.KfAgentHttpException e) {
+            System.err.println("KF Agent HTTP/source error: " + e.getMessage());
+            return 4;
+        } catch (SQLException e) {
+            System.err.println("PostgreSQL error: " + e.getMessage());
+            return 5;
+        } catch (RuntimeException e) {
+            System.err.println("Unexpected error: " + e.getMessage());
+            return 1;
+        }
+    }
+
     private static void printUsage() {
         System.out.println("KF Agent -> PostgreSQL ingestion (Part 2)");
         System.out.println("Usage: java -jar kfagent-ingest.jar <command>");
@@ -240,6 +302,14 @@ public final class Main {
         System.out.println("                       Fetch GET /kfagent/certification-archives and append into <PG_DEST_SCHEMA>.kf_certification_archive");
         System.out.println("  import-policy-constraint");
         System.out.println("                       Fetch GET /kfagent/policy-constraints and upsert into <PG_DEST_SCHEMA>.kf_policy_constraint");
+        System.out.println("  import-policy-violation");
+        System.out.println("                       Fetch GET /kfagent/policy-violations and upsert into <PG_DEST_SCHEMA>.kf_violation");
+        System.out.println("  import-entitlement-assignment");
+        System.out.println("                       Fetch GET /kfagent/entitlement-assignment (SQL report) and REPLACE <PG_DEST_SCHEMA>.kf_entitlement_assignment");
+        System.out.println("  import-workgroup-member");
+        System.out.println("                       Fetch GET /kfagent/workgroupmember and upsert into <PG_DEST_SCHEMA>.kf_workgroup_member");
+        System.out.println("  import-entitlement-certification");
+        System.out.println("                       Fetch GET /kfagent/entitlement-certification (SQL report) and REPLACE <PG_DEST_SCHEMA>.kf_entitlement_certification");
         System.out.println();
         System.out.println("Required env: KFAGENT_BASE_URL, PG_HOST, PG_DATABASE, PG_USERNAME, PG_PASSWORD");
         System.out.println("Optional env: PG_PORT (5432), PG_DEST_SCHEMA (iiq_native_part2), KFAGENT_PAGE_SIZE (500),");

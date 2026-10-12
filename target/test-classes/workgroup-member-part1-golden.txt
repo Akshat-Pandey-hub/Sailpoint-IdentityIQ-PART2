@@ -1,0 +1,12 @@
+REST={"workgroup_id":"7f0001019f061fdc819f10581517110e","workgroup_name":"AdminCap","identity_id":"7f000101971416688197147684ad00ff","member_name":"spadmin","first_name":"Molly","last_name":"J","member_is_workgroup":false}
+HASH=cc4b5f3a1adac1eef79e0c5ca862a2289e77204597d17d4dae121a57aaa728e6
+ID=b00be9b2-23da-34a9-90c9-19a5aa139584
+REST={"workgroup_id":"7f0001019f061fdc819f1057abc0110c","workgroup_name":"Adminq","identity_id":"7f000101971416688197147684ad00ff","member_name":"spadmin","first_name":"Molly","last_name":"J","member_is_workgroup":false}
+HASH=97f1b3e56ef2a7e43712df296d016f32a85fa987f28faad57d126a5429daaedb
+ID=3b4326a4-a539-39eb-81e4-bd8bb527e3cd
+REST={"workgroup_id":"7f0001019f061fdc819f34b0ac3451aa","workgroup_name":"Ops – café ✓","identity_id":"7f00010198421229819849ebca230c82","member_name":null,"first_name":null,"last_name":"Bailey","member_is_workgroup":null}
+HASH=a1a155133a99a8b8a9b6ca1a53942f19749ac04d06d25088b35ab9c1e41ed99d
+ID=28399aad-db20-3ecd-b1e9-5906f69b8f93
+REST={"workgroup_id":"not-a-guid","workgroup_name":"x","identity_id":"7f00010198421229819849ebca230c82","member_name":"y","first_name":null,"last_name":null,"member_is_workgroup":true}
+HASH=92a14bbf2070bf229eb1be5fbfa753b6bf5c97140f278570875a05ac6c562f3b
+ID=THROWS

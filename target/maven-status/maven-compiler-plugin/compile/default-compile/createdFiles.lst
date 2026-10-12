@@ -4,18 +4,23 @@ com\keyforge\part2\db\PostgresConnection.class
 com\keyforge\part2\http\KfAgentClient.class
 com\keyforge\part2\ingest\ImportResult.class
 com\keyforge\part2\ingest\ProvisioningItemRepository.class
+com\keyforge\part2\ingest\WorkgroupMemberRepository.class
+com\keyforge\part2\ingest\EntitlementAssignmentReport.class
 com\keyforge\part2\ingest\IdentityTable.class
 com\keyforge\part2\ingest\ColumnSpec$Kind.class
 com\keyforge\part2\ingest\IdentityRepository$1.class
+com\keyforge\part2\ingest\SqlReportRepository.class
 com\keyforge\part2\hash\HashValues.class
 com\keyforge\part2\ingest\CertificationArchiveRepository.class
 com\keyforge\part2\ingest\CertificationEntityTable.class
+com\keyforge\part2\ingest\SqlReportRepository$Replaced.class
 com\keyforge\part2\ingest\IdentityRequestTable.class
 com\keyforge\part2\ingest\AccountEntitlementTable.class
 com\keyforge\part2\ingest\IdentityRequestItemTable.class
 com\keyforge\part2\ingest\JsonColumnBinder.class
 com\keyforge\part2\config\SchemaName.class
 com\keyforge\part2\ingest\ProvisioningTxnTable.class
+com\keyforge\part2\ingest\EntitlementCertificationReport.class
 com\keyforge\part2\ingest\IdentityRequestApprovalTable.class
 com\keyforge\part2\ingest\RoleTable.class
 com\keyforge\part2\ingest\ColumnSpec.class
@@ -29,6 +34,7 @@ com\keyforge\part2\ingest\AccountTable.class
 com\keyforge\part2\ingest\BusinessHash$1.class
 com\keyforge\part2\ingest\EntityImportService.class
 com\keyforge\part2\ingest\RoleHierarchyRepository.class
+com\keyforge\part2\ingest\SqlReportImportService.class
 com\keyforge\part2\ingest\IdentityEntitlementTable.class
 com\keyforge\part2\ingest\EntityRepository$Outcome.class
 com\keyforge\part2\ingest\EntityRepository.class
@@ -39,6 +45,7 @@ com\keyforge\part2\hash\RecordHash.class
 com\keyforge\part2\ingest\EntitlementTable.class
 com\keyforge\part2\ingest\PolicyConstraintTable.class
 com\keyforge\part2\config\AppConfig.class
+com\keyforge\part2\ingest\PolicyViolationTable.class
 com\keyforge\part2\ingest\WorkflowDefinitionRepository.class
 com\keyforge\part2\id\CanonicalIds.class
 com\keyforge\part2\ingest\EntityImportService$1.class
@@ -46,6 +53,7 @@ com\keyforge\part2\ingest\EntityWriter.class
 com\keyforge\part2\ingest\RoleEntitlementRepository.class
 com\keyforge\part2\ingest\CertificationItemTable.class
 com\keyforge\part2\ingest\IdentityRepository$Outcome.class
+com\keyforge\part2\ingest\SqlReportImportService$PageFetcher.class
 com\keyforge\part2\ingest\EntitySpec.class
 com\keyforge\part2\ingest\IdentityRoleTable.class
 com\keyforge\part2\Main.class

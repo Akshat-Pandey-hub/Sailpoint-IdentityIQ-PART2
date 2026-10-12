@@ -317,4 +317,17 @@ public final class CanonicalIds {
         }
         return id;
     }
+
+    /**
+     * The PolicyViolation primary key, matching Part 1's {@code NativeViolationRepository.canonicalViolationId}:
+     * {@code canonicalUuid(source_id)}, falling back to {@code deterministicUuid("native-violation|"+id)}
+     * ({@code name} only when source_id is {@code null}).
+     */
+    public static String violationId(String sourceId, String name) {
+        String id = canonicalUuid(sourceId);
+        if (id == null) {
+            id = deterministicUuid("native-violation|" + (sourceId == null ? name : sourceId));
+        }
+        return id;
+    }
 }

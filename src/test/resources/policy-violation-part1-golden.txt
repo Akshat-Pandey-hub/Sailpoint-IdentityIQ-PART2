@@ -1,0 +1,9 @@
+REST={"source_id":"7f0001019f061fdc819f34b0ac34a1bb","name":"SOD violation – café ✓","identity_id":"7f00010198421229819849ebca230c82","identity_name":"Alexander Bailey","policy_id":"7f000101971416688197147685f80119","policy_name":"Account Template","constraint_id":"7f000101971416688197147685f8011a","constraint_name":"Multiple Application Accounts","status":"Open","active":true,"left_bundles":"[\"Finance Analyst\"]","right_bundles":"Payroll Admin,HR Admin","entitlements_marked_for_remediation":null,"bundles_marked_for_remediation":"Payroll Admin","relevant_apps":["EntraTarget",{"n":1.5}],"violating_entitlements":[],"arguments":{"k":"v","z":null},"created_at":"2026-10-02T09:10:11.123Z","modified_at":"2026-10-02T09:10:11.123456789Z"}
+HASH=8dea62b9335e454f01cc7ae572a62da1e442db1b0f7bdee7e9ab0a4aac487ce6
+ID=7f000101-9f06-1fdc-819f-34b0ac34a1bb
+REST={"source_id":null,"name":"No Id Violation","identity_id":null,"identity_name":null,"policy_id":null,"policy_name":null,"constraint_id":null,"constraint_name":null,"status":null,"active":null,"left_bundles":null,"right_bundles":null,"entitlements_marked_for_remediation":null,"bundles_marked_for_remediation":null,"relevant_apps":null,"violating_entitlements":null,"arguments":null,"created_at":null,"modified_at":null}
+HASH=c7169ff73555a4196ca6f3a752ef04246f5845364d37608a576bd1b5e2587a41
+ID=1b9a2f54-89b7-3b08-8dc2-8e219210c466
+REST={"source_id":"not-a-guid","name":"Odd","identity_id":null,"identity_name":null,"policy_id":null,"policy_name":null,"constraint_id":null,"constraint_name":null,"status":"Mitigated","active":false,"left_bundles":null,"right_bundles":null,"entitlements_marked_for_remediation":null,"bundles_marked_for_remediation":null,"relevant_apps":null,"violating_entitlements":null,"arguments":{},"created_at":null,"modified_at":null}
+HASH=d5a53dbf8950960183cbbb6f47bd99d41a3e796fef08610d3e62b01983f629df
+ID=b2475390-4d36-3ce4-9d8f-c88131dd6674
