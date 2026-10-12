@@ -61,6 +61,7 @@ import com.keyforge.part2.ingest.WorkflowDefinitionRepository;
 import com.keyforge.part2.ingest.WorkgroupTable;
 import com.keyforge.part2.ingest.ImportResult;
 import com.keyforge.part2.incremental.ExtractionMode;
+import com.keyforge.part2.incremental.FamilyIncrementalImportService;
 import com.keyforge.part2.incremental.IncrementalConfig;
 import com.keyforge.part2.incremental.IncrementalCursor;
 import com.keyforge.part2.incremental.IncrementalImportService;
@@ -75,6 +76,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -186,7 +188,21 @@ public final class Main {
         if (mode.isIncremental()) {
             Function<String, EntityWriter> writer = INCREMENTAL_WRITERS.get(command);
             if (writer != null) {
-                return runIncremental(writer, IncrementalCursor.MODIFIED);
+                // "changed": modified after the bound, or never modified and created after it (IIQ leaves modified
+                // NULL until an object is first updated); the watermark is max(coalesce(modified_at, created_at))
+                return runIncremental(writer, IncrementalCursor.CHANGED);
+            }
+            IncrementalFamily family = INCREMENTAL_FAMILIES.get(command);
+            if (family != null) {
+                return runFamilyIncremental(family);
+            }
+            String parentCommand = INCREMENTAL_CHILD_OF.get(command);
+            if (parentCommand != null) {
+                RunLedger.discard(); // a usage error is not an import run
+                System.err.println("'" + command + "' has no change time of its own; it is imported incrementally "
+                        + "together with its parent: run '" + parentCommand + " --incremental'. Without "
+                        + "--incremental, '" + command + "' runs as a full import.");
+                return 2;
             }
             Function<String, EntityWriter> changedWriter = CHANGED_INCREMENTAL_WRITERS.get(command);
             if (changedWriter != null) {
@@ -201,8 +217,8 @@ public final class Main {
             }
             RunLedger.discard(); // a usage error is not an import run
             System.err.println("--incremental is supported only for " + INCREMENTAL_WRITERS.keySet() + ", "
-                    + CHANGED_INCREMENTAL_WRITERS.keySet() + ", " + EVENT_INCREMENTAL_WRITERS.keySet() + " and "
-                    + SYSLOG_COMMAND
+                    + INCREMENTAL_FAMILIES.keySet() + ", " + CHANGED_INCREMENTAL_WRITERS.keySet() + ", "
+                    + EVENT_INCREMENTAL_WRITERS.keySet() + " and " + SYSLOG_COMMAND
                     + " (their KF Agent endpoints accept modifiedAfter); '" + command + "' runs in full mode only.");
             return 2;
         }
@@ -297,12 +313,39 @@ public final class Main {
      * {@code max(coalesce(modified_at, created_at))}. Incremental runs never sweep (the periodic full import does).
      */
     static final Map<String, Function<String, EntityWriter>> CHANGED_INCREMENTAL_WRITERS = Map.of(
-            "import-identity-request", schema -> new EntityRepository(schema, IdentityRequestTable.SPEC),
-            "import-provisioning-transaction", schema -> new EntityRepository(schema, ProvisioningTxnTable.SPEC),
             "import-work-item", schema -> new EntityRepository(schema, WorkItemTable.SPEC),
             "import-task-result", schema -> new EntityRepository(schema, TaskResultTable.SPEC),
             "import-certification-item", schema -> new EntityRepository(schema, CertificationItemTable.SPEC),
-            "import-certification-entity", schema -> new EntityRepository(schema, CertificationEntityTable.SPEC));
+            "import-certification-entity", schema -> new EntityRepository(schema, CertificationEntityTable.SPEC),
+            "import-identity-entitlement", schema -> new EntityRepository(schema, IdentityEntitlementTable.SPEC));
+
+    /** A parent entity plus the child entities IIQ builds from it, imported incrementally under one watermark. */
+    record IncrementalFamily(Function<String, EntityWriter> parent, List<Function<String, EntityWriter>> children) { }
+
+    /**
+     * Parents whose incremental run also refreshes their children (same writers as the full imports), under ONE shared
+     * watermark that advances only if the parent and every child loaded without a failure.
+     */
+    static final Map<String, IncrementalFamily> INCREMENTAL_FAMILIES = Map.of(
+            "import-identity-request", new IncrementalFamily(
+                    schema -> new EntityRepository(schema, IdentityRequestTable.SPEC),
+                    List.of(schema -> new EntityRepository(schema, IdentityRequestItemTable.SPEC),
+                            schema -> new EntityRepository(schema, IdentityRequestApprovalTable.SPEC))),
+            "import-provisioning-transaction", new IncrementalFamily(
+                    schema -> new EntityRepository(schema, ProvisioningTxnTable.SPEC),
+                    List.of(ProvisioningItemRepository::new)),
+            // account-entitlement edges have no change time of their own: they are bounded by their account's (Link's)
+            // change time, so this command also refreshes the changed accounts (same writer as import-account) under
+            // its own family watermark, independent of import-account's.
+            "import-account-entitlement", new IncrementalFamily(
+                    schema -> new EntityRepository(schema, AccountTable.SPEC),
+                    List.of(schema -> new EntityRepository(schema, AccountEntitlementTable.SPEC))));
+
+    /** Child commands and the parent command that imports them incrementally. */
+    static final Map<String, String> INCREMENTAL_CHILD_OF = Map.of(
+            "import-identity-request-item", "import-identity-request",
+            "import-identity-request-approval", "import-identity-request",
+            "import-provisioning-item", "import-provisioning-transaction");
 
     /** Syslog keeps its own paged, complete-scan-guarded import; its incremental mode reuses that scan. */
     static final String SYSLOG_COMMAND = "import-syslog-event";
@@ -714,6 +757,71 @@ public final class Main {
     }
 
     /**
+     * Incremental parent + children (see {@link FamilyIncrementalImportService}): every dataset is fetched with the same
+     * bound before anything is written, and the shared watermark advances only if no row failed in any of them.
+     */
+    private static int runFamilyIncremental(IncrementalFamily family) {
+        try {
+            AppConfig config = AppConfig.load();
+            String runId = RunLedger.runIdOrNew();
+            System.out.println(config.describe());
+            System.out.println("extraction_run_id: " + runId);
+
+            KfAgentClient client = new KfAgentClient(config);
+            EntityWriter parent = family.parent().apply(config.pgSchema());
+            List<EntityWriter> children = new ArrayList<>();
+            for (Function<String, EntityWriter> c : family.children()) {
+                children.add(c.apply(config.pgSchema()));
+            }
+            Duration overlap = IncrementalConfig.overlapWindow();
+            FamilyIncrementalImportService service = new FamilyIncrementalImportService(client::fetchSnapshot,
+                    parent, children, new WatermarkService(config.pgSchema()), overlap);
+
+            try (Connection conn = PostgresConnection.open(config)) {
+                FamilyIncrementalImportService.Outcome o = service.run(conn, runId);
+                RunLedger.window(o.bound(), o.fetchedAt());
+                for (ImportResult r : o.results()) {
+                    RunLedger.record(counts(r.targetTable(), r, null));
+                }
+                for (ImportResult r : o.results()) {
+                    System.out.println();
+                    System.out.println(r.summary());
+                }
+                System.out.println("  mode:      incremental, parent + children (overlap " + overlap.toMinutes()
+                        + " min); watermark " + o.key() + " was "
+                        + (o.stored() == null ? "unset -> full fetch (baseline)" : o.stored())
+                        + "; modifiedAfter=" + (o.bound() == null ? "none" : o.bound())
+                        + " (IIQ modified, or created if never modified)");
+                System.out.println("  watermark: " + (o.advanced() ? "advanced to " + o.newWatermark()
+                        : "NOT advanced (" + (o.failed() > 0 ? o.failed()
+                        + " row failure(s) in the family; the next run re-reads from the unchanged watermark)"
+                        : "no newer change time than the stored watermark") + ")"));
+                System.out.println("  sweep:     not run (an incremental import never marks rows deleted)");
+                if (o.failed() > 0) {
+                    RunLedger.error("watermark not advanced: " + o.failed() + " row failure(s)");
+                }
+                return o.failed() > 0 ? 6 : 0;
+            }
+        } catch (ConfigException e) {
+            System.err.println("Configuration error: " + e.getMessage());
+            RunLedger.error("configuration error: " + e.getMessage());
+            return 3;
+        } catch (KfAgentClient.KfAgentHttpException e) {
+            System.err.println("KF Agent HTTP/source error: " + e.getMessage());
+            RunLedger.error("KF Agent HTTP/source error: " + e.getMessage());
+            return 4;
+        } catch (SQLException e) {
+            System.err.println("PostgreSQL error: " + e.getMessage());
+            RunLedger.error("PostgreSQL error: " + e.getMessage());
+            return 5;
+        } catch (RuntimeException e) {
+            System.err.println("Unexpected error: " + e.getMessage());
+            RunLedger.error("unexpected error: " + e.getMessage());
+            return 1;
+        }
+    }
+
+    /**
      * Incremental syslog: the same paged, complete-scan-guarded import as {@link #runSyslogImport()}, with every
      * page bounded to events created after the stored watermark minus the overlap window (no watermark = a full
      * scan that sets the baseline). The watermark ({@code max(created_at)}) advances only after a scan confirmed
@@ -934,16 +1042,18 @@ public final class Main {
         System.out.println("                       Derive append-only EXPLICIT links for events already in kf_event into");
         System.out.println("                       <PG_DEST_SCHEMA>.kf_event_link (PostgreSQL only; run after derive-native-events)");
         System.out.println();
-        System.out.println("Incremental (opt-in): add --incremental to import-identity, import-entitlement,");
-        System.out.println("                       import-application, import-account or import-role (rows MODIFIED after");
-        System.out.println("                       the watermark); to import-identity-request, import-provisioning-transaction,");
-        System.out.println("                       import-work-item, import-task-result, import-certification-item and");
-        System.out.println("                       import-certification-entity (rows modified, or created and never modified,");
-        System.out.println("                       after it); or to import-audit-event, import-syslog-event,");
-        System.out.println("                       import-workitem-archive, import-certification-archive and the four");
-        System.out.println("                       import-access-history* commands (rows CREATED after the watermark).");
-        System.out.println("                       The watermark is lowered by INCREMENTAL_OVERLAP_MINUTES (default 5);");
-        System.out.println("                       never sweeps; full mode stays the default.");
+        System.out.println("Incremental (opt-in): add --incremental to fetch only what changed since the last successful run");
+        System.out.println("                       (per-entity watermark lowered by INCREMENTAL_OVERLAP_MINUTES, default 5):");
+        System.out.println("                       - changed (modified, or created and never modified) after the watermark:");
+        System.out.println("                         import-identity, import-entitlement, import-application, import-account,");
+        System.out.println("                         import-role, import-work-item, import-task-result, import-certification-item,");
+        System.out.println("                         import-certification-entity, import-identity-entitlement");
+        System.out.println("                       - parent + children under one shared watermark: import-identity-request");
+        System.out.println("                         (+ request items, approvals), import-provisioning-transaction (+ provisioning");
+        System.out.println("                         items), import-account-entitlement (+ the changed accounts)");
+        System.out.println("                       - created after the watermark: import-audit-event, import-syslog-event,");
+        System.out.println("                         import-workitem-archive, import-certification-archive, import-access-history*");
+        System.out.println("                       Incremental runs never sweep; full mode stays the default.");
         System.out.println();
         System.out.println("Required env: KFAGENT_BASE_URL, PG_HOST, PG_DATABASE, PG_USERNAME, PG_PASSWORD");
         System.out.println("Optional env: PG_PORT (5432), PG_DEST_SCHEMA (iiq_native_part2), KFAGENT_PAGE_SIZE (500),");

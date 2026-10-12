@@ -60,8 +60,13 @@ public final class WatermarkService {
 
     /** Ensures the table and returns the stored watermark for {@code table} ({@code null} = never set). */
     public Instant read(Connection conn, String table) throws SQLException {
+        return readKey(conn, watermarkKey(table));
+    }
+
+    /** Ensures the table and returns the watermark stored under an explicit {@code key} ({@code null} = never set). */
+    public Instant readKey(Connection conn, String key) throws SQLException {
         repository.ensureTargetTable(conn);
-        return repository.read(conn, watermarkKey(table));
+        return repository.read(conn, key);
     }
 
     /** {@code max(modified_at)} of the destination table: the newest IIQ change time captured. */
@@ -94,10 +99,16 @@ public final class WatermarkService {
     /** Same, recording the cursor's IIQ field ({@code modified} or {@code created}) with the watermark. */
     public boolean advanceIfSuccessful(Connection conn, String table, Instant newWatermark, int failed, String runId,
                                        IncrementalCursor cursor) throws SQLException {
+        return advanceKeyIfSuccessful(conn, watermarkKey(table), newWatermark, failed, runId, cursor);
+    }
+
+    /** Same, for a watermark stored under an explicit {@code key} (e.g. a parent + children family). */
+    public boolean advanceKeyIfSuccessful(Connection conn, String key, Instant newWatermark, int failed, String runId,
+                                          IncrementalCursor cursor) throws SQLException {
         if (!shouldAdvance(failed, newWatermark)) {
             return false;
         }
         repository.ensureTargetTable(conn);
-        return repository.advance(conn, watermarkKey(table), cursor.sourceField(), newWatermark, runId);
+        return repository.advance(conn, key, cursor.sourceField(), newWatermark, runId);
     }
 }

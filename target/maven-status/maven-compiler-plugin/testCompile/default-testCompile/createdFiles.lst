@@ -46,10 +46,13 @@ com\keyforge\part2\ingest\GroupDefinitionTableTest$Golden.class
 com\keyforge\part2\incremental\EventIncrementalImportTest$AppendWriter.class
 com\keyforge\part2\incremental\EventIncrementalImportTest$Db.class
 com\keyforge\part2\event\EventLinkDerivationServiceTest.class
+com\keyforge\part2\incremental\FamilyIncrementalImportServiceTest.class
+com\keyforge\part2\incremental\FamilyIncrementalImportServiceTest$Db.class
 com\keyforge\part2\ingest\IdentityRoleTableTest.class
 com\keyforge\part2\event\EventLinkDerivationServiceTest$Db.class
 com\keyforge\part2\reconciliation\WorkItemReconciliationTest.class
 com\keyforge\part2\ingest\CertificationItemTableTest$Golden.class
+com\keyforge\part2\incremental\FamilyIncrementalImportServiceTest$Agent.class
 com\keyforge\part2\event\EventDerivationServiceTest$Db.class
 com\keyforge\part2\ingest\AccountTableTest$Golden.class
 com\keyforge\part2\ChangedIncrementalDispatchTest.class
@@ -95,6 +98,7 @@ com\keyforge\part2\ingest\EntitlementCertificationReportTest$Recorder.class
 com\keyforge\part2\incremental\WatermarkServiceTest.class
 com\keyforge\part2\ledger\RunLedgerTest.class
 com\keyforge\part2\ingest\RoleTableTest$Golden.class
+com\keyforge\part2\incremental\FamilyIncrementalImportServiceTest$Writer.class
 com\keyforge\part2\ingest\SoftDeleteSweeperTest$FakeDb.class
 com\keyforge\part2\ingest\AccessHistoryRoleEventRepositoryTest.class
 com\keyforge\part2\ingest\TaskScheduleTableTest.class

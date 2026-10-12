@@ -104,11 +104,13 @@ Event and link ids are deterministic, so re-running is safe and never duplicates
 
 | Commands | Follows |
 |---|---|
-| `import-identity`, `import-entitlement`, `import-application`, `import-account`, `import-role` | IIQ `modified` (watermark `max(modified_at)`) |
-| `import-identity-request`, `import-provisioning-transaction`, `import-work-item`, `import-task-result`, `import-certification-item`, `import-certification-entity` | IIQ `modified`, or `created` for never-modified objects (watermark `max(coalesce(modified_at, created_at))`) |
+| `import-identity`, `import-entitlement`, `import-application`, `import-account`, `import-role`, `import-work-item`, `import-task-result`, `import-certification-item`, `import-certification-entity`, `import-identity-entitlement` | IIQ `modified`, or `created` for never-modified objects (watermark `max(coalesce(modified_at, created_at))`) |
+| `import-identity-request` (also refreshes request items and approvals), `import-provisioning-transaction` (also refreshes provisioning items), `import-account-entitlement` (also refreshes the changed accounts) | The parent's change time, under one shared watermark that advances only if the parent and every child loaded without a failure |
 | `import-audit-event`, `import-syslog-event`, `import-workitem-archive`, `import-certification-archive`, `import-access-history`, `import-access-history-identity-event`, `import-access-history-certification`, `import-access-history-role-event` | IIQ `created` (watermark `max(created_at)`) |
 
-The first incremental run of an entity is a full fetch that sets the baseline. The watermark advances only when a
+Request items, approvals and provisioning items have no change time of their own, so they have no
+`--incremental` of their own; they are refreshed by their parent's incremental run. The SQL-report commands and the
+remaining small configuration entities always run as full imports. The first incremental run of an entity is a full fetch that sets the baseline. The watermark advances only when a
 run has no failed rows (and, for syslog, only after a scan confirmed complete). Incremental runs never perform
 deletion sweeps, so keep running full imports periodically. Full mode is the default.
 
