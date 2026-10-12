@@ -1,6 +1,7 @@
 com\keyforge\part2\ingest\BusinessHash.class
 com\keyforge\part2\http\KfAgentClient$KfAgentHttpException.class
 com\keyforge\part2\db\PostgresConnection.class
+com\keyforge\part2\ingest\AccessHistoryCertificationRepository.class
 com\keyforge\part2\http\KfAgentClient.class
 com\keyforge\part2\ingest\ImportResult.class
 com\keyforge\part2\ingest\ProvisioningItemRepository.class
@@ -25,6 +26,7 @@ com\keyforge\part2\ingest\GroupDefinitionTable.class
 com\keyforge\part2\ingest\AccessHistoryEntitlementRepository$Kind.class
 com\keyforge\part2\ingest\JsonColumnBinder.class
 com\keyforge\part2\config\SchemaName.class
+com\keyforge\part2\ingest\AccessHistoryRoleEventRepository.class
 com\keyforge\part2\ingest\ProvisioningTxnTable.class
 com\keyforge\part2\ingest\AccessHistoryEntitlementRepository.class
 com\keyforge\part2\ingest\EntitlementCertificationReport.class

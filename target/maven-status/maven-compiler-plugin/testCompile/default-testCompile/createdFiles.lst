@@ -64,6 +64,7 @@ com\keyforge\part2\ingest\WorkgroupTableTest.class
 com\keyforge\part2\ingest\ProvisioningItemRepositoryTest$Golden.class
 com\keyforge\part2\ingest\EntitlementCertificationReportTest$Recorder.class
 com\keyforge\part2\ingest\RoleTableTest$Golden.class
+com\keyforge\part2\ingest\AccessHistoryRoleEventRepositoryTest.class
 com\keyforge\part2\ingest\TaskScheduleTableTest.class
 com\keyforge\part2\ingest\RoleEntitlementRepositoryTest.class
 com\keyforge\part2\ingest\WorkgroupTableTest$1.class
@@ -91,9 +92,12 @@ com\keyforge\part2\ingest\CertificationEntityTableTest$1.class
 com\keyforge\part2\ingest\ApplicationTableTest.class
 com\keyforge\part2\ingest\EntitlementCertificationStatusReportTest$Recorder.class
 com\keyforge\part2\ingest\TaskResultTableTest$Golden.class
+com\keyforge\part2\ingest\AccessHistoryCertificationRepositoryTest$Golden.class
 com\keyforge\part2\ingest\CertificationTableTest.class
 com\keyforge\part2\ingest\EntitlementParityTest$Golden.class
 com\keyforge\part2\ingest\PolicyConstraintTableTest.class
+com\keyforge\part2\ingest\AccessHistoryRoleEventRepositoryTest$Golden.class
+com\keyforge\part2\ingest\AccessHistoryCertificationRepositoryTest.class
 com\keyforge\part2\ingest\WorkItemArchiveRepositoryTest$Golden.class
 com\keyforge\part2\ingest\TaskScheduleTableTest$1.class
 com\keyforge\part2\ingest\IdentityRequestApprovalTableTest.class
