@@ -12,7 +12,9 @@ com\keyforge\part2\ingest\CertificationTableTest$1.class
 com\keyforge\part2\ingest\EntitlementCertificationStatusReportTest.class
 com\keyforge\part2\ingest\WorkgroupMemberRepositoryTest$Golden.class
 com\keyforge\part2\ingest\WorkgroupMemberRepositoryTest.class
+com\keyforge\part2\ingest\SyslogEventRepositoryTest$Golden.class
 com\keyforge\part2\ingest\PolicyTableTest.class
+com\keyforge\part2\ingest\SyslogEventRepositoryTest.class
 com\keyforge\part2\ingest\WorkItemTableTest.class
 com\keyforge\part2\ingest\IdentitySqlTest.class
 com\keyforge\part2\ingest\ProvisioningTxnTableTest.class
@@ -37,6 +39,7 @@ com\keyforge\part2\ingest\WorkItemTableTest$Golden.class
 com\keyforge\part2\ingest\IdentityRequestTableTest$1.class
 com\keyforge\part2\ingest\IdentityRequestTableTest$Golden.class
 com\keyforge\part2\ingest\AccountTableTest.class
+com\keyforge\part2\ingest\SyslogEventImportServiceTest$Agent.class
 com\keyforge\part2\ingest\IdentityRoleTableTest$1.class
 com\keyforge\part2\ingest\RoleHierarchyRepositoryTest$Golden.class
 com\keyforge\part2\ingest\IdentityEntitlementTableTest$1.class
@@ -56,6 +59,7 @@ com\keyforge\part2\ingest\ApplicationTableTest$Golden.class
 com\keyforge\part2\ingest\EntitlementAssignmentReportTest$TxStub.class
 com\keyforge\part2\ingest\PolicyViolationTableTest.class
 com\keyforge\part2\ingest\AccountTableTest$1.class
+com\keyforge\part2\ingest\SoftDeleteSweeperTest$Row.class
 com\keyforge\part2\ingest\AccessHistoryIdentityEventRepositoryTest.class
 com\keyforge\part2\ingest\EntitlementAssignmentReportTest.class
 com\keyforge\part2\ingest\AccessHistoryIdentityEventRepositoryTest$Golden.class
@@ -64,11 +68,13 @@ com\keyforge\part2\ingest\WorkgroupTableTest.class
 com\keyforge\part2\ingest\ProvisioningItemRepositoryTest$Golden.class
 com\keyforge\part2\ingest\EntitlementCertificationReportTest$Recorder.class
 com\keyforge\part2\ingest\RoleTableTest$Golden.class
+com\keyforge\part2\ingest\SoftDeleteSweeperTest$FakeDb.class
 com\keyforge\part2\ingest\AccessHistoryRoleEventRepositoryTest.class
 com\keyforge\part2\ingest\TaskScheduleTableTest.class
 com\keyforge\part2\ingest\RoleEntitlementRepositoryTest.class
 com\keyforge\part2\ingest\WorkgroupTableTest$1.class
 com\keyforge\part2\ingest\PolicyConstraintTableTest$Golden.class
+com\keyforge\part2\ingest\SyslogEventImportServiceTest$MemoryWriter.class
 com\keyforge\part2\ingest\AuditEventRepositoryTest.class
 com\keyforge\part2\ingest\IdentityRoleTableTest$Golden.class
 com\keyforge\part2\ingest\CertificationArchiveRepositoryTest$Golden.class
@@ -91,8 +97,10 @@ com\keyforge\part2\ingest\EntityImportServiceTest.class
 com\keyforge\part2\ingest\CertificationEntityTableTest$1.class
 com\keyforge\part2\ingest\ApplicationTableTest.class
 com\keyforge\part2\ingest\EntitlementCertificationStatusReportTest$Recorder.class
+com\keyforge\part2\ingest\SyslogEventImportServiceTest.class
 com\keyforge\part2\ingest\TaskResultTableTest$Golden.class
 com\keyforge\part2\ingest\AccessHistoryCertificationRepositoryTest$Golden.class
+com\keyforge\part2\ingest\SoftDeleteSweeperTest.class
 com\keyforge\part2\ingest\CertificationTableTest.class
 com\keyforge\part2\ingest\EntitlementParityTest$Golden.class
 com\keyforge\part2\ingest\PolicyConstraintTableTest.class

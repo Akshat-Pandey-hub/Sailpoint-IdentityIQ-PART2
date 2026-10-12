@@ -29,6 +29,12 @@ public final class KfAgentClient {
                 .build();
     }
 
+    /** One fetched page: the raw body plus the agent's {@code X-KF-Source-Count} header ({@code null} if absent). */
+    public record Page(String body, Integer sourceCount) { }
+
+    /** Response header in which the KF Agent reports the source population size (syslog-events). */
+    public static final String SOURCE_COUNT_HEADER = "X-KF-Source-Count";
+
     /**
      * Fetches one page of {@code /kfagent/<resource>}.
      *
@@ -37,6 +43,14 @@ public final class KfAgentClient {
      * @throws KfAgentHttpException on a non-2xx status, timeout, or transport error
      */
     public String fetchPage(String resource, int start, int limit) {
+        return fetch(resource, start, limit).body();
+    }
+
+    /**
+     * Like {@link #fetchPage} but also returns the {@value #SOURCE_COUNT_HEADER} response header. A header that is
+     * absent or not an integer is reported as {@code null}.
+     */
+    public Page fetch(String resource, int start, int limit) {
         String url = config.kfAgentBaseUrl() + "/kfagent/" + resource
                 + "?start=" + Math.max(0, start) + "&limit=" + limit;
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(url))
@@ -54,7 +68,7 @@ public final class KfAgentClient {
             if (code < 200 || code >= 300) {
                 throw new KfAgentHttpException("GET " + url + " returned HTTP " + code + ": " + snippet(resp.body()));
             }
-            return resp.body();
+            return new Page(resp.body(), sourceCount(resp.headers().firstValue(SOURCE_COUNT_HEADER).orElse(null)));
         } catch (KfAgentHttpException e) {
             throw e;
         } catch (java.io.IOException | InterruptedException e) {
@@ -62,6 +76,18 @@ public final class KfAgentClient {
                 Thread.currentThread().interrupt();
             }
             throw new KfAgentHttpException("GET " + url + " failed: " + e.getMessage(), e);
+        }
+    }
+
+    /** Parses a {@value #SOURCE_COUNT_HEADER} value; absent, blank or non-integer → {@code null}. */
+    public static Integer sourceCount(String header) {
+        if (header == null || header.isBlank()) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(header.trim());
+        } catch (NumberFormatException e) {
+            return null;
         }
     }
 

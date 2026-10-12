@@ -42,6 +42,8 @@ import com.keyforge.part2.ingest.RoleHierarchyRepository;
 import com.keyforge.part2.ingest.RoleTable;
 import com.keyforge.part2.ingest.SqlReportImportService;
 import com.keyforge.part2.ingest.SqlReportRepository;
+import com.keyforge.part2.ingest.SyslogEventImportService;
+import com.keyforge.part2.ingest.SyslogEventRepository;
 import com.keyforge.part2.ingest.TaskResultTable;
 import com.keyforge.part2.ingest.TaskScheduleTable;
 import com.keyforge.part2.ingest.WorkItemArchiveRepository;
@@ -129,11 +131,13 @@ import java.util.function.Function;
  *  import-access-history-certification
  *                       Fetch GET /kfagent/access-history/certifications and append into &lt;PG_DEST_SCHEMA&gt;.kf_access_hist_certification
  *  import-access-history-role-event
- *                       Fetch GET /kfagent/access-history/role-events and append into &lt;PG_DEST_SCHEMA&gt;.kf_access_hist_role_event</pre>
+ *                       Fetch GET /kfagent/access-history/role-events and append into &lt;PG_DEST_SCHEMA&gt;.kf_access_hist_role_event
+ *  import-syslog-event
+ *                       Page GET /kfagent/syslog-events (complete-scan guarded) and append into &lt;PG_DEST_SCHEMA&gt;.kf_syslog_event</pre>
  *
  * Configuration is entirely external (environment variables / -D system properties) — see {@link AppConfig}.
  * Exit codes: 0 ok, 2 usage, 3 config error, 4 HTTP/source error, 5 PostgreSQL error, 6 completed with row
- * failures, 1 unexpected.
+ * failures, 7 scan not confirmed complete (import-syslog-event), 1 unexpected.
  */
 public final class Main {
 
@@ -192,6 +196,7 @@ public final class Main {
                     System.exit(runImport(AccessHistoryCertificationRepository::new));
             case "import-access-history-role-event" ->
                     System.exit(runImport(AccessHistoryRoleEventRepository::new));
+            case "import-syslog-event" -> System.exit(runSyslogImport());
             default -> {
                 printUsage();
                 System.exit("".equals(command) ? 2 : 2);
@@ -267,6 +272,58 @@ public final class Main {
             System.err.println("Unexpected error: " + e.getMessage());
             return 1;
         }
+    }
+
+    /**
+     * Runs the syslog import: streams /kfagent/syslog-events page by page (append-only) and confirms the scan is
+     * complete against the agent's X-KF-Source-Count. A scan that cannot be confirmed complete exits 7 with the
+     * partial counts; rows already appended are kept (immutable, skipped on re-run).
+     */
+    private static int runSyslogImport() {
+        try {
+            AppConfig config = AppConfig.load();
+            String runId = UUID.randomUUID().toString();
+            System.out.println(config.describe());
+            System.out.println("extraction_run_id: " + runId);
+
+            KfAgentClient client = new KfAgentClient(config);
+            SyslogEventImportService service = new SyslogEventImportService(
+                    client::fetch, new SyslogEventRepository(config.pgSchema()), config.pageSize());
+
+            try (Connection conn = PostgresConnection.open(config)) {
+                try {
+                    ImportResult result = service.run(conn, runId);
+                    System.out.println();
+                    System.out.println(result.summary());
+                    printSyslogScan(service, "complete");
+                    return result.failed() > 0 ? 6 : 0;
+                } catch (SyslogEventImportService.IncompleteScanException e) {
+                    System.out.println();
+                    System.out.println(e.partial().summary());
+                    printSyslogScan(service, "NOT CONFIRMED COMPLETE");
+                    System.err.println("Incomplete scan: " + e.getMessage());
+                    return 7;
+                }
+            }
+        } catch (ConfigException e) {
+            System.err.println("Configuration error: " + e.getMessage());
+            return 3;
+        } catch (KfAgentClient.KfAgentHttpException e) {
+            System.err.println("KF Agent HTTP/source error: " + e.getMessage());
+            return 4;
+        } catch (SQLException e) {
+            System.err.println("PostgreSQL error: " + e.getMessage());
+            return 5;
+        } catch (RuntimeException e) {
+            System.err.println("Unexpected error: " + e.getMessage());
+            return 1;
+        }
+    }
+
+    private static void printSyslogScan(SyslogEventImportService service, String status) {
+        System.out.println("  scan:      " + status + " (baseline source count " + service.baselineSourceCount()
+                + ", highest " + service.highWaterSourceCount() + ", distinct in-order rows "
+                + service.inOrderRows() + ", overlapping/out-of-order " + service.overlapRows() + ")");
     }
 
     /**
@@ -382,6 +439,8 @@ public final class Main {
         System.out.println("                       Fetch GET /kfagent/access-history/certifications and append into <PG_DEST_SCHEMA>.kf_access_hist_certification");
         System.out.println("  import-access-history-role-event");
         System.out.println("                       Fetch GET /kfagent/access-history/role-events and append into <PG_DEST_SCHEMA>.kf_access_hist_role_event");
+        System.out.println("  import-syslog-event");
+        System.out.println("                       Page GET /kfagent/syslog-events (complete-scan guarded) and append into <PG_DEST_SCHEMA>.kf_syslog_event");
         System.out.println();
         System.out.println("Required env: KFAGENT_BASE_URL, PG_HOST, PG_DATABASE, PG_USERNAME, PG_PASSWORD");
         System.out.println("Optional env: PG_PORT (5432), PG_DEST_SCHEMA (iiq_native_part2), KFAGENT_PAGE_SIZE (500),");
