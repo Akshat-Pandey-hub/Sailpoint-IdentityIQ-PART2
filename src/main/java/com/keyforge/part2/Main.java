@@ -6,6 +6,8 @@ import com.keyforge.part2.db.PostgresConnection;
 import com.keyforge.part2.http.KfAgentClient;
 import com.keyforge.part2.ingest.AccountEntitlementTable;
 import com.keyforge.part2.ingest.AccountTable;
+import com.keyforge.part2.ingest.CertificationEntityTable;
+import com.keyforge.part2.ingest.CertificationItemTable;
 import com.keyforge.part2.ingest.CertificationTable;
 import com.keyforge.part2.ingest.ApplicationTable;
 import com.keyforge.part2.ingest.EntitlementTable;
@@ -69,7 +71,11 @@ import java.util.function.Function;
  *  import-work-item     Fetch GET /kfagent/work-items   and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_workitem
  *  import-workflow-definition
  *                       Fetch GET /kfagent/workflow-definitions and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_workflow_definition
- *  import-certification Fetch GET /kfagent/certifications and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_certification</pre>
+ *  import-certification Fetch GET /kfagent/certifications and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_certification
+ *  import-certification-entity
+ *                       Fetch GET /kfagent/certification-entities and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_certification_entity
+ *  import-certification-item
+ *                       Fetch GET /kfagent/certification-items and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_certification_item</pre>
  *
  * Configuration is entirely external (environment variables / -D system properties) — see {@link AppConfig}.
  * Exit codes: 0 ok, 2 usage, 3 config error, 4 HTTP/source error, 5 PostgreSQL error, 6 completed with row
@@ -103,6 +109,8 @@ public final class Main {
             case "import-work-item" -> System.exit(runImport(WorkItemTable.SPEC));
             case "import-workflow-definition" -> System.exit(runImport(WorkflowDefinitionRepository::new));
             case "import-certification" -> System.exit(runImport(CertificationTable.SPEC));
+            case "import-certification-entity" -> System.exit(runImport(CertificationEntityTable.SPEC));
+            case "import-certification-item" -> System.exit(runImport(CertificationItemTable.SPEC));
             default -> {
                 printUsage();
                 System.exit("".equals(command) ? 2 : 2);
@@ -216,6 +224,10 @@ public final class Main {
         System.out.println("  import-workflow-definition");
         System.out.println("                       Fetch GET /kfagent/workflow-definitions and upsert into <PG_DEST_SCHEMA>.kf_workflow_definition");
         System.out.println("  import-certification Fetch GET /kfagent/certifications and upsert into <PG_DEST_SCHEMA>.kf_certification");
+        System.out.println("  import-certification-entity");
+        System.out.println("                       Fetch GET /kfagent/certification-entities and upsert into <PG_DEST_SCHEMA>.kf_certification_entity");
+        System.out.println("  import-certification-item");
+        System.out.println("                       Fetch GET /kfagent/certification-items and upsert into <PG_DEST_SCHEMA>.kf_certification_item");
         System.out.println();
         System.out.println("Required env: KFAGENT_BASE_URL, PG_HOST, PG_DATABASE, PG_USERNAME, PG_PASSWORD");
         System.out.println("Optional env: PG_PORT (5432), PG_DEST_SCHEMA (iiq_native_part2), KFAGENT_PAGE_SIZE (500),");

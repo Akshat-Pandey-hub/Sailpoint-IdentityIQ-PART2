@@ -31,6 +31,7 @@ Implemented entities:
 | `import-work-item` | `GET /kfagent/work-items` | `kf_workitem` | `workitemid` (no fallback) | `sailpoint.object.WorkItem` | 30 of 41 fields |
 | `import-workflow-definition` | `GET /kfagent/workflow-definitions` | `kf_workflow_definition` | `workflowid` | `sailpoint.object.Workflow` | Part 1 parser's 7-field camelCase hash (no timestamps) |
 | `import-certification` | `GET /kfagent/certifications` | `kf_certification` | `certificationid` | `sailpoint.object.Certification` | 26 of 43 fields |
+| `import-certification-entity` | `GET /kfagent/certification-entities` | `kf_certification_entity` | `certificationentityid` | `sailpoint.object.CertificationEntity` | 11 of 32 fields |
 
 ## How identity rows are keyed (the "two ids" explained)
 `userid` (the uuid primary key) is **not** a new/random id — it is `source_id` rewritten in canonical UUID
@@ -347,6 +348,26 @@ The certification **header**, one IIQ `Certification` (access review). Part 1 ru
 - Checked against real data: for both live certifications, the key, `record_hash`, object type and the stored
   `allowed_statuses` / `tags` text equal what Part 1 stored (2/2).
 
+## Certification-Entity (`kf_certification_entity`)
+Each IIQ `CertificationEntity`: one identity, account or account group being reviewed inside a certification. Part 1
+rules from `NativeCertificationEntityRepository`:
+- `certificationentityid` = the entity's **own** `canonicalUuid(source_id)`. The fallback is
+  `deterministicUuid("native-certification-entity|" + source_id)`, or `+ identity` (the entity's identity, not a name) when
+  `source_id` is null. These rules differ from the certification header. The key does not depend on the parent.
+- **Links:** `certification_id` = the parent Certification's **raw** IIQ id (`kf_certification.source_id`). Certification
+  items reference an entity through their `entity_id`, which holds the entity's raw `source_id`. Join with
+  `kf_certification_entity.certification_id = kf_certification.source_id` and
+  `kf_certification_item.entity_id = kf_certification_entity.source_id`.
+- 32 business columns = the 32 response fields, same names and order, all scalar: `entity_delegated` is boolean,
+  `composite_score` is integer, and there are 4 timestamps.
+- `record_hash` = Part 1's **11-field** subset: `source_id`, `certification_id`, `identity`, `application`,
+  `native_identity`, `type`, `summary_status`, `completed`, `action_status`, `action_decision_date`, `action_actor_name`.
+- Lineage: `IdentityIQ` / `native_iiq_java_api` / `sailpoint.object.CertificationEntity`.
+- Checked against real data (offline; the KF Agent was down for this entity): the 2 entities Part 1 stored in
+  `iiq_native`, rebuilt from the dump, reproduce their stored key and `record_hash` exactly (Part 1's own code agrees).
+  In the stored data, both entities link to a stored certification (2/2) and all 45 stored certification items link to a
+  stored entity through `entity_id` (45/45). The live comparison is still to run once the agent is up.
+
 ## Build (Java 17, Maven)
 ```bash
 mvn clean package
@@ -392,6 +413,7 @@ psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_provisi
 psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_workitem.sql
 psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_workflow_definition.sql
 psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_certification.sql
+psql -h <host> -U <user> -d <db> -v schema=iiq_native_part2 -f schema/kf_certification_entity.sql
 ```
 It writes to a **separate** schema and never alters an existing populated schema.
 
@@ -420,6 +442,7 @@ java -jar target/kfagent-ingest.jar import-provisioning-transaction
 java -jar target/kfagent-ingest.jar import-work-item
 java -jar target/kfagent-ingest.jar import-workflow-definition
 java -jar target/kfagent-ingest.jar import-certification
+java -jar target/kfagent-ingest.jar import-certification-entity
 ```
 Prints a credential-free config line, the run id, and an import summary (pages / fetched / inserted /
 updated / failed, with up to 10 sample failures). Exit codes: `0` ok, `2` usage, `3` config, `4` HTTP/source,
@@ -467,6 +490,8 @@ mvn test
   binding/NULL/invalid handling, lineage params.
 - `AccountTableTest` — `record_hash` + `accountid` parity with Part 1, including both fallback-key cases (natural
   key, and a null application name), every field hashed, DDL order = iiq_native.kf_account, binding, lineage.
+- `CertificationEntityTableTest` — reproduces the 2 real stored entities (key + hash), fallback on identity, key independent
+  of the parent, only the 11 hashed fields matter, DDL, binding.
 - `CertificationTableTest` — key/hash parity with Part 1 (fallbacks), allowed_statuses/tags written back as Part 1's text
   (incl. a non-JSON string), 17 un-hashed fields, trailing DDL with text columns, binding.
 - `WorkflowDefinitionRepositoryTest` — key/definition-text/hash parity with Part 1's parser (incl. JSON-null definition and
@@ -506,7 +531,7 @@ mvn test
   nested JSON → `jsonb`, ISO timestamps, SQL NULL for null/absent fields, metadata params. No live DB needed.
 
 ## Status / next
-Identity, Entitlement, Application, Account, Workgroup, Role, Identity-Role, Identity-Entitlement, Account-Entitlement, Role-Entitlement, Role-Hierarchy, Identity-Request, Identity-Request-Item, Identity-Request-Approval, Policy, Provisioning-Item, Provisioning-Transaction, Work-Item, Workflow-Definition and Certification are done. Entitlement runs on the generic engine (`EntitySpec` + `EntityRepository` +
+Identity, Entitlement, Application, Account, Workgroup, Role, Identity-Role, Identity-Entitlement, Account-Entitlement, Role-Entitlement, Role-Hierarchy, Identity-Request, Identity-Request-Item, Identity-Request-Approval, Policy, Provisioning-Item, Provisioning-Transaction, Work-Item, Workflow-Definition, Certification and Certification-Entity are done. Entitlement runs on the generic engine (`EntitySpec` + `EntityRepository` +
 `EntityImportService`); further current-state entities are added as one `*Table` spec each. Identity is the complete first vertical slice (HTTP → parse → map → metadata → upsert → verification). The
 column-spec + upsert engine is built to extend to the other ~39 endpoints, each with its own table, PK/salt,
 `source_object_type`, `record_hash` behavior (where applicable), nested fields, and current-state vs

@@ -276,4 +276,31 @@ public final class CanonicalIds {
         }
         return id;
     }
+
+    /**
+     * The CertificationEntity primary key, matching Part 1's
+     * {@code NativeCertificationEntityRepository.canonicalCertificationEntityId}: {@code canonicalUuid(source_id)},
+     * falling back to {@code deterministicUuid("native-certification-entity|"+id)} — with the entity's {@code identity}
+     * (not a name) only when source_id is {@code null}.
+     */
+    public static String certificationEntityId(String sourceId, String identity) {
+        String id = canonicalUuid(sourceId);
+        if (id == null) {
+            id = deterministicUuid("native-certification-entity|" + (sourceId == null ? identity : sourceId));
+        }
+        return id;
+    }
+
+    /**
+     * The CertificationItem primary key, matching Part 1's {@code NativeCertificationItemRepository.canonicalItemId}:
+     * {@code canonicalUuid(source_id)}, falling back to {@code deterministicUuid("native-certification-item|"+source_id)}
+     * — no name/identity fallback (a null id becomes the text "null", exactly like Part 1).
+     */
+    public static String certificationItemId(String sourceId) {
+        String id = canonicalUuid(sourceId);
+        if (id == null) {
+            id = deterministicUuid("native-certification-item|" + sourceId);
+        }
+        return id;
+    }
 }
