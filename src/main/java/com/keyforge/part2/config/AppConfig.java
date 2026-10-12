@@ -49,8 +49,21 @@ public final class AppConfig {
     }
 
     public static AppConfig load() {
+        return load(true);
+    }
+
+    /**
+     * Configuration for a command that only reads/writes PostgreSQL (e.g. deriving events from loaded tables, or
+     * recording the run ledger): {@code KFAGENT_BASE_URL} is not required ({@link #kfAgentBaseUrl()} is then
+     * {@code null}); all PostgreSQL settings are resolved and validated exactly as by {@link #load()}.
+     */
+    public static AppConfig loadDatabaseOnly() {
+        return load(false);
+    }
+
+    private static AppConfig load(boolean requireKfAgent) {
         List<String> missing = new ArrayList<>();
-        String base = required("KFAGENT_BASE_URL", missing);
+        String base = requireKfAgent ? required("KFAGENT_BASE_URL", missing) : nullable("KFAGENT_BASE_URL");
         String pgHost = required("PG_HOST", missing);
         String pgDatabase = required("PG_DATABASE", missing);
         String pgUsername = required("PG_USERNAME", missing);
@@ -61,12 +74,15 @@ public final class AppConfig {
                     + " or JVM system properties (-DKFAGENT_BASE_URL=...).");
         }
 
-        String url = base.trim();
-        while (url.endsWith("/")) {
-            url = url.substring(0, url.length() - 1);
-        }
-        if (!url.startsWith("http://") && !url.startsWith("https://")) {
-            throw new ConfigException("KFAGENT_BASE_URL must be an http(s) URL but was: " + base);
+        String url = null;
+        if (base != null) {
+            url = base.trim();
+            while (url.endsWith("/")) {
+                url = url.substring(0, url.length() - 1);
+            }
+            if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                throw new ConfigException("KFAGENT_BASE_URL must be an http(s) URL but was: " + base);
+            }
         }
 
         String pgPort = orDefault("PG_PORT", "5432");
@@ -93,7 +109,8 @@ public final class AppConfig {
 
     /** A one-line, credential-free description for startup logging. */
     public String describe() {
-        return "KF Agent: " + kfAgentBaseUrl + (hasBasicAuth() ? " (basic-auth)" : "")
+        return "KF Agent: " + (kfAgentBaseUrl == null ? "(not used)" : kfAgentBaseUrl)
+                + (hasBasicAuth() ? " (basic-auth)" : "")
                 + " | PostgreSQL: " + jdbcUrl() + " (user '" + pgUsername + "', dest schema '" + pgSchema + "')"
                 + " | pageSize=" + pageSize + ", httpTimeout=" + httpTimeoutSeconds + "s";
     }

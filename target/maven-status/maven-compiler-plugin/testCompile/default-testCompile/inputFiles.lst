@@ -1,4 +1,12 @@
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\event\DeriveCommandConfigTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\event\EventDerivationServiceTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\event\EventDeriverTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\event\EventFingerprintTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\event\EventLinkDerivationServiceTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\event\EventLinkDeriverTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\id\CanonicalIdsTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\incremental\IncrementalImportServiceTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\incremental\WatermarkServiceTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\AccessHistoryCertificationRepositoryTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\AccessHistoryEntitlementRepositoryTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\AccessHistoryIdentityEventRepositoryTest.java
@@ -46,4 +54,9 @@ D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\WorkgroupM
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\WorkgroupTableTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\WorkItemArchiveRepositoryTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\WorkItemTableTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ledger\RunLedgerRepositoryTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ledger\RunLedgerTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\MainLedgerTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\reconciliation\ReconciliationFindingRepositoryTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\reconciliation\WorkItemReconciliationTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\testsupport\RecordingJdbc.java

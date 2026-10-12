@@ -71,7 +71,19 @@ public final class KfAgentClient {
      * body comes from a single KF Agent scan — one consistent snapshot — together with its verified source count.
      */
     public Snapshot fetchSnapshot(String resource) {
-        HttpResponse<String> resp = get(config.kfAgentBaseUrl() + "/kfagent/" + resource);
+        return fetchSnapshot(resource, null);
+    }
+
+    /**
+     * Like {@link #fetchSnapshot(String)}, bounded to objects modified after {@code modifiedAfterIso} (an ISO-8601
+     * instant) when it is not {@code null}: the KF Agent passes it to the plugin as a server-side filter. Supported only
+     * by identities, accounts, applications, entitlements and roles.
+     */
+    public Snapshot fetchSnapshot(String resource, String modifiedAfterIso) {
+        String url = config.kfAgentBaseUrl() + "/kfagent/" + resource
+                + (modifiedAfterIso == null ? ""
+                : "?modifiedAfter=" + java.net.URLEncoder.encode(modifiedAfterIso, StandardCharsets.UTF_8));
+        HttpResponse<String> resp = get(url);
         return new Snapshot(resp.body(),
                 sourceCount(resp.headers().firstValue(VERIFIED_SOURCE_COUNT_HEADER).orElse(null)));
     }

@@ -1,6 +1,10 @@
 package com.keyforge.part2;
 
 import com.keyforge.part2.config.AppConfig;
+import com.keyforge.part2.event.EventDerivationService;
+import com.keyforge.part2.event.EventLinkDerivationService;
+import com.keyforge.part2.event.EventLinkRepository;
+import com.keyforge.part2.event.EventRepository;
 import com.keyforge.part2.config.ConfigException;
 import com.keyforge.part2.db.PostgresConnection;
 import com.keyforge.part2.http.KfAgentClient;
@@ -56,12 +60,22 @@ import com.keyforge.part2.ingest.WorkgroupMembersReport;
 import com.keyforge.part2.ingest.WorkflowDefinitionRepository;
 import com.keyforge.part2.ingest.WorkgroupTable;
 import com.keyforge.part2.ingest.ImportResult;
+import com.keyforge.part2.incremental.ExtractionMode;
+import com.keyforge.part2.incremental.IncrementalConfig;
+import com.keyforge.part2.incremental.IncrementalImportService;
+import com.keyforge.part2.incremental.WatermarkService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.keyforge.part2.ledger.RunContext;
+import com.keyforge.part2.ledger.RunLedger;
+import com.keyforge.part2.reconciliation.ReconciliationFindingRepository;
+import com.keyforge.part2.reconciliation.WorkItemReconciliation;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.function.Function;
 
 /**
@@ -151,68 +165,342 @@ public final class Main {
 
     public static void main(String[] args) {
         String command = args.length == 0 ? "" : args[0].trim();
-        switch (command) {
-            case "import-identity" -> System.exit(runImportIdentity());
-            case "import-entitlement" -> System.exit(runImport(EntitlementTable.SPEC));
-            case "import-application" -> System.exit(runImport(ApplicationTable.SPEC));
-            case "import-account" -> System.exit(runImport(AccountTable.SPEC));
-            case "import-workgroup" -> System.exit(runImport(WorkgroupTable.SPEC));
-            case "import-role" -> System.exit(runImport(RoleTable.SPEC));
-            case "import-identity-role" -> System.exit(runImport(IdentityRoleTable.SPEC));
-            case "import-identity-entitlement" -> System.exit(runImport(IdentityEntitlementTable.SPEC));
-            case "import-account-entitlement" -> System.exit(runImport(AccountEntitlementTable.SPEC));
-            case "import-role-entitlement" -> System.exit(runImport(RoleEntitlementRepository::new));
-            case "import-role-hierarchy" -> System.exit(runImport(RoleHierarchyRepository::new));
-            case "import-identity-request" -> System.exit(runImport(IdentityRequestTable.SPEC));
-            case "import-identity-request-item" -> System.exit(runImport(IdentityRequestItemTable.SPEC));
-            case "import-identity-request-approval" -> System.exit(runImport(IdentityRequestApprovalTable.SPEC));
-            case "import-policy" -> System.exit(runImport(PolicyTable.SPEC));
-            case "import-provisioning-item" -> System.exit(runImport(ProvisioningItemRepository::new));
-            case "import-provisioning-transaction" -> System.exit(runImport(ProvisioningTxnTable.SPEC));
-            case "import-work-item" -> System.exit(runImport(WorkItemTable.SPEC));
-            case "import-workflow-definition" -> System.exit(runImport(WorkflowDefinitionRepository::new));
-            case "import-certification" -> System.exit(runImport(CertificationTable.SPEC));
-            case "import-certification-entity" -> System.exit(runImport(CertificationEntityTable.SPEC));
-            case "import-certification-item" -> System.exit(runImport(CertificationItemTable.SPEC));
-            case "import-certification-archive" -> System.exit(runImport(CertificationArchiveRepository::new));
-            case "import-policy-constraint" -> System.exit(runImport(PolicyConstraintTable.SPEC));
-            case "import-policy-violation" -> System.exit(runImport(PolicyViolationTable.SPEC));
-            case "import-entitlement-assignment" -> System.exit(runSqlReport("EntitlementAssignment",
-                    EntitlementAssignmentReport.RESOURCE, EntitlementAssignmentReport.TABLE,
-                    EntitlementAssignmentReport.COLUMNS));
-            case "import-workgroup-member" -> System.exit(runImport(WorkgroupMemberRepository::new));
-            case "import-entitlement-certification" -> System.exit(runSqlReport("EntitlementCertification",
-                    EntitlementCertificationReport.RESOURCE, EntitlementCertificationReport.TABLE,
-                    EntitlementCertificationReport.COLUMNS));
-            case "import-entitlement-certification-status" -> System.exit(runSqlReport("EntitlementCertificationStatus",
-                    EntitlementCertificationStatusReport.RESOURCE, EntitlementCertificationStatusReport.TABLE,
-                    EntitlementCertificationStatusReport.COLUMNS));
-            case "import-workgroup-members" -> System.exit(runSqlReport("WorkgroupMembers",
-                    WorkgroupMembersReport.RESOURCE, WorkgroupMembersReport.TABLE, WorkgroupMembersReport.COLUMNS));
-            case "import-audit-event" -> System.exit(runImport(AuditEventRepository::new));
-            case "import-task-result" -> System.exit(runImport(TaskResultTable.SPEC));
-            case "import-task-schedule" -> System.exit(runImport(TaskScheduleTable.SPEC));
-            case "import-workitem-archive" -> System.exit(runImport(WorkItemArchiveRepository::new));
-            case "import-group-definition" -> System.exit(runImport(GroupDefinitionTable.SPEC));
-            case "import-access-history" -> System.exit(runImport(AccessHistoryEntitlementRepository::new));
-            case "import-access-history-identity-event" ->
-                    System.exit(runImport(AccessHistoryIdentityEventRepository::new));
-            case "import-access-history-certification" ->
-                    System.exit(runImport(AccessHistoryCertificationRepository::new));
-            case "import-access-history-role-event" ->
-                    System.exit(runImport(AccessHistoryRoleEventRepository::new));
-            case "import-syslog-event" -> System.exit(runSyslogImport());
-            default -> {
-                printUsage();
-                System.exit("".equals(command) ? 2 : 2);
+        ExtractionMode mode = ExtractionMode.fromArgs(java.util.Arrays.copyOfRange(args, Math.min(1, args.length),
+                args.length));
+        String ledgerCommand = mode.isIncremental() ? command + " --incremental" : command;
+        System.exit(RunLedger.run(ledgerCommand, () -> dispatch(command, mode)));
+    }
+
+    /** Runs one full-mode command (see {@link #dispatch(String, ExtractionMode)}). */
+    static int dispatch(String command) {
+        return dispatch(command, ExtractionMode.FULL);
+    }
+
+    /**
+     * Runs one command and returns its exit code; every import is recorded in kf_extraction_run. Incremental mode is
+     * opt-in ({@code --incremental}) and only for the entities whose KF Agent endpoint supports {@code modifiedAfter}.
+     */
+    static int dispatch(String command, ExtractionMode mode) {
+        if (mode.isIncremental()) {
+            Function<String, EntityWriter> writer = INCREMENTAL_WRITERS.get(command);
+            if (writer == null) {
+                RunLedger.discard(); // a usage error is not an import run
+                System.err.println("--incremental is supported only for " + INCREMENTAL_WRITERS.keySet()
+                        + " (their KF Agent endpoints accept modifiedAfter); '" + command + "' runs in full mode only.");
+                return 2;
             }
+            return runIncremental(writer);
+        }
+        return switch (command) {
+            case "import-identity" -> runImportIdentity();
+            case "import-entitlement" -> runImport(EntitlementTable.SPEC);
+            case "import-application" -> runImport(ApplicationTable.SPEC);
+            case "import-account" -> runImport(AccountTable.SPEC);
+            case "import-workgroup" -> runImport(WorkgroupTable.SPEC);
+            case "import-role" -> runImport(RoleTable.SPEC);
+            case "import-identity-role" -> runImport(IdentityRoleTable.SPEC);
+            case "import-identity-entitlement" -> runImport(IdentityEntitlementTable.SPEC);
+            case "import-account-entitlement" -> runImport(AccountEntitlementTable.SPEC);
+            case "import-role-entitlement" -> runImport(RoleEntitlementRepository::new);
+            case "import-role-hierarchy" -> runImport(RoleHierarchyRepository::new);
+            case "import-identity-request" -> runImport(IdentityRequestTable.SPEC);
+            case "import-identity-request-item" -> runImport(IdentityRequestItemTable.SPEC);
+            case "import-identity-request-approval" -> runImport(IdentityRequestApprovalTable.SPEC);
+            case "import-policy" -> runImport(PolicyTable.SPEC);
+            case "import-provisioning-item" -> runImport(ProvisioningItemRepository::new);
+            case "import-provisioning-transaction" -> runImport(ProvisioningTxnTable.SPEC);
+            case "import-work-item" -> runImport(WorkItemTable.SPEC);
+            case "import-workflow-definition" -> runImport(WorkflowDefinitionRepository::new);
+            case "import-certification" -> runImport(CertificationTable.SPEC);
+            case "import-certification-entity" -> runImport(CertificationEntityTable.SPEC);
+            case "import-certification-item" -> runImport(CertificationItemTable.SPEC);
+            case "import-certification-archive" -> runImport(CertificationArchiveRepository::new);
+            case "import-policy-constraint" -> runImport(PolicyConstraintTable.SPEC);
+            case "import-policy-violation" -> runImport(PolicyViolationTable.SPEC);
+            case "import-entitlement-assignment" -> runSqlReport("EntitlementAssignment",
+                    EntitlementAssignmentReport.RESOURCE, EntitlementAssignmentReport.TABLE,
+                    EntitlementAssignmentReport.COLUMNS);
+            case "import-workgroup-member" -> runImport(WorkgroupMemberRepository::new);
+            case "import-entitlement-certification" -> runSqlReport("EntitlementCertification",
+                    EntitlementCertificationReport.RESOURCE, EntitlementCertificationReport.TABLE,
+                    EntitlementCertificationReport.COLUMNS);
+            case "import-entitlement-certification-status" -> runSqlReport("EntitlementCertificationStatus",
+                    EntitlementCertificationStatusReport.RESOURCE, EntitlementCertificationStatusReport.TABLE,
+                    EntitlementCertificationStatusReport.COLUMNS);
+            case "import-workgroup-members" -> runSqlReport("WorkgroupMembers",
+                    WorkgroupMembersReport.RESOURCE, WorkgroupMembersReport.TABLE, WorkgroupMembersReport.COLUMNS);
+            case "import-audit-event" -> runImport(AuditEventRepository::new);
+            case "import-task-result" -> runImport(TaskResultTable.SPEC);
+            case "import-task-schedule" -> runImport(TaskScheduleTable.SPEC);
+            case "import-workitem-archive" -> runImport(WorkItemArchiveRepository::new);
+            case "import-group-definition" -> runImport(GroupDefinitionTable.SPEC);
+            case "import-access-history" -> runImport(AccessHistoryEntitlementRepository::new);
+            case "import-access-history-identity-event" ->
+                    runImport(AccessHistoryIdentityEventRepository::new);
+            case "import-access-history-certification" ->
+                    runImport(AccessHistoryCertificationRepository::new);
+            case "import-access-history-role-event" ->
+                    runImport(AccessHistoryRoleEventRepository::new);
+            case "import-syslog-event" -> runSyslogImport();
+            case "reconcile-native-workitems" -> runReconcileWorkItems();
+            case "derive-native-events" -> runDeriveNativeEvents();
+            case "derive-native-event-links" -> runDeriveNativeEventLinks();
+            default -> {
+                RunLedger.discard(); // a usage error is not an import run
+                printUsage();
+                yield 2;
+            }
+        };
+    }
+
+    /** The commands with opt-in incremental mode, and the writer each uses (the same one as its full import). */
+    static final Map<String, Function<String, EntityWriter>> INCREMENTAL_WRITERS = Map.of(
+            "import-identity", Main::identityWriter,
+            "import-entitlement", schema -> new EntityRepository(schema, EntitlementTable.SPEC),
+            "import-application", schema -> new EntityRepository(schema, ApplicationTable.SPEC),
+            "import-account", schema -> new EntityRepository(schema, AccountTable.SPEC),
+            "import-role", schema -> new EntityRepository(schema, RoleTable.SPEC));
+
+    /** The Identity table's dedicated repository as an {@link EntityWriter} (incremental path only). */
+    static EntityWriter identityWriter(String schema) {
+        IdentityRepository repository = new IdentityRepository(schema);
+        return new EntityWriter() {
+            @Override public String entity() { return "Identity"; }
+            @Override public String resource() { return "identities"; }
+            @Override public String targetTable() { return repository.targetTable(); }
+            @Override public void ensureSchemaAndTable(Connection conn) throws SQLException {
+                repository.ensureSchemaAndTable(conn);
+            }
+            @Override public EntityRepository.Outcome upsert(Connection conn, JsonNode row, String runId)
+                    throws SQLException {
+                return repository.upsert(conn, row, runId) == IdentityRepository.Outcome.INSERTED
+                        ? EntityRepository.Outcome.INSERTED : EntityRepository.Outcome.UPDATED;
+            }
+            @Override public String ref(JsonNode row) {
+                return "identity " + row.path("name").asText(null) + " (" + row.path("source_id").asText(null) + ")";
+            }
+        };
+    }
+
+    /**
+     * Incremental import (opt-in): rows modified after the stored watermark minus the overlap, one KF Agent request,
+     * the ordinary writer, and a watermark advance only when no row failed. Never sweeps.
+     */
+    private static int runIncremental(Function<String, EntityWriter> writerForSchema) {
+        try {
+            AppConfig config = AppConfig.load();
+            String runId = RunLedger.runIdOrNew();
+            System.out.println(config.describe());
+            System.out.println("extraction_run_id: " + runId);
+
+            KfAgentClient client = new KfAgentClient(config);
+            EntityWriter writer = writerForSchema.apply(config.pgSchema());
+            Duration overlap = IncrementalConfig.overlapWindow();
+            IncrementalImportService service = new IncrementalImportService(client::fetchSnapshot, writer,
+                    new WatermarkService(config.pgSchema()), overlap);
+
+            try (Connection conn = PostgresConnection.open(config)) {
+                IncrementalImportService.Outcome o = service.run(conn, runId);
+                RunLedger.window(o.bound(), o.fetchedAt());
+                RunLedger.record(counts(writer.targetTable(), o.result(), null));
+                System.out.println();
+                System.out.println(o.result().summary());
+                System.out.println("  mode:      incremental (overlap " + overlap.toMinutes() + " min); watermark "
+                        + WatermarkService.watermarkKey(writer.targetTable()) + " was "
+                        + (o.stored() == null ? "unset -> full fetch (baseline)" : o.stored())
+                        + "; modifiedAfter=" + (o.bound() == null ? "none" : o.bound()));
+                System.out.println("  watermark: " + (o.advanced() ? "advanced to " + o.newWatermark()
+                        : "NOT advanced (" + (o.result().failed() > 0 ? o.result().failed()
+                        + " row failure(s); the next run re-reads from the unchanged watermark)"
+                        : "no newer change time than the stored watermark") + ")"));
+                System.out.println("  sweep:     not run (an incremental import never marks rows deleted)");
+                if (o.result().failed() > 0) {
+                    RunLedger.error("watermark not advanced: " + o.result().failed() + " row failure(s)");
+                }
+                return o.result().failed() > 0 ? 6 : 0;
+            }
+        } catch (ConfigException e) {
+            System.err.println("Configuration error: " + e.getMessage());
+            RunLedger.error("configuration error: " + e.getMessage());
+            return 3;
+        } catch (KfAgentClient.KfAgentHttpException e) {
+            System.err.println("KF Agent HTTP/source error: " + e.getMessage());
+            RunLedger.error("KF Agent HTTP/source error: " + e.getMessage());
+            return 4;
+        } catch (SQLException e) {
+            System.err.println("PostgreSQL error: " + e.getMessage());
+            RunLedger.error("PostgreSQL error: " + e.getMessage());
+            return 5;
+        } catch (RuntimeException e) {
+            System.err.println("Unexpected error: " + e.getMessage());
+            RunLedger.error("unexpected error: " + e.getMessage());
+            return 1;
+        }
+    }
+
+    /**
+     * Reconciliation (Part 1 reconcile-native-workitems-db): reads the loaded approval / work-item / work-item-archive
+     * tables and persists one finding for this run to kf_reconciliation_finding. Read-only over every other table.
+     */
+    private static int runReconcileWorkItems() {
+        try {
+            AppConfig config = AppConfig.load();
+            String runId = RunLedger.runIdOrNew();
+            System.out.println(config.describe());
+            System.out.println("extraction_run_id: " + runId);
+            System.out.println("WorkItem reconciliation (read-only over loaded tables; writes only "
+                    + "kf_reconciliation_finding): approval work_item_id references vs kf_workitem + kf_workitem_archive");
+            try (Connection conn = PostgresConnection.open(config)) {
+                WorkItemReconciliation svc = new WorkItemReconciliation(config.pgSchema());
+                WorkItemReconciliation.Result r = svc.reconcile(conn, runId);
+                RunLedger.record(new RunContext.EntityCount(ReconciliationFindingRepository.TABLE, 1, 1, 0, 0, 0,
+                        null, null, null));
+                System.out.println();
+                if (r.skipped) {
+                    System.out.println("Reconciliation SKIPPED: " + r.skipReason);
+                } else {
+                    System.out.println("Live WorkItems (kf_workitem):                " + r.liveWorkItems);
+                    System.out.println("WorkItem archives (kf_workitem_archive):     " + r.workItemArchives);
+                    System.out.println("Approval work_item_id references (distinct): " + r.approvalRefs);
+                    System.out.println("  matched to a live WorkItem:      " + r.matchedLive);
+                    System.out.println("  matched to an archived WorkItem: " + r.matchedArchive);
+                    System.out.println("  matched to either:               " + r.matchedEither);
+                    System.out.println("  UNMATCHED:                       " + r.unmatched);
+                    if (!r.unmatchedSamples.isEmpty()) {
+                        System.out.println("  unmatched sample ids: " + r.unmatchedSamples);
+                    }
+                }
+                System.out.println();
+                System.out.println("Determination: " + r.determination);
+                System.out.println("Finding " + r.findingId + " persisted to " + svc.findings().targetTable()
+                        + " (check '" + WorkItemReconciliation.CHECK_NAME + "', run_id " + runId + ")");
+                return 0;
+            }
+        } catch (ConfigException e) {
+            System.err.println("Configuration error: " + e.getMessage());
+            RunLedger.error("configuration error: " + e.getMessage());
+            return 3;
+        } catch (SQLException e) {
+            System.err.println("PostgreSQL error: " + e.getMessage());
+            RunLedger.error("PostgreSQL error: " + e.getMessage());
+            return 5;
+        } catch (RuntimeException e) {
+            System.err.println("Unexpected error: " + e.getMessage());
+            RunLedger.error("unexpected error: " + e.getMessage());
+            return 1;
+        }
+    }
+
+    /**
+     * Event derivation (Part 1 derive-native-events-db, events only): reads the loaded approval / task-result /
+     * provisioning-transaction / work-item-archive / certification-item tables and appends the derived events to
+     * kf_event in one transaction. Needs PostgreSQL only (no KF Agent call, KFAGENT_BASE_URL not required).
+     */
+    private static int runDeriveNativeEvents() {
+        try {
+            AppConfig config = AppConfig.loadDatabaseOnly();
+            String runId = RunLedger.runIdOrNew();
+            System.out.println(config.describe());
+            System.out.println("extraction_run_id: " + runId);
+            System.out.println("Native event derivation (append-only; reads loaded tables only, no KF Agent call): "
+                    + "kf_identity_request_approval, kf_task_result, kf_provisioning_txn, kf_workitem_archive, "
+                    + "kf_certification_item -> kf_event");
+            try (Connection conn = PostgresConnection.open(config)) {
+                EventDerivationService svc = new EventDerivationService(config.pgSchema());
+                EventDerivationService.Result r = svc.derive(conn, runId);
+                RunLedger.record(new RunContext.EntityCount(EventRepository.TABLE, r.eventsDerived, r.eventsInserted,
+                        0, 0, r.eventsAlreadyPresent(), null, null, null));
+                System.out.println();
+                System.out.println("Source rows read: approval=" + r.approvalRows + ", task_result=" + r.taskRows
+                        + ", provisioning_txn=" + r.provRows + ", workitem_archive=" + r.archiveRows
+                        + ", certification_item=" + r.certItemRows);
+                if (!r.sourcesMissing.isEmpty()) {
+                    System.out.println("  source tables absent (no events derived from them): " + r.sourcesMissing);
+                }
+                System.out.println("Events derived: " + r.eventsDerived + " (inserted " + r.eventsInserted
+                        + ", already present " + r.eventsAlreadyPresent() + ") -> " + svc.eventTable());
+                for (Map.Entry<String, Integer> e : r.eventsByType.entrySet()) {
+                    System.out.println("    " + e.getKey() + ": " + e.getValue() + " (inserted "
+                            + r.insertedByType.getOrDefault(e.getKey(), 0) + ")");
+                }
+                return 0;
+            }
+        } catch (ConfigException e) {
+            System.err.println("Configuration error: " + e.getMessage());
+            RunLedger.error("configuration error: " + e.getMessage());
+            return 3;
+        } catch (SQLException e) {
+            System.err.println("PostgreSQL error (derivation rolled back, kf_event unchanged): " + e.getMessage());
+            RunLedger.error("PostgreSQL error: " + e.getMessage());
+            return 5;
+        } catch (RuntimeException e) {
+            System.err.println("Unexpected error: " + e.getMessage());
+            RunLedger.error("unexpected error: " + e.getMessage());
+            return 1;
+        }
+    }
+
+    /**
+     * Event-link derivation (Part 1 derive-native-events-db, link half): re-derives each loaded source row's event id
+     * and its explicit links, and appends to kf_event_link only the links whose event is already in kf_event, in one
+     * transaction. Reads kf_event, never writes it. PostgreSQL only (no KF Agent call, KFAGENT_BASE_URL not required).
+     */
+    private static int runDeriveNativeEventLinks() {
+        try {
+            AppConfig config = AppConfig.loadDatabaseOnly();
+            String runId = RunLedger.runIdOrNew();
+            System.out.println(config.describe());
+            System.out.println("extraction_run_id: " + runId);
+            System.out.println("Native event-link derivation (append-only, EXPLICIT ids only; reads loaded tables and "
+                    + "kf_event, no KF Agent call) -> kf_event_link");
+            try (Connection conn = PostgresConnection.open(config)) {
+                EventLinkDerivationService svc = new EventLinkDerivationService(config.pgSchema());
+                EventLinkDerivationService.Result r = svc.derive(conn, runId);
+                RunLedger.record(new RunContext.EntityCount(EventLinkRepository.TABLE, r.linksDerived,
+                        r.linksInserted, 0, 0, r.linksAlreadyPresent + r.linksWithoutEvent, null, null, null));
+                System.out.println();
+                System.out.println("Source rows read: approval=" + r.approvalRows + ", task_result=" + r.taskRows
+                        + ", provisioning_txn=" + r.provRows + ", workitem_archive=" + r.archiveRows
+                        + ", certification_item=" + r.certItemRows);
+                if (!r.sourcesMissing.isEmpty()) {
+                    System.out.println("  source tables absent (no links derived from them): " + r.sourcesMissing);
+                }
+                if (r.eventTableMissing) {
+                    System.out.println("  kf_event is absent: no link can be written (run derive-native-events first)");
+                }
+                System.out.println("Links derived: " + r.linksDerived + " (inserted " + r.linksInserted
+                        + ", already present " + r.linksAlreadyPresent + ", event not in kf_event "
+                        + r.linksWithoutEvent + ") -> " + svc.linkTable());
+                for (Map.Entry<String, Integer> e : r.derivedByType.entrySet()) {
+                    System.out.println("    " + e.getKey() + ": " + e.getValue() + " (inserted "
+                            + r.insertedByType.getOrDefault(e.getKey(), 0) + ")");
+                }
+                if (r.linksWithoutEvent > 0) {
+                    System.out.println("  " + r.linksWithoutEvent + " link(s) not written because their event is not "
+                            + "stored; run derive-native-events, then this command again.");
+                }
+                return 0;
+            }
+        } catch (ConfigException e) {
+            System.err.println("Configuration error: " + e.getMessage());
+            RunLedger.error("configuration error: " + e.getMessage());
+            return 3;
+        } catch (SQLException e) {
+            System.err.println("PostgreSQL error (link derivation rolled back, kf_event_link unchanged): "
+                    + e.getMessage());
+            RunLedger.error("PostgreSQL error: " + e.getMessage());
+            return 5;
+        } catch (RuntimeException e) {
+            System.err.println("Unexpected error: " + e.getMessage());
+            RunLedger.error("unexpected error: " + e.getMessage());
+            return 1;
         }
     }
 
     private static int runImportIdentity() {
         try {
             AppConfig config = AppConfig.load();
-            String runId = UUID.randomUUID().toString();
+            String runId = RunLedger.runIdOrNew();
             System.out.println(config.describe());
             System.out.println("extraction_run_id: " + runId);
 
@@ -222,21 +510,26 @@ public final class Main {
 
             try (Connection conn = PostgresConnection.open(config)) {
                 ImportResult result = service.run(conn, runId);
+                RunLedger.record(counts(repository.targetTable(), result, null));
                 System.out.println();
                 System.out.println(result.summary());
                 return result.failed() > 0 ? 6 : 0;
             }
         } catch (ConfigException e) {
             System.err.println("Configuration error: " + e.getMessage());
+            RunLedger.error("configuration error: " + e.getMessage());
             return 3;
         } catch (KfAgentClient.KfAgentHttpException e) {
             System.err.println("KF Agent HTTP/source error: " + e.getMessage());
+            RunLedger.error("KF Agent HTTP/source error: " + e.getMessage());
             return 4;
         } catch (SQLException e) {
             System.err.println("PostgreSQL error: " + e.getMessage());
+            RunLedger.error("PostgreSQL error: " + e.getMessage());
             return 5;
         } catch (RuntimeException e) {
             System.err.println("Unexpected error: " + e.getMessage());
+            RunLedger.error("unexpected error: " + e.getMessage());
             return 1;
         }
     }
@@ -250,7 +543,7 @@ public final class Main {
     private static int runImport(Function<String, EntityWriter> writerForSchema) {
         try {
             AppConfig config = AppConfig.load();
-            String runId = UUID.randomUUID().toString();
+            String runId = RunLedger.runIdOrNew();
             System.out.println(config.describe());
             System.out.println("extraction_run_id: " + runId);
 
@@ -262,27 +555,33 @@ public final class Main {
                 if (sweep.isEmpty()) {
                     // not swept: the ordinary paged import, unchanged
                     ImportResult result = new EntityImportService(client, writer, config.pageSize()).run(conn, runId);
+                    RunLedger.record(counts(writer.targetTable(), result, null));
                     System.out.println();
                     System.out.println(result.summary());
                     return result.failed() > 0 ? 6 : 0;
                 }
                 SnapshotSweepImportService.Outcome outcome = new SnapshotSweepImportService(client::fetchSnapshot,
                         writer, sweep.get(), new SoftDeleteSweeper(config.pgSchema()), false).run(conn, runId);
+                RunLedger.record(counts(writer.targetTable(), outcome.result(), outcome.sweep()));
                 System.out.println();
                 System.out.println(outcome.result().summary());
                 return printSweep(outcome.sweep(), outcome.result().failed());
             }
         } catch (ConfigException e) {
             System.err.println("Configuration error: " + e.getMessage());
+            RunLedger.error("configuration error: " + e.getMessage());
             return 3;
         } catch (KfAgentClient.KfAgentHttpException e) {
             System.err.println("KF Agent HTTP/source error: " + e.getMessage());
+            RunLedger.error("KF Agent HTTP/source error: " + e.getMessage());
             return 4;
         } catch (SQLException e) {
             System.err.println("PostgreSQL error: " + e.getMessage());
+            RunLedger.error("PostgreSQL error: " + e.getMessage());
             return 5;
         } catch (RuntimeException e) {
             System.err.println("Unexpected error: " + e.getMessage());
+            RunLedger.error("unexpected error: " + e.getMessage());
             return 1;
         }
     }
@@ -295,42 +594,57 @@ public final class Main {
     private static int runSyslogImport() {
         try {
             AppConfig config = AppConfig.load();
-            String runId = UUID.randomUUID().toString();
+            String runId = RunLedger.runIdOrNew();
             System.out.println(config.describe());
             System.out.println("extraction_run_id: " + runId);
 
             KfAgentClient client = new KfAgentClient(config);
-            SyslogEventImportService service = new SyslogEventImportService(
-                    client::fetch, new SyslogEventRepository(config.pgSchema()), config.pageSize());
+            SyslogEventRepository syslog = new SyslogEventRepository(config.pgSchema());
+            SyslogEventImportService service = new SyslogEventImportService(client::fetch, syslog, config.pageSize());
 
             try (Connection conn = PostgresConnection.open(config)) {
                 try {
                     ImportResult result = service.run(conn, runId);
+                    RunLedger.record(counts(syslog.targetTable(), result, null));
                     System.out.println();
                     System.out.println(result.summary());
                     printSyslogScan(service, "complete");
                     return result.failed() > 0 ? 6 : 0;
                 } catch (SyslogEventImportService.IncompleteScanException e) {
                     System.out.println();
+                    RunLedger.record(counts(syslog.targetTable(), e.partial(), null));
                     System.out.println(e.partial().summary());
                     printSyslogScan(service, "NOT CONFIRMED COMPLETE");
                     System.err.println("Incomplete scan: " + e.getMessage());
+                    RunLedger.error("incomplete scan: " + e.getMessage());
                     return 7;
                 }
             }
         } catch (ConfigException e) {
             System.err.println("Configuration error: " + e.getMessage());
+            RunLedger.error("configuration error: " + e.getMessage());
             return 3;
         } catch (KfAgentClient.KfAgentHttpException e) {
             System.err.println("KF Agent HTTP/source error: " + e.getMessage());
+            RunLedger.error("KF Agent HTTP/source error: " + e.getMessage());
             return 4;
         } catch (SQLException e) {
             System.err.println("PostgreSQL error: " + e.getMessage());
+            RunLedger.error("PostgreSQL error: " + e.getMessage());
             return 5;
         } catch (RuntimeException e) {
             System.err.println("Unexpected error: " + e.getMessage());
+            RunLedger.error("unexpected error: " + e.getMessage());
             return 1;
         }
+    }
+
+    /** One table's ledger counts (unqualified table name), with the sweep outcome when the table is swept. */
+    static RunContext.EntityCount counts(String qualifiedTable, ImportResult r, SoftDeleteSweeper.Result sweep) {
+        String table = qualifiedTable.substring(qualifiedTable.lastIndexOf('.') + 1);
+        return new RunContext.EntityCount(table, r.fetched(), r.inserted(), r.updated(), r.failed(), r.skipped(),
+                sweep == null ? null : sweep.status().name(),
+                sweep == null ? null : sweep.marked(), sweep == null ? null : sweep.revived());
     }
 
     /** Prints the sweep line; exit 7 when completeness could not be proven (the deletion state may be stale). */
@@ -346,6 +660,7 @@ public final class Main {
                 || sweep.status() == SoftDeleteSweeper.Status.SKIPPED_NOT_VERIFIED;
         if (unproven) {
             System.err.println("Deletion sweep skipped: snapshot completeness not proven — " + sweep.note());
+            RunLedger.error("deletion sweep skipped: " + sweep.note());
             return 7;
         }
         return failedRows > 0 ? 6 : 0;
@@ -364,7 +679,7 @@ public final class Main {
     private static int runSqlReport(String entity, String resource, String table, List<String> columns) {
         try {
             AppConfig config = AppConfig.load();
-            String runId = UUID.randomUUID().toString();
+            String runId = RunLedger.runIdOrNew();
             System.out.println(config.describe());
             System.out.println("extraction_run_id: " + runId);
 
@@ -375,6 +690,7 @@ public final class Main {
 
             try (Connection conn = PostgresConnection.open(config)) {
                 ImportResult result = service.run(conn, entity, runId);
+                RunLedger.record(counts(repository.targetTable(), result, null));
                 System.out.println();
                 System.out.println(result.summary());
                 System.out.println("  replaced:  " + service.lastDeleted()
@@ -383,15 +699,19 @@ public final class Main {
             }
         } catch (ConfigException e) {
             System.err.println("Configuration error: " + e.getMessage());
+            RunLedger.error("configuration error: " + e.getMessage());
             return 3;
         } catch (KfAgentClient.KfAgentHttpException e) {
             System.err.println("KF Agent HTTP/source error: " + e.getMessage());
+            RunLedger.error("KF Agent HTTP/source error: " + e.getMessage());
             return 4;
         } catch (SQLException e) {
             System.err.println("PostgreSQL error: " + e.getMessage());
+            RunLedger.error("PostgreSQL error: " + e.getMessage());
             return 5;
         } catch (RuntimeException e) {
             System.err.println("Unexpected error: " + e.getMessage());
+            RunLedger.error("unexpected error: " + e.getMessage());
             return 1;
         }
     }
@@ -472,6 +792,22 @@ public final class Main {
         System.out.println("                       Fetch GET /kfagent/access-history/role-events and append into <PG_DEST_SCHEMA>.kf_access_hist_role_event");
         System.out.println("  import-syslog-event");
         System.out.println("                       Page GET /kfagent/syslog-events (complete-scan guarded) and append into <PG_DEST_SCHEMA>.kf_syslog_event");
+        System.out.println();
+        System.out.println("  reconcile-native-workitems");
+        System.out.println("                       Reconcile loaded approval work_item_id references against kf_workitem +");
+        System.out.println("                       kf_workitem_archive; record one finding per run in <PG_DEST_SCHEMA>.kf_reconciliation_finding");
+        System.out.println("  derive-native-events");
+        System.out.println("                       Derive append-only events from loaded approval / task-result / provisioning-txn /");
+        System.out.println("                       workitem-archive / certification-item tables into <PG_DEST_SCHEMA>.kf_event");
+        System.out.println("                       (PostgreSQL only; KFAGENT_BASE_URL not required)");
+        System.out.println("  derive-native-event-links");
+        System.out.println("                       Derive append-only EXPLICIT links for events already in kf_event into");
+        System.out.println("                       <PG_DEST_SCHEMA>.kf_event_link (PostgreSQL only; run after derive-native-events)");
+        System.out.println();
+        System.out.println("Incremental (opt-in): add --incremental to import-identity, import-entitlement,");
+        System.out.println("                       import-application, import-account or import-role. Fetches only rows");
+        System.out.println("                       modified after the stored watermark minus INCREMENTAL_OVERLAP_MINUTES");
+        System.out.println("                       (default 5); never sweeps; full mode stays the default.");
         System.out.println();
         System.out.println("Required env: KFAGENT_BASE_URL, PG_HOST, PG_DATABASE, PG_USERNAME, PG_PASSWORD");
         System.out.println("Optional env: PG_PORT (5432), PG_DEST_SCHEMA (iiq_native_part2), KFAGENT_PAGE_SIZE (500),");

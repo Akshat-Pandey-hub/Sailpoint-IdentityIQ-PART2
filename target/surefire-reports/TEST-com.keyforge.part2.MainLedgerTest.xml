@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report-3.0.xsd" version="3.0" name="com.keyforge.part2.MainLedgerTest" time="0.006" tests="3" errors="0" skipped="0" failures="0">
+  <properties>
+    <property name="java.specification.version" value="17"/>
+    <property name="sun.cpu.isalist" value="amd64"/>
+    <property name="sun.jnu.encoding" value="Cp1252"/>
+    <property name="java.class.path" value="D:\Sailpoint-IdentityIQ-Part2\target\test-classes;D:\Sailpoint-IdentityIQ-Part2\target\classes;C:\Users\AKSHAT PANDEY\.m2\repository\com\fasterxml\jackson\core\jackson-databind\2.17.2\jackson-databind-2.17.2.jar;C:\Users\AKSHAT PANDEY\.m2\repository\com\fasterxml\jackson\core\jackson-annotations\2.17.2\jackson-annotations-2.17.2.jar;C:\Users\AKSHAT PANDEY\.m2\repository\com\fasterxml\jackson\core\jackson-core\2.17.2\jackson-core-2.17.2.jar;C:\Users\AKSHAT PANDEY\.m2\repository\org\postgresql\postgresql\42.7.4\postgresql-42.7.4.jar;C:\Users\AKSHAT PANDEY\.m2\repository\org\checkerframework\checker-qual\3.42.0\checker-qual-3.42.0.jar;C:\Users\AKSHAT PANDEY\.m2\repository\org\junit\jupiter\junit-jupiter\5.10.2\junit-jupiter-5.10.2.jar;C:\Users\AKSHAT PANDEY\.m2\repository\org\junit\jupiter\junit-jupiter-api\5.10.2\junit-jupiter-api-5.10.2.jar;C:\Users\AKSHAT PANDEY\.m2\repository\org\opentest4j\opentest4j\1.3.0\opentest4j-1.3.0.jar;C:\Users\AKSHAT PANDEY\.m2\repository\org\junit\platform\junit-platform-commons\1.10.2\junit-platform-commons-1.10.2.jar;C:\Users\AKSHAT PANDEY\.m2\repository\org\apiguardian\apiguardian-api\1.1.2\apiguardian-api-1.1.2.jar;C:\Users\AKSHAT PANDEY\.m2\repository\org\junit\jupiter\junit-jupiter-params\5.10.2\junit-jupiter-params-5.10.2.jar;C:\Users\AKSHAT PANDEY\.m2\repository\org\junit\jupiter\junit-jupiter-engine\5.10.2\junit-jupiter-engine-5.10.2.jar;C:\Users\AKSHAT PANDEY\.m2\repository\org\junit\platform\junit-platform-engine\1.10.2\junit-platform-engine-1.10.2.jar;"/>
+    <property name="java.vm.vendor" value="Eclipse Adoptium"/>
+    <property name="sun.arch.data.model" value="64"/>
+    <property name="user.variant" value=""/>
+    <property name="java.vendor.url" value="https://adoptium.net/"/>
+    <property name="user.timezone" value="Asia/Calcutta"/>
+    <property name="os.name" value="Windows 11"/>
+    <property name="java.vm.specification.version" value="17"/>
+    <property name="sun.java.launcher" value="SUN_STANDARD"/>
+    <property name="user.country" value="IN"/>
+    <property name="sun.boot.library.path" value="D:\Java\jdk-17\bin"/>
+    <property name="sun.java.command" value="C:\Users\AKSHAT PANDEY\AppData\Local\Temp\surefire3811553978358253688\surefirebooter-20261012183529634_3.jar C:\Users\AKSHAT PANDEY\AppData\Local\Temp\surefire3811553978358253688 2026-10-12T18-35-29_451-jvmRun1 surefire-20261012183529634_1tmp surefire_0-20261012183529634_2tmp"/>
+    <property name="jdk.debug" value="release"/>
+    <property name="surefire.test.class.path" value="D:\Sailpoint-IdentityIQ-Part2\target\test-classes;D:\Sailpoint-IdentityIQ-Part2\target\classes;C:\Users\AKSHAT PANDEY\.m2\repository\com\fasterxml\jackson\core\jackson-databind\2.17.2\jackson-databind-2.17.2.jar;C:\Users\AKSHAT PANDEY\.m2\repository\com\fasterxml\jackson\core\jackson-annotations\2.17.2\jackson-annotations-2.17.2.jar;C:\Users\AKSHAT PANDEY\.m2\repository\com\fasterxml\jackson\core\jackson-core\2.17.2\jackson-core-2.17.2.jar;C:\Users\AKSHAT PANDEY\.m2\repository\org\postgresql\postgresql\42.7.4\postgresql-42.7.4.jar;C:\Users\AKSHAT PANDEY\.m2\repository\org\checkerframework\checker-qual\3.42.0\checker-qual-3.42.0.jar;C:\Users\AKSHAT PANDEY\.m2\repository\org\junit\jupiter\junit-jupiter\5.10.2\junit-jupiter-5.10.2.jar;C:\Users\AKSHAT PANDEY\.m2\repository\org\junit\jupiter\junit-jupiter-api\5.10.2\junit-jupiter-api-5.10.2.jar;C:\Users\AKSHAT PANDEY\.m2\repository\org\opentest4j\opentest4j\1.3.0\opentest4j-1.3.0.jar;C:\Users\AKSHAT PANDEY\.m2\repository\org\junit\platform\junit-platform-commons\1.10.2\junit-platform-commons-1.10.2.jar;C:\Users\AKSHAT PANDEY\.m2\repository\org\apiguardian\apiguardian-api\1.1.2\apiguardian-api-1.1.2.jar;C:\Users\AKSHAT PANDEY\.m2\repository\org\junit\jupiter\junit-jupiter-params\5.10.2\junit-jupiter-params-5.10.2.jar;C:\Users\AKSHAT PANDEY\.m2\repository\org\junit\jupiter\junit-jupiter-engine\5.10.2\junit-jupiter-engine-5.10.2.jar;C:\Users\AKSHAT PANDEY\.m2\repository\org\junit\platform\junit-platform-engine\1.10.2\junit-platform-engine-1.10.2.jar;"/>
+    <property name="sun.cpu.endian" value="little"/>
+    <property name="user.home" value="C:\Users\AKSHAT PANDEY"/>
+    <property name="user.language" value="en"/>
+    <property name="java.specification.vendor" value="Oracle Corporation"/>
+    <property name="java.version.date" value="2026-07-21"/>
+    <property name="java.home" value="D:\Java\jdk-17"/>
+    <property name="file.separator" value="\"/>
+    <property name="basedir" value="D:\Sailpoint-IdentityIQ-Part2"/>
+    <property name="java.vm.compressedOopsMode" value="Zero based"/>
+    <property name="line.separator" value="&#10;"/>
+    <property name="java.vm.specification.vendor" value="Oracle Corporation"/>
+    <property name="java.specification.name" value="Java Platform API Specification"/>
+    <property name="surefire.real.class.path" value="C:\Users\AKSHAT PANDEY\AppData\Local\Temp\surefire3811553978358253688\surefirebooter-20261012183529634_3.jar"/>
+    <property name="user.script" value=""/>
+    <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
+    <property name="jdk.net.unixdomain.tmpdir" value="D:\Sailpoint-IdentityIQ-Part2\target"/>
+    <property name="java.runtime.version" value="17.0.20+8"/>
+    <property name="user.name" value="AKSHAT PANDEY"/>
+    <property name="path.separator" value=";"/>
+    <property name="os.version" value="10.0"/>
+    <property name="java.runtime.name" value="OpenJDK Runtime Environment"/>
+    <property name="file.encoding" value="Cp1252"/>
+    <property name="java.vm.name" value="OpenJDK 64-Bit Server VM"/>
+    <property name="java.vendor.version" value="Temurin-17.0.20+8"/>
+    <property name="localRepository" value="C:\Users\AKSHAT PANDEY\.m2\repository"/>
+    <property name="java.vendor.url.bug" value="https://github.com/adoptium/adoptium-support/issues"/>
+    <property name="java.io.tmpdir" value="C:\Users\AKSHAT~1\AppData\Local\Temp\"/>
+    <property name="java.version" value="17.0.20"/>
+    <property name="user.dir" value="D:\Sailpoint-IdentityIQ-Part2"/>
+    <property name="os.arch" value="amd64"/>
+    <property name="java.vm.specification.name" value="Java Virtual Machine Specification"/>
+    <property name="sun.os.patch.level" value=""/>
+    <property name="native.encoding" value="Cp1252"/>
+    <property name="java.library.path" value="D:\Java\jdk-17\bin;C:\windows\Sun\Java\bin;C:\windows\system32;C:\windows;D:\Java\jdk-17\bin;C:\Program Files\Common Files\Oracle\Java\javapath;C:\windows\system32;C:\windows;C:\windows\System32\Wbem;C:\windows\System32\WindowsPowerShell\v1.0\;C:\windows\System32\OpenSSH\;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Users\Administrator\AppData\Local\Microsoft\WindowsApps;C:\Program Files\HP\OMEN-Broadcast\Common;D:\Java\jdk-17\bin;C:\Program Files\nodejs\;C:\Program Files\NVIDIA Corporation\NVIDIA App\NvDLISR;C:\Program Files\Git\cmd;D:\apache-maven-3.9.14\bin;D:\Rust\.cargo\bin;C:\Users\AKSHAT PANDEY\AppData\Local\Programs\Python\Python313\;C:\Users\AKSHAT PANDEY\AppData\Local\Programs\Python\Python313\Scripts\;C:\Users\AKSHAT PANDEY\AppData\Local\Microsoft\WindowsApps;C:\Users\AKSHAT PANDEY\AppData\Local\Programs\Microsoft VS Code\bin;C:\Users\AKSHAT PANDEY\AppData\Roaming\npm;C:\Program Files\JetBrains\IntelliJ IDEA 2025.3\bin;."/>
+    <property name="java.vm.info" value="mixed mode, sharing"/>
+    <property name="java.vendor" value="Eclipse Adoptium"/>
+    <property name="java.vm.version" value="17.0.20+8"/>
+    <property name="java.specification.maintenance.version" value="1"/>
+    <property name="sun.io.unicode.encoding" value="UnicodeLittle"/>
+    <property name="java.class.version" value="61.0"/>
+  </properties>
+  <testcase name="countsUseTheUnqualifiedTableAndTheSweepOutcome" classname="com.keyforge.part2.MainLedgerTest" time="0.002"/>
+  <testcase name="incrementalIsOfferedOnlyForTheFiveModifiedAfterEntitiesAndIsNotRecordedOtherwise" classname="com.keyforge.part2.MainLedgerTest" time="0.003">
+    <system-err><![CDATA[--incremental is supported only for [import-entitlement, import-role, import-application, import-identity, import-account] (their KF Agent endpoints accept modifiedAfter); 'import-identity-role' runs in full mode only.
+]]></system-err>
+  </testcase>
+  <testcase name="anUnknownCommandIsAUsageErrorAndIsNotRecorded" classname="com.keyforge.part2.MainLedgerTest" time="0.001">
+    <system-out><![CDATA[KF Agent -> PostgreSQL ingestion (Part 2)
+Usage: java -jar kfagent-ingest.jar <command>
+
+Commands:
+  import-identity      Fetch GET /kfagent/identities   and upsert into <PG_DEST_SCHEMA>.kf_identity
+  import-entitlement   Fetch GET /kfagent/entitlements and upsert into <PG_DEST_SCHEMA>.kf_entitlement
+  import-application   Fetch GET /kfagent/applications and upsert into <PG_DEST_SCHEMA>.kf_application
+  import-account       Fetch GET /kfagent/accounts     and upsert into <PG_DEST_SCHEMA>.kf_account
+  import-workgroup     Fetch GET /kfagent/workgroups   and upsert into <PG_DEST_SCHEMA>.kf_workgroup
+  import-role          Fetch GET /kfagent/roles        and upsert into <PG_DEST_SCHEMA>.kf_role
+  import-identity-role Fetch GET /kfagent/identity-roles and upsert into <PG_DEST_SCHEMA>.kf_identity_role
+  import-identity-entitlement
+                       Fetch GET /kfagent/identity-entitlements and upsert into <PG_DEST_SCHEMA>.kf_identity_entitlement
+  import-account-entitlement
+                       Fetch GET /kfagent/account-entitlements and upsert into <PG_DEST_SCHEMA>.kf_account_entitlement
+  import-role-entitlement
+                       Fetch GET /kfagent/role-entitlements and upsert into <PG_DEST_SCHEMA>.kf_role_entitlement
+                       (needs kf_entitlement in the same schema: run import-entitlement first)
+  import-role-hierarchy
+                       Fetch GET /kfagent/role-hierarchy and upsert into <PG_DEST_SCHEMA>.kf_role_hierarchy
+  import-identity-request
+                       Fetch GET /kfagent/identity-requests and upsert into <PG_DEST_SCHEMA>.kf_identity_request
+  import-identity-request-item
+                       Fetch GET /kfagent/identity-request-items and upsert into <PG_DEST_SCHEMA>.kf_identity_request_item
+  import-identity-request-approval
+                       Fetch GET /kfagent/identity-request-approvals and upsert into <PG_DEST_SCHEMA>.kf_identity_request_approval
+  import-policy        Fetch GET /kfagent/policies     and upsert into <PG_DEST_SCHEMA>.kf_policy
+  import-provisioning-item
+                       Fetch GET /kfagent/provisioning-items and upsert into <PG_DEST_SCHEMA>.kf_provisioning_item
+  import-provisioning-transaction
+                       Fetch GET /kfagent/provisioning-transactions and upsert into <PG_DEST_SCHEMA>.kf_provisioning_txn
+  import-work-item     Fetch GET /kfagent/work-items   and upsert into <PG_DEST_SCHEMA>.kf_workitem
+  import-workflow-definition
+                       Fetch GET /kfagent/workflow-definitions and upsert into <PG_DEST_SCHEMA>.kf_workflow_definition
+  import-certification Fetch GET /kfagent/certifications and upsert into <PG_DEST_SCHEMA>.kf_certification
+  import-certification-entity
+                       Fetch GET /kfagent/certification-entities and upsert into <PG_DEST_SCHEMA>.kf_certification_entity
+  import-certification-item
+                       Fetch GET /kfagent/certification-items and upsert into <PG_DEST_SCHEMA>.kf_certification_item
+  import-certification-archive
+                       Fetch GET /kfagent/certification-archives and append into <PG_DEST_SCHEMA>.kf_certification_archive
+  import-policy-constraint
+                       Fetch GET /kfagent/policy-constraints and upsert into <PG_DEST_SCHEMA>.kf_policy_constraint
+  import-policy-violation
+                       Fetch GET /kfagent/policy-violations and upsert into <PG_DEST_SCHEMA>.kf_violation
+  import-entitlement-assignment
+                       Fetch GET /kfagent/entitlement-assignment (SQL report) and REPLACE <PG_DEST_SCHEMA>.kf_entitlement_assignment
+  import-workgroup-member
+                       Fetch GET /kfagent/workgroupmember and upsert into <PG_DEST_SCHEMA>.kf_workgroup_member
+  import-entitlement-certification
+                       Fetch GET /kfagent/entitlement-certification (SQL report) and REPLACE <PG_DEST_SCHEMA>.kf_entitlement_certification
+  import-entitlement-certification-status
+                       Fetch GET /kfagent/entitlement-certification-status (SQL report) and REPLACE <PG_DEST_SCHEMA>.kf_entitlement_certification_status
+  import-workgroup-members
+                       Fetch GET /kfagent/workgroup-members (SQL report) and REPLACE <PG_DEST_SCHEMA>.kf_workgroup_members
+  import-audit-event
+                       Fetch GET /kfagent/audit-events and append into <PG_DEST_SCHEMA>.kf_audit_event
+  import-task-result
+                       Fetch GET /kfagent/task-results and upsert into <PG_DEST_SCHEMA>.kf_task_result
+  import-task-schedule
+                       Fetch GET /kfagent/task-schedules and upsert into <PG_DEST_SCHEMA>.kf_task_schedule
+  import-workitem-archive
+                       Fetch GET /kfagent/workitem-archives and append into <PG_DEST_SCHEMA>.kf_workitem_archive
+  import-group-definition
+                       Fetch GET /kfagent/group-definitions and upsert into <PG_DEST_SCHEMA>.kf_group_definition
+  import-access-history
+                       Fetch GET /kfagent/access-history and append into <PG_DEST_SCHEMA>.kf_access_hist_entitlement
+  import-access-history-identity-event
+                       Fetch GET /kfagent/access-history/identity-events and append into <PG_DEST_SCHEMA>.kf_access_hist_identity_event
+  import-access-history-certification
+                       Fetch GET /kfagent/access-history/certifications and append into <PG_DEST_SCHEMA>.kf_access_hist_certification
+  import-access-history-role-event
+                       Fetch GET /kfagent/access-history/role-events and append into <PG_DEST_SCHEMA>.kf_access_hist_role_event
+  import-syslog-event
+                       Page GET /kfagent/syslog-events (complete-scan guarded) and append into <PG_DEST_SCHEMA>.kf_syslog_event
+
+  reconcile-native-workitems
+                       Reconcile loaded approval work_item_id references against kf_workitem +
+                       kf_workitem_archive; record one finding per run in <PG_DEST_SCHEMA>.kf_reconciliation_finding
+  derive-native-events
+                       Derive append-only events from loaded approval / task-result / provisioning-txn /
+                       workitem-archive / certification-item tables into <PG_DEST_SCHEMA>.kf_event
+                       (PostgreSQL only; KFAGENT_BASE_URL not required)
+  derive-native-event-links
+                       Derive append-only EXPLICIT links for events already in kf_event into
+                       <PG_DEST_SCHEMA>.kf_event_link (PostgreSQL only; run after derive-native-events)
+
+Incremental (opt-in): add --incremental to import-identity, import-entitlement,
+                       import-application, import-account or import-role. Fetches only rows
+                       modified after the stored watermark minus INCREMENTAL_OVERLAP_MINUTES
+                       (default 5); never sweeps; full mode stays the default.
+
+Required env: KFAGENT_BASE_URL, PG_HOST, PG_DATABASE, PG_USERNAME, PG_PASSWORD
+Optional env: PG_PORT (5432), PG_DEST_SCHEMA (iiq_native_part2), KFAGENT_PAGE_SIZE (500),
+              HTTP_TIMEOUT_SECONDS (60), KFAGENT_USERNAME, KFAGENT_PASSWORD
+KF Agent -> PostgreSQL ingestion (Part 2)
+Usage: java -jar kfagent-ingest.jar <command>
+
+Commands:
+  import-identity      Fetch GET /kfagent/identities   and upsert into <PG_DEST_SCHEMA>.kf_identity
+  import-entitlement   Fetch GET /kfagent/entitlements and upsert into <PG_DEST_SCHEMA>.kf_entitlement
+  import-application   Fetch GET /kfagent/applications and upsert into <PG_DEST_SCHEMA>.kf_application
+  import-account       Fetch GET /kfagent/accounts     and upsert into <PG_DEST_SCHEMA>.kf_account
+  import-workgroup     Fetch GET /kfagent/workgroups   and upsert into <PG_DEST_SCHEMA>.kf_workgroup
+  import-role          Fetch GET /kfagent/roles        and upsert into <PG_DEST_SCHEMA>.kf_role
+  import-identity-role Fetch GET /kfagent/identity-roles and upsert into <PG_DEST_SCHEMA>.kf_identity_role
+  import-identity-entitlement
+                       Fetch GET /kfagent/identity-entitlements and upsert into <PG_DEST_SCHEMA>.kf_identity_entitlement
+  import-account-entitlement
+                       Fetch GET /kfagent/account-entitlements and upsert into <PG_DEST_SCHEMA>.kf_account_entitlement
+  import-role-entitlement
+                       Fetch GET /kfagent/role-entitlements and upsert into <PG_DEST_SCHEMA>.kf_role_entitlement
+                       (needs kf_entitlement in the same schema: run import-entitlement first)
+  import-role-hierarchy
+                       Fetch GET /kfagent/role-hierarchy and upsert into <PG_DEST_SCHEMA>.kf_role_hierarchy
+  import-identity-request
+                       Fetch GET /kfagent/identity-requests and upsert into <PG_DEST_SCHEMA>.kf_identity_request
+  import-identity-request-item
+                       Fetch GET /kfagent/identity-request-items and upsert into <PG_DEST_SCHEMA>.kf_identity_request_item
+  import-identity-request-approval
+                       Fetch GET /kfagent/identity-request-approvals and upsert into <PG_DEST_SCHEMA>.kf_identity_request_approval
+  import-policy        Fetch GET /kfagent/policies     and upsert into <PG_DEST_SCHEMA>.kf_policy
+  import-provisioning-item
+                       Fetch GET /kfagent/provisioning-items and upsert into <PG_DEST_SCHEMA>.kf_provisioning_item
+  import-provisioning-transaction
+                       Fetch GET /kfagent/provisioning-transactions and upsert into <PG_DEST_SCHEMA>.kf_provisioning_txn
+  import-work-item     Fetch GET /kfagent/work-items   and upsert into <PG_DEST_SCHEMA>.kf_workitem
+  import-workflow-definition
+                       Fetch GET /kfagent/workflow-definitions and upsert into <PG_DEST_SCHEMA>.kf_workflow_definition
+  import-certification Fetch GET /kfagent/certifications and upsert into <PG_DEST_SCHEMA>.kf_certification
+  import-certification-entity
+                       Fetch GET /kfagent/certification-entities and upsert into <PG_DEST_SCHEMA>.kf_certification_entity
+  import-certification-item
+                       Fetch GET /kfagent/certification-items and upsert into <PG_DEST_SCHEMA>.kf_certification_item
+  import-certification-archive
+                       Fetch GET /kfagent/certification-archives and append into <PG_DEST_SCHEMA>.kf_certification_archive
+  import-policy-constraint
+                       Fetch GET /kfagent/policy-constraints and upsert into <PG_DEST_SCHEMA>.kf_policy_constraint
+  import-policy-violation
+                       Fetch GET /kfagent/policy-violations and upsert into <PG_DEST_SCHEMA>.kf_violation
+  import-entitlement-assignment
+                       Fetch GET /kfagent/entitlement-assignment (SQL report) and REPLACE <PG_DEST_SCHEMA>.kf_entitlement_assignment
+  import-workgroup-member
+                       Fetch GET /kfagent/workgroupmember and upsert into <PG_DEST_SCHEMA>.kf_workgroup_member
+  import-entitlement-certification
+                       Fetch GET /kfagent/entitlement-certification (SQL report) and REPLACE <PG_DEST_SCHEMA>.kf_entitlement_certification
+  import-entitlement-certification-status
+                       Fetch GET /kfagent/entitlement-certification-status (SQL report) and REPLACE <PG_DEST_SCHEMA>.kf_entitlement_certification_status
+  import-workgroup-members
+                       Fetch GET /kfagent/workgroup-members (SQL report) and REPLACE <PG_DEST_SCHEMA>.kf_workgroup_members
+  import-audit-event
+                       Fetch GET /kfagent/audit-events and append into <PG_DEST_SCHEMA>.kf_audit_event
+  import-task-result
+                       Fetch GET /kfagent/task-results and upsert into <PG_DEST_SCHEMA>.kf_task_result
+  import-task-schedule
+                       Fetch GET /kfagent/task-schedules and upsert into <PG_DEST_SCHEMA>.kf_task_schedule
+  import-workitem-archive
+                       Fetch GET /kfagent/workitem-archives and append into <PG_DEST_SCHEMA>.kf_workitem_archive
+  import-group-definition
+                       Fetch GET /kfagent/group-definitions and upsert into <PG_DEST_SCHEMA>.kf_group_definition
+  import-access-history
+                       Fetch GET /kfagent/access-history and append into <PG_DEST_SCHEMA>.kf_access_hist_entitlement
+  import-access-history-identity-event
+                       Fetch GET /kfagent/access-history/identity-events and append into <PG_DEST_SCHEMA>.kf_access_hist_identity_event
+  import-access-history-certification
+                       Fetch GET /kfagent/access-history/certifications and append into <PG_DEST_SCHEMA>.kf_access_hist_certification
+  import-access-history-role-event
+                       Fetch GET /kfagent/access-history/role-events and append into <PG_DEST_SCHEMA>.kf_access_hist_role_event
+  import-syslog-event
+                       Page GET /kfagent/syslog-events (complete-scan guarded) and append into <PG_DEST_SCHEMA>.kf_syslog_event
+
+  reconcile-native-workitems
+                       Reconcile loaded approval work_item_id references against kf_workitem +
+                       kf_workitem_archive; record one finding per run in <PG_DEST_SCHEMA>.kf_reconciliation_finding
+  derive-native-events
+                       Derive append-only events from loaded approval / task-result / provisioning-txn /
+                       workitem-archive / certification-item tables into <PG_DEST_SCHEMA>.kf_event
+                       (PostgreSQL only; KFAGENT_BASE_URL not required)
+  derive-native-event-links
+                       Derive append-only EXPLICIT links for events already in kf_event into
+                       <PG_DEST_SCHEMA>.kf_event_link (PostgreSQL only; run after derive-native-events)
+
+Incremental (opt-in): add --incremental to import-identity, import-entitlement,
+                       import-application, import-account or import-role. Fetches only rows
+                       modified after the stored watermark minus INCREMENTAL_OVERLAP_MINUTES
+                       (default 5); never sweeps; full mode stays the default.
+
+Required env: KFAGENT_BASE_URL, PG_HOST, PG_DATABASE, PG_USERNAME, PG_PASSWORD
+Optional env: PG_PORT (5432), PG_DEST_SCHEMA (iiq_native_part2), KFAGENT_PAGE_SIZE (500),
+              HTTP_TIMEOUT_SECONDS (60), KFAGENT_USERNAME, KFAGENT_PASSWORD
+]]></system-out>
+  </testcase>
+</testsuite>
