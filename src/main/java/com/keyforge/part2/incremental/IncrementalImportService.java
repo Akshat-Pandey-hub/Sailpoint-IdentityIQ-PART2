@@ -48,14 +48,25 @@ public final class IncrementalImportService {
     private final EntityWriter writer;
     private final WatermarkService watermarks;
     private final Duration overlap;
+    private final IncrementalCursor cursor;
     private final ObjectMapper mapper = new ObjectMapper();
 
     public IncrementalImportService(Fetcher fetcher, EntityWriter writer, WatermarkService watermarks,
                                     Duration overlap) {
+        this(fetcher, writer, watermarks, overlap, IncrementalCursor.MODIFIED);
+    }
+
+    /**
+     * @param cursor which IIQ timestamp the bound and the watermark follow: {@code modified} for current-state
+     *               objects, {@code created} for append-only event objects
+     */
+    public IncrementalImportService(Fetcher fetcher, EntityWriter writer, WatermarkService watermarks,
+                                    Duration overlap, IncrementalCursor cursor) {
         this.fetcher = fetcher;
         this.writer = writer;
         this.watermarks = watermarks;
         this.overlap = overlap;
+        this.cursor = cursor;
     }
 
     public Outcome run(Connection conn, String extractionRunId) throws SQLException {
@@ -83,9 +94,9 @@ public final class IncrementalImportService {
             }
         }
 
-        Instant newWatermark = watermarks.maxModified(conn, writer.targetTable());
+        Instant newWatermark = watermarks.maxValue(conn, writer.targetTable(), cursor);
         boolean advanced = watermarks.advanceIfSuccessful(conn, writer.targetTable(), newWatermark, result.failed(),
-                extractionRunId);
+                extractionRunId, cursor);
         return new Outcome(result, stored, bound, fetchedAt, newWatermark, advanced);
     }
 

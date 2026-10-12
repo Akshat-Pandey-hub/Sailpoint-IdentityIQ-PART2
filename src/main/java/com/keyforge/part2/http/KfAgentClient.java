@@ -51,8 +51,15 @@ public final class KfAgentClient {
      * absent or not an integer is reported as {@code null}.
      */
     public Page fetch(String resource, int start, int limit) {
+        return fetch(resource, start, limit, null);
+    }
+
+    /** Same, bounded to objects after {@code modifiedAfterIso} (an ISO-8601 instant; {@code null} = unbounded). */
+    public Page fetch(String resource, int start, int limit, String modifiedAfterIso) {
         String url = config.kfAgentBaseUrl() + "/kfagent/" + resource
-                + "?start=" + Math.max(0, start) + "&limit=" + limit;
+                + "?start=" + Math.max(0, start) + "&limit=" + limit
+                + (modifiedAfterIso == null ? ""
+                : "&modifiedAfter=" + java.net.URLEncoder.encode(modifiedAfterIso, StandardCharsets.UTF_8));
         HttpResponse<String> resp = get(url);
         return new Page(resp.body(), sourceCount(resp.headers().firstValue(SOURCE_COUNT_HEADER).orElse(null)));
     }

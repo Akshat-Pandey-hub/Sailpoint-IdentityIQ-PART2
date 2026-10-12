@@ -62,6 +62,7 @@ import com.keyforge.part2.ingest.WorkgroupTable;
 import com.keyforge.part2.ingest.ImportResult;
 import com.keyforge.part2.incremental.ExtractionMode;
 import com.keyforge.part2.incremental.IncrementalConfig;
+import com.keyforge.part2.incremental.IncrementalCursor;
 import com.keyforge.part2.incremental.IncrementalImportService;
 import com.keyforge.part2.incremental.WatermarkService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -73,6 +74,7 @@ import com.keyforge.part2.reconciliation.WorkItemReconciliation;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -183,13 +185,26 @@ public final class Main {
     static int dispatch(String command, ExtractionMode mode) {
         if (mode.isIncremental()) {
             Function<String, EntityWriter> writer = INCREMENTAL_WRITERS.get(command);
-            if (writer == null) {
-                RunLedger.discard(); // a usage error is not an import run
-                System.err.println("--incremental is supported only for " + INCREMENTAL_WRITERS.keySet()
-                        + " (their KF Agent endpoints accept modifiedAfter); '" + command + "' runs in full mode only.");
-                return 2;
+            if (writer != null) {
+                return runIncremental(writer, IncrementalCursor.MODIFIED);
             }
-            return runIncremental(writer);
+            Function<String, EntityWriter> changedWriter = CHANGED_INCREMENTAL_WRITERS.get(command);
+            if (changedWriter != null) {
+                return runIncremental(changedWriter, IncrementalCursor.CHANGED);
+            }
+            Function<String, EntityWriter> eventWriter = EVENT_INCREMENTAL_WRITERS.get(command);
+            if (eventWriter != null) {
+                return runIncremental(eventWriter, IncrementalCursor.CREATED);
+            }
+            if (SYSLOG_COMMAND.equals(command)) {
+                return runSyslogIncremental();
+            }
+            RunLedger.discard(); // a usage error is not an import run
+            System.err.println("--incremental is supported only for " + INCREMENTAL_WRITERS.keySet() + ", "
+                    + CHANGED_INCREMENTAL_WRITERS.keySet() + ", " + EVENT_INCREMENTAL_WRITERS.keySet() + " and "
+                    + SYSLOG_COMMAND
+                    + " (their KF Agent endpoints accept modifiedAfter); '" + command + "' runs in full mode only.");
+            return 2;
         }
         return switch (command) {
             case "import-identity" -> runImportIdentity();
@@ -261,6 +276,37 @@ public final class Main {
             "import-account", schema -> new EntityRepository(schema, AccountTable.SPEC),
             "import-role", schema -> new EntityRepository(schema, RoleTable.SPEC));
 
+    /**
+     * The append-only, event-shaped commands with opt-in incremental mode (each uses the same writer as its full
+     * import). Their KF Agent {@code modifiedAfter} bounds IIQ {@code created}; the watermark is
+     * {@code max(created_at)}. Rows are deduplicated on append, so the overlap window never duplicates them.
+     */
+    static final Map<String, Function<String, EntityWriter>> EVENT_INCREMENTAL_WRITERS = Map.of(
+            "import-audit-event", AuditEventRepository::new,
+            "import-workitem-archive", WorkItemArchiveRepository::new,
+            "import-certification-archive", CertificationArchiveRepository::new,
+            "import-access-history", AccessHistoryEntitlementRepository::new,
+            "import-access-history-identity-event", AccessHistoryIdentityEventRepository::new,
+            "import-access-history-certification", AccessHistoryCertificationRepository::new,
+            "import-access-history-role-event", AccessHistoryRoleEventRepository::new);
+
+    /**
+     * Current-state commands with opt-in incremental mode whose IIQ objects may keep a NULL {@code modified} until
+     * first updated (each uses the same writer as its full import). The KF Agent's {@code modifiedAfter} returns
+     * objects modified after the bound or never modified and created after it; the watermark is
+     * {@code max(coalesce(modified_at, created_at))}. Incremental runs never sweep (the periodic full import does).
+     */
+    static final Map<String, Function<String, EntityWriter>> CHANGED_INCREMENTAL_WRITERS = Map.of(
+            "import-identity-request", schema -> new EntityRepository(schema, IdentityRequestTable.SPEC),
+            "import-provisioning-transaction", schema -> new EntityRepository(schema, ProvisioningTxnTable.SPEC),
+            "import-work-item", schema -> new EntityRepository(schema, WorkItemTable.SPEC),
+            "import-task-result", schema -> new EntityRepository(schema, TaskResultTable.SPEC),
+            "import-certification-item", schema -> new EntityRepository(schema, CertificationItemTable.SPEC),
+            "import-certification-entity", schema -> new EntityRepository(schema, CertificationEntityTable.SPEC));
+
+    /** Syslog keeps its own paged, complete-scan-guarded import; its incremental mode reuses that scan. */
+    static final String SYSLOG_COMMAND = "import-syslog-event";
+
     /** The Identity table's dedicated repository as an {@link EntityWriter} (incremental path only). */
     static EntityWriter identityWriter(String schema) {
         IdentityRepository repository = new IdentityRepository(schema);
@@ -286,7 +332,7 @@ public final class Main {
      * Incremental import (opt-in): rows modified after the stored watermark minus the overlap, one KF Agent request,
      * the ordinary writer, and a watermark advance only when no row failed. Never sweeps.
      */
-    private static int runIncremental(Function<String, EntityWriter> writerForSchema) {
+    private static int runIncremental(Function<String, EntityWriter> writerForSchema, IncrementalCursor cursor) {
         try {
             AppConfig config = AppConfig.load();
             String runId = RunLedger.runIdOrNew();
@@ -297,7 +343,7 @@ public final class Main {
             EntityWriter writer = writerForSchema.apply(config.pgSchema());
             Duration overlap = IncrementalConfig.overlapWindow();
             IncrementalImportService service = new IncrementalImportService(client::fetchSnapshot, writer,
-                    new WatermarkService(config.pgSchema()), overlap);
+                    new WatermarkService(config.pgSchema()), overlap, cursor);
 
             try (Connection conn = PostgresConnection.open(config)) {
                 IncrementalImportService.Outcome o = service.run(conn, runId);
@@ -308,7 +354,8 @@ public final class Main {
                 System.out.println("  mode:      incremental (overlap " + overlap.toMinutes() + " min); watermark "
                         + WatermarkService.watermarkKey(writer.targetTable()) + " was "
                         + (o.stored() == null ? "unset -> full fetch (baseline)" : o.stored())
-                        + "; modifiedAfter=" + (o.bound() == null ? "none" : o.bound()));
+                        + "; modifiedAfter=" + (o.bound() == null ? "none" : o.bound())
+                        + " (IIQ " + cursor.sourceField() + ")");
                 System.out.println("  watermark: " + (o.advanced() ? "advanced to " + o.newWatermark()
                         : "NOT advanced (" + (o.result().failed() > 0 ? o.result().failed()
                         + " row failure(s); the next run re-reads from the unchanged watermark)"
@@ -666,6 +713,89 @@ public final class Main {
         return failedRows > 0 ? 6 : 0;
     }
 
+    /**
+     * Incremental syslog: the same paged, complete-scan-guarded import as {@link #runSyslogImport()}, with every
+     * page bounded to events created after the stored watermark minus the overlap window (no watermark = a full
+     * scan that sets the baseline). The watermark ({@code max(created_at)}) advances only after a scan confirmed
+     * complete with no row failures; an incomplete scan exits 7 and leaves it unchanged. Never sweeps.
+     */
+    private static int runSyslogIncremental() {
+        try {
+            AppConfig config = AppConfig.load();
+            String runId = RunLedger.runIdOrNew();
+            System.out.println(config.describe());
+            System.out.println("extraction_run_id: " + runId);
+
+            KfAgentClient client = new KfAgentClient(config);
+            SyslogEventRepository syslog = new SyslogEventRepository(config.pgSchema());
+            WatermarkService watermarks = new WatermarkService(config.pgSchema());
+            Duration overlap = IncrementalConfig.overlapWindow();
+
+            try (Connection conn = PostgresConnection.open(config)) {
+                conn.setAutoCommit(true);
+                Instant stored = watermarks.read(conn, syslog.targetTable());
+                Instant bound = WatermarkService.effectiveBound(stored, ExtractionMode.INCREMENTAL, overlap);
+                String boundIso = bound == null ? null : bound.toString();
+                Instant fetchedAt = Instant.now();
+                SyslogEventImportService service = new SyslogEventImportService(
+                        (resource, start, limit) -> client.fetch(resource, start, limit, boundIso),
+                        syslog, config.pageSize());
+                RunLedger.window(bound, fetchedAt);
+                String mode = "  mode:      incremental (overlap " + overlap.toMinutes() + " min); watermark "
+                        + WatermarkService.watermarkKey(syslog.targetTable()) + " was "
+                        + (stored == null ? "unset -> full scan (baseline)" : stored)
+                        + "; modifiedAfter=" + (bound == null ? "none" : bound) + " (IIQ created)";
+                ImportResult result;
+                try {
+                    result = service.run(conn, runId);
+                } catch (SyslogEventImportService.IncompleteScanException e) {
+                    System.out.println();
+                    RunLedger.record(counts(syslog.targetTable(), e.partial(), null));
+                    System.out.println(e.partial().summary());
+                    printSyslogScan(service, "NOT CONFIRMED COMPLETE");
+                    System.out.println(mode);
+                    System.out.println("  watermark: NOT advanced (scan not confirmed complete)");
+                    System.err.println("Incomplete scan: " + e.getMessage());
+                    RunLedger.error("incomplete scan: " + e.getMessage());
+                    return 7;
+                }
+                Instant newWatermark = watermarks.maxValue(conn, syslog.targetTable(), IncrementalCursor.CREATED);
+                boolean advanced = watermarks.advanceIfSuccessful(conn, syslog.targetTable(), newWatermark,
+                        result.failed(), runId, IncrementalCursor.CREATED);
+                RunLedger.record(counts(syslog.targetTable(), result, null));
+                System.out.println();
+                System.out.println(result.summary());
+                printSyslogScan(service, "complete");
+                System.out.println(mode);
+                System.out.println("  watermark: " + (advanced ? "advanced to " + newWatermark
+                        : "NOT advanced (" + (result.failed() > 0 ? result.failed()
+                        + " row failure(s); the next run re-reads from the unchanged watermark)"
+                        : "no newer event time than the stored watermark") + ")"));
+                System.out.println("  sweep:     not run (append-only table)");
+                if (result.failed() > 0) {
+                    RunLedger.error("watermark not advanced: " + result.failed() + " row failure(s)");
+                }
+                return result.failed() > 0 ? 6 : 0;
+            }
+        } catch (ConfigException e) {
+            System.err.println("Configuration error: " + e.getMessage());
+            RunLedger.error("configuration error: " + e.getMessage());
+            return 3;
+        } catch (KfAgentClient.KfAgentHttpException e) {
+            System.err.println("KF Agent HTTP/source error: " + e.getMessage());
+            RunLedger.error("KF Agent HTTP/source error: " + e.getMessage());
+            return 4;
+        } catch (SQLException e) {
+            System.err.println("PostgreSQL error: " + e.getMessage());
+            RunLedger.error("PostgreSQL error: " + e.getMessage());
+            return 5;
+        } catch (RuntimeException e) {
+            System.err.println("Unexpected error: " + e.getMessage());
+            RunLedger.error("unexpected error: " + e.getMessage());
+            return 1;
+        }
+    }
+
     private static void printSyslogScan(SyslogEventImportService service, String status) {
         System.out.println("  scan:      " + status + " (baseline source count " + service.baselineSourceCount()
                 + ", highest " + service.highWaterSourceCount() + ", distinct in-order rows "
@@ -805,9 +935,15 @@ public final class Main {
         System.out.println("                       <PG_DEST_SCHEMA>.kf_event_link (PostgreSQL only; run after derive-native-events)");
         System.out.println();
         System.out.println("Incremental (opt-in): add --incremental to import-identity, import-entitlement,");
-        System.out.println("                       import-application, import-account or import-role. Fetches only rows");
-        System.out.println("                       modified after the stored watermark minus INCREMENTAL_OVERLAP_MINUTES");
-        System.out.println("                       (default 5); never sweeps; full mode stays the default.");
+        System.out.println("                       import-application, import-account or import-role (rows MODIFIED after");
+        System.out.println("                       the watermark); to import-identity-request, import-provisioning-transaction,");
+        System.out.println("                       import-work-item, import-task-result, import-certification-item and");
+        System.out.println("                       import-certification-entity (rows modified, or created and never modified,");
+        System.out.println("                       after it); or to import-audit-event, import-syslog-event,");
+        System.out.println("                       import-workitem-archive, import-certification-archive and the four");
+        System.out.println("                       import-access-history* commands (rows CREATED after the watermark).");
+        System.out.println("                       The watermark is lowered by INCREMENTAL_OVERLAP_MINUTES (default 5);");
+        System.out.println("                       never sweeps; full mode stays the default.");
         System.out.println();
         System.out.println("Required env: KFAGENT_BASE_URL, PG_HOST, PG_DATABASE, PG_USERNAME, PG_PASSWORD");
         System.out.println("Optional env: PG_PORT (5432), PG_DEST_SCHEMA (iiq_native_part2), KFAGENT_PAGE_SIZE (500),");

@@ -99,10 +99,18 @@ Event and link ids are deterministic, so re-running is safe and never duplicates
 
 ## Incremental mode
 
-`--incremental` is supported for `import-identity`, `import-entitlement`, `import-application`, `import-account`
-and `import-role`. It fetches only objects modified after the stored watermark (`kf_extraction_watermark`) minus
-the overlap window. The watermark advances only when a run has no failed rows, and incremental runs never perform
-deletion sweeps. Full mode is the default.
+`--incremental` fetches only what changed since the last successful run, using a per-entity watermark in
+`kf_extraction_watermark` minus the overlap window (`INCREMENTAL_OVERLAP_MINUTES`, default 5):
+
+| Commands | Follows |
+|---|---|
+| `import-identity`, `import-entitlement`, `import-application`, `import-account`, `import-role` | IIQ `modified` (watermark `max(modified_at)`) |
+| `import-identity-request`, `import-provisioning-transaction`, `import-work-item`, `import-task-result`, `import-certification-item`, `import-certification-entity` | IIQ `modified`, or `created` for never-modified objects (watermark `max(coalesce(modified_at, created_at))`) |
+| `import-audit-event`, `import-syslog-event`, `import-workitem-archive`, `import-certification-archive`, `import-access-history`, `import-access-history-identity-event`, `import-access-history-certification`, `import-access-history-role-event` | IIQ `created` (watermark `max(created_at)`) |
+
+The first incremental run of an entity is a full fetch that sets the baseline. The watermark advances only when a
+run has no failed rows (and, for syslog, only after a scan confirmed complete). Incremental runs never perform
+deletion sweeps, so keep running full imports periodically. Full mode is the default.
 
 ## Deletion sweeps
 

@@ -18,6 +18,7 @@ D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\http\KfAgentClien
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\id\CanonicalIds.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\incremental\ExtractionMode.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\incremental\IncrementalConfig.java
+D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\incremental\IncrementalCursor.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\incremental\IncrementalImportService.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\incremental\WatermarkRepository.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\incremental\WatermarkService.java

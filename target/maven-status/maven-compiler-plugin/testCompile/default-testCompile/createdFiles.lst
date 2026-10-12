@@ -29,6 +29,7 @@ com\keyforge\part2\ingest\IdentityRequestItemTableTest.class
 com\keyforge\part2\ingest\IdentityBindingTest.class
 com\keyforge\part2\ingest\WorkItemArchiveRepositoryTest.class
 com\keyforge\part2\event\EventFingerprintTest.class
+com\keyforge\part2\incremental\EventIncrementalImportTest$Agent.class
 com\keyforge\part2\ingest\IdentityEntitlementTableTest.class
 com\keyforge\part2\MainLedgerTest.class
 com\keyforge\part2\ingest\ApplicationTableTest$1.class
@@ -42,6 +43,8 @@ com\keyforge\part2\ingest\IdentityRequestTableTest.class
 com\keyforge\part2\ingest\GroupDefinitionTableTest.class
 com\keyforge\part2\ingest\AuditEventRepositoryTest$Golden.class
 com\keyforge\part2\ingest\GroupDefinitionTableTest$Golden.class
+com\keyforge\part2\incremental\EventIncrementalImportTest$AppendWriter.class
+com\keyforge\part2\incremental\EventIncrementalImportTest$Db.class
 com\keyforge\part2\event\EventLinkDerivationServiceTest.class
 com\keyforge\part2\ingest\IdentityRoleTableTest.class
 com\keyforge\part2\event\EventLinkDerivationServiceTest$Db.class
@@ -49,6 +52,7 @@ com\keyforge\part2\reconciliation\WorkItemReconciliationTest.class
 com\keyforge\part2\ingest\CertificationItemTableTest$Golden.class
 com\keyforge\part2\event\EventDerivationServiceTest$Db.class
 com\keyforge\part2\ingest\AccountTableTest$Golden.class
+com\keyforge\part2\ChangedIncrementalDispatchTest.class
 com\keyforge\part2\ingest\IdentityRequestItemTableTest$Golden.class
 com\keyforge\part2\ingest\WorkItemTableTest$Golden.class
 com\keyforge\part2\ingest\SnapshotSweepImportServiceTest.class
@@ -58,6 +62,7 @@ com\keyforge\part2\ingest\AccountTableTest.class
 com\keyforge\part2\ingest\SyslogEventImportServiceTest$Agent.class
 com\keyforge\part2\ingest\IdentityRoleTableTest$1.class
 com\keyforge\part2\ingest\RoleHierarchyRepositoryTest$Golden.class
+com\keyforge\part2\incremental\ChangedIncrementalTest.class
 com\keyforge\part2\ingest\IdentityEntitlementTableTest$1.class
 com\keyforge\part2\ingest\EntitlementCertificationReportTest.class
 com\keyforge\part2\ingest\WorkflowDefinitionRepositoryTest$Golden.class
@@ -95,6 +100,7 @@ com\keyforge\part2\ingest\AccessHistoryRoleEventRepositoryTest.class
 com\keyforge\part2\ingest\TaskScheduleTableTest.class
 com\keyforge\part2\ingest\RoleEntitlementRepositoryTest.class
 com\keyforge\part2\ingest\WorkgroupTableTest$1.class
+com\keyforge\part2\incremental\EventIncrementalImportTest.class
 com\keyforge\part2\ingest\PolicyConstraintTableTest$Golden.class
 com\keyforge\part2\ingest\SyslogEventImportServiceTest$MemoryWriter.class
 com\keyforge\part2\reconciliation\WorkItemReconciliationTest$Db.class
@@ -135,5 +141,6 @@ com\keyforge\part2\ingest\WorkItemArchiveRepositoryTest$Golden.class
 com\keyforge\part2\ingest\TaskScheduleTableTest$1.class
 com\keyforge\part2\ingest\IdentityRequestApprovalTableTest.class
 com\keyforge\part2\ingest\ProvisioningTxnTableTest$Golden.class
+com\keyforge\part2\EventIncrementalDispatchTest.class
 com\keyforge\part2\ingest\EntitlementParityTest.class
 com\keyforge\part2\testsupport\RecordingJdbc.class

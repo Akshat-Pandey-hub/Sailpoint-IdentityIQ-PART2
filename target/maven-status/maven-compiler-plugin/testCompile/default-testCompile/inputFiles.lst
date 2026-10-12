@@ -1,10 +1,14 @@
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ChangedIncrementalDispatchTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\event\DeriveCommandConfigTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\event\EventDerivationServiceTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\event\EventDeriverTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\event\EventFingerprintTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\event\EventLinkDerivationServiceTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\event\EventLinkDeriverTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\EventIncrementalDispatchTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\id\CanonicalIdsTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\incremental\ChangedIncrementalTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\incremental\EventIncrementalImportTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\incremental\IncrementalImportServiceTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\incremental\WatermarkServiceTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\AccessHistoryCertificationRepositoryTest.java

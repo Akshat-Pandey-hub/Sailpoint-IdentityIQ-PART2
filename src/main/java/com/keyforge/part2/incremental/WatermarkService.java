@@ -66,9 +66,14 @@ public final class WatermarkService {
 
     /** {@code max(modified_at)} of the destination table: the newest IIQ change time captured. */
     public Instant maxModified(Connection conn, String table) throws SQLException {
+        return maxValue(conn, table, IncrementalCursor.MODIFIED);
+    }
+
+    /** {@code max(<cursor column>)} of the destination table: the newest IIQ time captured for that cursor. */
+    public Instant maxValue(Connection conn, String table, IncrementalCursor cursor) throws SQLException {
         String unqualified = table.substring(table.lastIndexOf('.') + 1);
         try (Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery("SELECT max(modified_at) FROM " + schema + "." + unqualified)) {
+             ResultSet rs = st.executeQuery("SELECT max(" + cursor.column() + ") FROM " + schema + "." + unqualified)) {
             if (rs.next()) {
                 OffsetDateTime odt = rs.getObject(1, OffsetDateTime.class);
                 return odt == null ? null : odt.toInstant();
@@ -83,10 +88,16 @@ public final class WatermarkService {
      */
     public boolean advanceIfSuccessful(Connection conn, String table, Instant newWatermark, int failed, String runId)
             throws SQLException {
+        return advanceIfSuccessful(conn, table, newWatermark, failed, runId, IncrementalCursor.MODIFIED);
+    }
+
+    /** Same, recording the cursor's IIQ field ({@code modified} or {@code created}) with the watermark. */
+    public boolean advanceIfSuccessful(Connection conn, String table, Instant newWatermark, int failed, String runId,
+                                       IncrementalCursor cursor) throws SQLException {
         if (!shouldAdvance(failed, newWatermark)) {
             return false;
         }
         repository.ensureTargetTable(conn);
-        return repository.advance(conn, watermarkKey(table), WATERMARK_FIELD, newWatermark, runId);
+        return repository.advance(conn, watermarkKey(table), cursor.sourceField(), newWatermark, runId);
     }
 }

@@ -24,6 +24,7 @@ com\keyforge\part2\ingest\JsonColumnBinder.class
 com\keyforge\part2\event\EventDeriver$TaskSrc.class
 com\keyforge\part2\ingest\ProvisioningTxnTable.class
 com\keyforge\part2\ledger\ExtractionRun.class
+com\keyforge\part2\incremental\IncrementalCursor.class
 com\keyforge\part2\ingest\IdentityRequestApprovalTable.class
 com\keyforge\part2\ingest\RoleTable.class
 com\keyforge\part2\event\EventDeriver.class
