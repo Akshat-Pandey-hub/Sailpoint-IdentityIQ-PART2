@@ -43,10 +43,10 @@ public final class EntityImportService {
             for (JsonNode row : page) {
                 result.countFetched(1);
                 try {
-                    if (repository.upsert(conn, row, extractionRunId) == EntityRepository.Outcome.INSERTED) {
-                        result.countInserted();
-                    } else {
-                        result.countUpdated();
+                    switch (repository.upsert(conn, row, extractionRunId)) {
+                        case INSERTED -> result.countInserted();
+                        case UPDATED -> result.countUpdated();
+                        case SKIPPED -> result.countSkipped();
                     }
                 } catch (SQLException | RuntimeException e) {
                     result.countFailure(repository.ref(row), e.getMessage());

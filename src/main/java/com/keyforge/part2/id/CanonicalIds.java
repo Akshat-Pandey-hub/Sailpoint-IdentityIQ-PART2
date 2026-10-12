@@ -303,4 +303,18 @@ public final class CanonicalIds {
         }
         return id;
     }
+
+    /**
+     * The policy-constraint primary key, matching Part 1's {@code NativePolicyConstraintRepository.canonicalConstraintId}:
+     * {@code canonicalUuid(source_id)}, else the composite {@code deterministicUuid("native-policy-constraint|" + policy_id
+     * + "|" + (source_id, or name when source_id is null) + "|" + constraint_type)} (null parts become the text "null").
+     */
+    public static String policyConstraintId(String sourceId, String policyId, String name, String constraintType) {
+        String id = canonicalUuid(sourceId);
+        if (id == null) {
+            id = deterministicUuid("native-policy-constraint|" + policyId + "|"
+                    + (sourceId != null ? sourceId : name) + "|" + constraintType);
+        }
+        return id;
+    }
 }

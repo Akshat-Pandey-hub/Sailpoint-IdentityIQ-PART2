@@ -1,0 +1,9 @@
+REST={"source_id":"7f0001019f061fdc819f34b0ac3491aa","policy_id":"7f000101971416688197147685e90115","policy_name":"SOD Template","name":"Finance vs Payroll – café ✓","description":"No one may hold both","constraint_type":"SODConstraint","weight":1000,"compensating_control":"Quarterly review","violation_owner_id":null,"violation_owner_name":null,"violation_owner_type":"Manager","left_bundles":[{"id":"r1","name":"Finance Analyst"}],"right_bundles":[{"id":"r2","name":"Payroll Admin","n":1.5}],"selectors":[],"selector_count":0,"arguments":{"k":"v","z":null},"created_at":"2025-05-28T01:16:41.321Z","modified_at":"2026-09-30T14:44:40.123456789Z"}
+HASH=db4d8b64078cb237274d28a3176e95de4286ea73805b0bb437202d2ef0b89bb7
+ID=7f000101-9f06-1fdc-819f-34b0ac3491aa
+REST={"source_id":null,"policy_id":"7f000101971416688197147685e90115","policy_name":null,"name":"No Id Rule","description":null,"constraint_type":"GenericConstraint","weight":null,"compensating_control":null,"violation_owner_id":null,"violation_owner_name":null,"violation_owner_type":null,"left_bundles":null,"right_bundles":null,"selectors":null,"selector_count":null,"arguments":null,"created_at":null,"modified_at":null}
+HASH=8dc0174b02b30fe70e87ae162e6ea9642b37b7be33591f2b96fa2f6c294ddbca
+ID=9d28b179-15f5-38c7-98a0-89cfc8c37272
+REST={"source_id":"not-a-guid","policy_id":null,"policy_name":null,"name":"x","description":null,"constraint_type":null,"weight":null,"compensating_control":null,"violation_owner_id":null,"violation_owner_name":null,"violation_owner_type":null,"left_bundles":null,"right_bundles":null,"selectors":null,"selector_count":null,"arguments":{},"created_at":null,"modified_at":null}
+HASH=d8b441cc3783aad1f18864fd6cb583f808bab66284aef9fb3873d1cb0719b884
+ID=e67a7a3a-2f1d-33de-ad36-68f97196586b

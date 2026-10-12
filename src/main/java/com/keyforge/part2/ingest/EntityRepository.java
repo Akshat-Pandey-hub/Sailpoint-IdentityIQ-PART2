@@ -28,7 +28,8 @@ import java.util.StringJoiner;
  */
 public final class EntityRepository implements EntityWriter {
 
-    public enum Outcome { INSERTED, UPDATED }
+    /** INSERTED = new row; UPDATED = existing row rewritten; SKIPPED = existing row left untouched (append-only tables). */
+    public enum Outcome { INSERTED, UPDATED, SKIPPED }
 
     private static final List<String> LINEAGE_PARAMS =
             List.of("source_system", "source_interface", "source_object_type", "extraction_run_id");

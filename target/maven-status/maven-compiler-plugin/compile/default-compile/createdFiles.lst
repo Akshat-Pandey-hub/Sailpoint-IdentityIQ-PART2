@@ -8,6 +8,7 @@ com\keyforge\part2\ingest\IdentityTable.class
 com\keyforge\part2\ingest\ColumnSpec$Kind.class
 com\keyforge\part2\ingest\IdentityRepository$1.class
 com\keyforge\part2\hash\HashValues.class
+com\keyforge\part2\ingest\CertificationArchiveRepository.class
 com\keyforge\part2\ingest\CertificationEntityTable.class
 com\keyforge\part2\ingest\IdentityRequestTable.class
 com\keyforge\part2\ingest\AccountEntitlementTable.class
@@ -36,9 +37,11 @@ com\keyforge\part2\ingest\CertificationTable.class
 com\keyforge\part2\ingest\WorkgroupTable.class
 com\keyforge\part2\hash\RecordHash.class
 com\keyforge\part2\ingest\EntitlementTable.class
+com\keyforge\part2\ingest\PolicyConstraintTable.class
 com\keyforge\part2\config\AppConfig.class
 com\keyforge\part2\ingest\WorkflowDefinitionRepository.class
 com\keyforge\part2\id\CanonicalIds.class
+com\keyforge\part2\ingest\EntityImportService$1.class
 com\keyforge\part2\ingest\EntityWriter.class
 com\keyforge\part2\ingest\RoleEntitlementRepository.class
 com\keyforge\part2\ingest\CertificationItemTable.class

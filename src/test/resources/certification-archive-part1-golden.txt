@@ -1,0 +1,9 @@
+REST={"source_id":"7f0001019f061fdc819f34b0ac3481ee","name":"Targeted Access Review for Alexander Evans – café ✓","certification_id":"7f0001019f061fdc819f34b0ac3471dd","certification_group_id":"7f0001019f061fdc819f34b0ac3471d0","creator_name":"spadmin","owner_name":"Alexander Evans","comments":"archived","signed":"2026-10-01T08:00:00.500Z","expiration":null,"child_certification_ids":["7f0001019f061fdc819f34b0ac3471aa",{"n":1.5}],"archive_xml":"<?xml version='1.0' encoding='UTF-8'?>\n<!DOCTYPE CertificationArchive PUBLIC \"sailpoint.dtd\" \"sailpoint.dtd\">\n<CertificationArchive name=\"x\">\n  <Item a=\"&amp;\"/>\n</CertificationArchive>","created_at":"2026-10-02T09:10:11.123Z","modified_at":"2026-10-02T09:10:11.123456789Z","archived_ts":"2026-10-02T09:10:11.123Z"}
+HASH=610f8c29cf381aaa3e17faff7fa7bc53f8a23962062a6ba754f895e2868bbca7
+ID=7f000101-9f06-1fdc-819f-34b0ac3481ee
+REST={"source_id":"arch-not-a-guid","name":"Odd Archive","certification_id":null,"certification_group_id":null,"creator_name":null,"owner_name":null,"comments":null,"signed":null,"expiration":null,"child_certification_ids":null,"archive_xml":null,"created_at":null,"modified_at":null,"archived_ts":null}
+HASH=9dbb24bca79c9f38b80eb689764f939977737af4fd7a713f55797288f4b56533
+ID=d7cae911-5b34-3b06-9c3c-a4c8fd8cc041
+REST={"source_id":"   ","name":"blank id archive","certification_id":null,"certification_group_id":null,"creator_name":null,"owner_name":null,"comments":null,"signed":null,"expiration":null,"child_certification_ids":[],"archive_xml":null,"created_at":null,"modified_at":null,"archived_ts":null}
+HASH=8d4b60510de784b44e42e75ff77b449a67063f51c5845b9678f7d6ef35409aa4
+ID=THROWS

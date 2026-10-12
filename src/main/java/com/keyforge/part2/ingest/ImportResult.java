@@ -12,6 +12,7 @@ public final class ImportResult {
     private int fetched;
     private int inserted;
     private int updated;
+    private int skipped;
     private int failed;
     private final List<String> failures = new ArrayList<>();
 
@@ -24,6 +25,7 @@ public final class ImportResult {
     public void countFetched(int n) { fetched += n; }
     public void countInserted() { inserted++; }
     public void countUpdated() { updated++; }
+    public void countSkipped() { skipped++; }
 
     public void countFailure(String ref, String message) {
         failed++;
@@ -38,6 +40,7 @@ public final class ImportResult {
     public int fetched() { return fetched; }
     public int inserted() { return inserted; }
     public int updated() { return updated; }
+    public int skipped() { return skipped; }
     public int failed() { return failed; }
     public int persisted() { return inserted + updated; }
     public List<String> failures() { return failures; }
@@ -50,6 +53,9 @@ public final class ImportResult {
         sb.append("  fetched:   ").append(fetched).append('\n');
         sb.append("  inserted:  ").append(inserted).append('\n');
         sb.append("  updated:   ").append(updated).append('\n');
+        if (skipped > 0) {
+            sb.append("  skipped:   ").append(skipped).append(" (already present; append-only, left unchanged)\n");
+        }
         sb.append("  failed:    ").append(failed);
         int shown = Math.min(failures.size(), 10);
         for (int i = 0; i < shown; i++) {

@@ -6,6 +6,7 @@ import com.keyforge.part2.db.PostgresConnection;
 import com.keyforge.part2.http.KfAgentClient;
 import com.keyforge.part2.ingest.AccountEntitlementTable;
 import com.keyforge.part2.ingest.AccountTable;
+import com.keyforge.part2.ingest.CertificationArchiveRepository;
 import com.keyforge.part2.ingest.CertificationEntityTable;
 import com.keyforge.part2.ingest.CertificationItemTable;
 import com.keyforge.part2.ingest.CertificationTable;
@@ -22,6 +23,7 @@ import com.keyforge.part2.ingest.IdentityRepository;
 import com.keyforge.part2.ingest.IdentityEntitlementTable;
 import com.keyforge.part2.ingest.IdentityRoleTable;
 import com.keyforge.part2.ingest.EntityWriter;
+import com.keyforge.part2.ingest.PolicyConstraintTable;
 import com.keyforge.part2.ingest.PolicyTable;
 import com.keyforge.part2.ingest.ProvisioningItemRepository;
 import com.keyforge.part2.ingest.ProvisioningTxnTable;
@@ -75,7 +77,11 @@ import java.util.function.Function;
  *  import-certification-entity
  *                       Fetch GET /kfagent/certification-entities and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_certification_entity
  *  import-certification-item
- *                       Fetch GET /kfagent/certification-items and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_certification_item</pre>
+ *                       Fetch GET /kfagent/certification-items and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_certification_item
+ *  import-certification-archive
+ *                       Fetch GET /kfagent/certification-archives and append into &lt;PG_DEST_SCHEMA&gt;.kf_certification_archive
+ *  import-policy-constraint
+ *                       Fetch GET /kfagent/policy-constraints and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_policy_constraint</pre>
  *
  * Configuration is entirely external (environment variables / -D system properties) — see {@link AppConfig}.
  * Exit codes: 0 ok, 2 usage, 3 config error, 4 HTTP/source error, 5 PostgreSQL error, 6 completed with row
@@ -111,6 +117,8 @@ public final class Main {
             case "import-certification" -> System.exit(runImport(CertificationTable.SPEC));
             case "import-certification-entity" -> System.exit(runImport(CertificationEntityTable.SPEC));
             case "import-certification-item" -> System.exit(runImport(CertificationItemTable.SPEC));
+            case "import-certification-archive" -> System.exit(runImport(CertificationArchiveRepository::new));
+            case "import-policy-constraint" -> System.exit(runImport(PolicyConstraintTable.SPEC));
             default -> {
                 printUsage();
                 System.exit("".equals(command) ? 2 : 2);
@@ -228,6 +236,10 @@ public final class Main {
         System.out.println("                       Fetch GET /kfagent/certification-entities and upsert into <PG_DEST_SCHEMA>.kf_certification_entity");
         System.out.println("  import-certification-item");
         System.out.println("                       Fetch GET /kfagent/certification-items and upsert into <PG_DEST_SCHEMA>.kf_certification_item");
+        System.out.println("  import-certification-archive");
+        System.out.println("                       Fetch GET /kfagent/certification-archives and append into <PG_DEST_SCHEMA>.kf_certification_archive");
+        System.out.println("  import-policy-constraint");
+        System.out.println("                       Fetch GET /kfagent/policy-constraints and upsert into <PG_DEST_SCHEMA>.kf_policy_constraint");
         System.out.println();
         System.out.println("Required env: KFAGENT_BASE_URL, PG_HOST, PG_DATABASE, PG_USERNAME, PG_PASSWORD");
         System.out.println("Optional env: PG_PORT (5432), PG_DEST_SCHEMA (iiq_native_part2), KFAGENT_PAGE_SIZE (500),");
