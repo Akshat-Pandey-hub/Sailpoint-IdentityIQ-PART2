@@ -31,7 +31,7 @@ All settings come from environment variables (or `-D` JVM system properties). No
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
 | `KFAGENT_BASE_URL` | yes¹ | — | KF Agent base URL, e.g. `http://127.0.0.1:8100` |
-| `KFAGENT_USERNAME` / `KFAGENT_PASSWORD` | no | — | Basic auth for the KF Agent, if enabled |
+| `KFAGENT_USERNAME` / `KFAGENT_PASSWORD` | yes¹ | — | KF Agent Basic Auth: the same `IIQ_USERNAME` / `IIQ_PASSWORD` the KF Agent runs with |
 | `PG_HOST`, `PG_DATABASE`, `PG_USERNAME`, `PG_PASSWORD` | yes | — | PostgreSQL connection |
 | `PG_PORT` | no | `5432` | PostgreSQL port |
 | `PG_DEST_SCHEMA` | no | `iiq_native_part2` | Destination schema |
@@ -40,6 +40,21 @@ All settings come from environment variables (or `-D` JVM system properties). No
 | `INCREMENTAL_OVERLAP_MINUTES` | no | `5` | Overlap applied to incremental watermarks |
 
 ¹ Not required by the database-only commands (`derive-native-events`, `derive-native-event-links`).
+Without the KF Agent credentials, imports fail with `HTTP 401` (exit code 4).
+
+Example (Windows CMD):
+
+```bat
+set KFAGENT_BASE_URL=http://127.0.0.1:8100
+set KFAGENT_USERNAME=<IIQ username>
+set KFAGENT_PASSWORD=<IIQ password>
+set PG_HOST=localhost
+set PG_PORT=5432
+set PG_DATABASE=<database>
+set PG_DEST_SCHEMA=iiq_native_part2
+set PG_USERNAME=<user>
+set PG_PASSWORD=<password>
+```
 
 ## Usage
 
