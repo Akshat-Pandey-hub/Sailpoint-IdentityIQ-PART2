@@ -1,0 +1,12 @@
+REST={"source_id":"7f0001019eb91d3c819f06cf65c20836","action":"ServerUpDown","audit_source":"keyforgeiga","target":"ServerDown","application":null,"account_name":null,"instance":null,"attribute_name":null,"attribute_value":null,"interface_name":null,"server_host":"keyforgeiga","client_host":null,"tracking_id":null,"string1":null,"string2":null,"string3":null,"string4":null,"attributes":{},"created_at":"2026-06-27T02:01:23.138Z"}
+HASH=828771d424b8bb9dfe3bb15243485506f50d062c3eab870c721e0e152e1cf5fc
+ID=7f000101-9eb9-1d3c-819f-06cf65c20836
+REST={"source_id":"7f0001019f061fdc819f06e6cb170029","action":"AccessRequestStart","audit_source":"spadmin","target":"EMP00001","application":"corp directory","account_name":"EMP00001","instance":null,"attribute_name":"posixgroups","attribute_value":"\"cn=devs,ou=rocktar,dc=moli,dc=org\"","interface_name":"LCM","server_host":"keyforgeiga","client_host":"127.0.0.1","tracking_id":null,"string1":null,"string2":null,"string3":null,"string4":null,"attributes":{"attachments":null,"id":"7f0001019eb91d3c819f020fe42b7f45","interface":"LCM","attachmentConfigList":null,"operation":"EntitlementAdd","flow":"AccessRequest"},"created_at":"2026-06-27T02:26:56.407Z"}
+HASH=5bbbbe0ec509777eee25482dbd07c67ecd29613ee2edc3ace20a721e00de0b03
+ID=7f000101-9f06-1fdc-819f-06e6cb170029
+REST={"source_id":"7f0001019fbf1a17819fcd7e8b1c1bbe","action":"ManualChange","audit_source":"Molly J","target":null,"application":"FlatFile-HR-Source","account_name":"App_IDJ0001009","instance":null,"attribute_name":null,"attribute_value":null,"interface_name":"LCM","server_host":"keyforgeiga","client_host":"127.0.0.1","tracking_id":null,"string1":null,"string2":null,"string3":null,"string4":null,"attributes":{"requester":"spadmin","op":"Disable","interface":"LCM","operation":"Disable","flow":"Lifecycle"},"created_at":"2026-08-04T15:57:30.268Z"}
+HASH=3f62868a86e7fc38457448cfae5aa416cc348dc7543d7202b5cd0e94f1f4b499
+ID=7f000101-9fbf-1a17-819f-cd7e8b1c1bbe
+REST={"source_id":"7f0001019f061fdc819f1057abd1110d","action":"IdentityWorkgroupAdd","audit_source":"spadmin","target":"spadmin","application":null,"account_name":null,"instance":null,"attribute_name":null,"attribute_value":null,"interface_name":null,"server_host":"keyforgeiga","client_host":"127.0.0.1","tracking_id":null,"string1":"Adminq","string2":null,"string3":null,"string4":null,"attributes":{},"created_at":"2026-06-28T22:26:48.913Z"}
+HASH=d8c53eea11a0780a1ecf1fdf21f3b40cf4a45ccee13228a2fd14b1236a1b52f9
+ID=7f000101-9f06-1fdc-819f-1057abd1110d

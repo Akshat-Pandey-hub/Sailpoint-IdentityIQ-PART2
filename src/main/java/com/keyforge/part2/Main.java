@@ -6,6 +6,7 @@ import com.keyforge.part2.db.PostgresConnection;
 import com.keyforge.part2.http.KfAgentClient;
 import com.keyforge.part2.ingest.AccountEntitlementTable;
 import com.keyforge.part2.ingest.AccountTable;
+import com.keyforge.part2.ingest.AuditEventRepository;
 import com.keyforge.part2.ingest.CertificationArchiveRepository;
 import com.keyforge.part2.ingest.CertificationEntityTable;
 import com.keyforge.part2.ingest.CertificationItemTable;
@@ -13,6 +14,7 @@ import com.keyforge.part2.ingest.CertificationTable;
 import com.keyforge.part2.ingest.ApplicationTable;
 import com.keyforge.part2.ingest.EntitlementAssignmentReport;
 import com.keyforge.part2.ingest.EntitlementCertificationReport;
+import com.keyforge.part2.ingest.EntitlementCertificationStatusReport;
 import com.keyforge.part2.ingest.EntitlementTable;
 import com.keyforge.part2.ingest.EntityImportService;
 import com.keyforge.part2.ingest.EntityRepository;
@@ -35,8 +37,10 @@ import com.keyforge.part2.ingest.RoleHierarchyRepository;
 import com.keyforge.part2.ingest.RoleTable;
 import com.keyforge.part2.ingest.SqlReportImportService;
 import com.keyforge.part2.ingest.SqlReportRepository;
+import com.keyforge.part2.ingest.TaskResultTable;
 import com.keyforge.part2.ingest.WorkItemTable;
 import com.keyforge.part2.ingest.WorkgroupMemberRepository;
+import com.keyforge.part2.ingest.WorkgroupMembersReport;
 import com.keyforge.part2.ingest.WorkflowDefinitionRepository;
 import com.keyforge.part2.ingest.WorkgroupTable;
 import com.keyforge.part2.ingest.ImportResult;
@@ -96,7 +100,15 @@ import java.util.function.Function;
  *  import-workgroup-member
  *                       Fetch GET /kfagent/workgroupmember and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_workgroup_member
  *  import-entitlement-certification
- *                       Fetch GET /kfagent/entitlement-certification (SQL report) and REPLACE &lt;PG_DEST_SCHEMA&gt;.kf_entitlement_certification</pre>
+ *                       Fetch GET /kfagent/entitlement-certification (SQL report) and REPLACE &lt;PG_DEST_SCHEMA&gt;.kf_entitlement_certification
+ *  import-entitlement-certification-status
+ *                       Fetch GET /kfagent/entitlement-certification-status (SQL report) and REPLACE &lt;PG_DEST_SCHEMA&gt;.kf_entitlement_certification_status
+ *  import-workgroup-members
+ *                       Fetch GET /kfagent/workgroup-members (SQL report) and REPLACE &lt;PG_DEST_SCHEMA&gt;.kf_workgroup_members
+ *  import-audit-event
+ *                       Fetch GET /kfagent/audit-events and append into &lt;PG_DEST_SCHEMA&gt;.kf_audit_event
+ *  import-task-result
+ *                       Fetch GET /kfagent/task-results and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_task_result</pre>
  *
  * Configuration is entirely external (environment variables / -D system properties) — see {@link AppConfig}.
  * Exit codes: 0 ok, 2 usage, 3 config error, 4 HTTP/source error, 5 PostgreSQL error, 6 completed with row
@@ -142,6 +154,13 @@ public final class Main {
             case "import-entitlement-certification" -> System.exit(runSqlReport("EntitlementCertification",
                     EntitlementCertificationReport.RESOURCE, EntitlementCertificationReport.TABLE,
                     EntitlementCertificationReport.COLUMNS));
+            case "import-entitlement-certification-status" -> System.exit(runSqlReport("EntitlementCertificationStatus",
+                    EntitlementCertificationStatusReport.RESOURCE, EntitlementCertificationStatusReport.TABLE,
+                    EntitlementCertificationStatusReport.COLUMNS));
+            case "import-workgroup-members" -> System.exit(runSqlReport("WorkgroupMembers",
+                    WorkgroupMembersReport.RESOURCE, WorkgroupMembersReport.TABLE, WorkgroupMembersReport.COLUMNS));
+            case "import-audit-event" -> System.exit(runImport(AuditEventRepository::new));
+            case "import-task-result" -> System.exit(runImport(TaskResultTable.SPEC));
             default -> {
                 printUsage();
                 System.exit("".equals(command) ? 2 : 2);
@@ -310,6 +329,14 @@ public final class Main {
         System.out.println("                       Fetch GET /kfagent/workgroupmember and upsert into <PG_DEST_SCHEMA>.kf_workgroup_member");
         System.out.println("  import-entitlement-certification");
         System.out.println("                       Fetch GET /kfagent/entitlement-certification (SQL report) and REPLACE <PG_DEST_SCHEMA>.kf_entitlement_certification");
+        System.out.println("  import-entitlement-certification-status");
+        System.out.println("                       Fetch GET /kfagent/entitlement-certification-status (SQL report) and REPLACE <PG_DEST_SCHEMA>.kf_entitlement_certification_status");
+        System.out.println("  import-workgroup-members");
+        System.out.println("                       Fetch GET /kfagent/workgroup-members (SQL report) and REPLACE <PG_DEST_SCHEMA>.kf_workgroup_members");
+        System.out.println("  import-audit-event");
+        System.out.println("                       Fetch GET /kfagent/audit-events and append into <PG_DEST_SCHEMA>.kf_audit_event");
+        System.out.println("  import-task-result");
+        System.out.println("                       Fetch GET /kfagent/task-results and upsert into <PG_DEST_SCHEMA>.kf_task_result");
         System.out.println();
         System.out.println("Required env: KFAGENT_BASE_URL, PG_HOST, PG_DATABASE, PG_USERNAME, PG_PASSWORD");
         System.out.println("Optional env: PG_PORT (5432), PG_DEST_SCHEMA (iiq_native_part2), KFAGENT_PAGE_SIZE (500),");
