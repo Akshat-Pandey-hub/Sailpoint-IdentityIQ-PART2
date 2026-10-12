@@ -7,6 +7,7 @@ D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\hash\RecordHash.j
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\http\KfAgentClient.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\id\CanonicalIds.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\AccessHistoryEntitlementRepository.java
+D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\AccessHistoryIdentityEventRepository.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\AccountEntitlementTable.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\AccountTable.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\ApplicationTable.java

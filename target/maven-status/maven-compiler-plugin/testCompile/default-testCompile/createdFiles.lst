@@ -56,7 +56,9 @@ com\keyforge\part2\ingest\ApplicationTableTest$Golden.class
 com\keyforge\part2\ingest\EntitlementAssignmentReportTest$TxStub.class
 com\keyforge\part2\ingest\PolicyViolationTableTest.class
 com\keyforge\part2\ingest\AccountTableTest$1.class
+com\keyforge\part2\ingest\AccessHistoryIdentityEventRepositoryTest.class
 com\keyforge\part2\ingest\EntitlementAssignmentReportTest.class
+com\keyforge\part2\ingest\AccessHistoryIdentityEventRepositoryTest$Golden.class
 com\keyforge\part2\ingest\PolicyTableTest$1.class
 com\keyforge\part2\ingest\WorkgroupTableTest.class
 com\keyforge\part2\ingest\ProvisioningItemRepositoryTest$Golden.class

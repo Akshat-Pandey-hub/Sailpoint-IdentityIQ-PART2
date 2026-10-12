@@ -7,6 +7,7 @@ import com.keyforge.part2.http.KfAgentClient;
 import com.keyforge.part2.ingest.AccountEntitlementTable;
 import com.keyforge.part2.ingest.AccountTable;
 import com.keyforge.part2.ingest.AccessHistoryEntitlementRepository;
+import com.keyforge.part2.ingest.AccessHistoryIdentityEventRepository;
 import com.keyforge.part2.ingest.AuditEventRepository;
 import com.keyforge.part2.ingest.CertificationArchiveRepository;
 import com.keyforge.part2.ingest.CertificationEntityTable;
@@ -120,7 +121,9 @@ import java.util.function.Function;
  *  import-group-definition
  *                       Fetch GET /kfagent/group-definitions and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_group_definition
  *  import-access-history
- *                       Fetch GET /kfagent/access-history and append into &lt;PG_DEST_SCHEMA&gt;.kf_access_hist_entitlement</pre>
+ *                       Fetch GET /kfagent/access-history and append into &lt;PG_DEST_SCHEMA&gt;.kf_access_hist_entitlement
+ *  import-access-history-identity-event
+ *                       Fetch GET /kfagent/access-history/identity-events and append into &lt;PG_DEST_SCHEMA&gt;.kf_access_hist_identity_event</pre>
  *
  * Configuration is entirely external (environment variables / -D system properties) — see {@link AppConfig}.
  * Exit codes: 0 ok, 2 usage, 3 config error, 4 HTTP/source error, 5 PostgreSQL error, 6 completed with row
@@ -177,6 +180,8 @@ public final class Main {
             case "import-workitem-archive" -> System.exit(runImport(WorkItemArchiveRepository::new));
             case "import-group-definition" -> System.exit(runImport(GroupDefinitionTable.SPEC));
             case "import-access-history" -> System.exit(runImport(AccessHistoryEntitlementRepository::new));
+            case "import-access-history-identity-event" ->
+                    System.exit(runImport(AccessHistoryIdentityEventRepository::new));
             default -> {
                 printUsage();
                 System.exit("".equals(command) ? 2 : 2);
@@ -361,6 +366,8 @@ public final class Main {
         System.out.println("                       Fetch GET /kfagent/group-definitions and upsert into <PG_DEST_SCHEMA>.kf_group_definition");
         System.out.println("  import-access-history");
         System.out.println("                       Fetch GET /kfagent/access-history and append into <PG_DEST_SCHEMA>.kf_access_hist_entitlement");
+        System.out.println("  import-access-history-identity-event");
+        System.out.println("                       Fetch GET /kfagent/access-history/identity-events and append into <PG_DEST_SCHEMA>.kf_access_hist_identity_event");
         System.out.println();
         System.out.println("Required env: KFAGENT_BASE_URL, PG_HOST, PG_DATABASE, PG_USERNAME, PG_PASSWORD");
         System.out.println("Optional env: PG_PORT (5432), PG_DEST_SCHEMA (iiq_native_part2), KFAGENT_PAGE_SIZE (500),");

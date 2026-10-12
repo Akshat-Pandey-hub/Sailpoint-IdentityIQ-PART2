@@ -10,6 +10,7 @@ com\keyforge\part2\ingest\EntitlementAssignmentReport.class
 com\keyforge\part2\ingest\AuditEventRepository.class
 com\keyforge\part2\ingest\IdentityTable.class
 com\keyforge\part2\ingest\ColumnSpec$Kind.class
+com\keyforge\part2\ingest\AccessHistoryIdentityEventRepository.class
 com\keyforge\part2\ingest\IdentityRepository$1.class
 com\keyforge\part2\ingest\SqlReportRepository.class
 com\keyforge\part2\hash\HashValues.class
