@@ -76,11 +76,22 @@
       </exclusions>
     </dependency>
   </dependencies>
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>com.fasterxml.jackson</groupId>
+        <artifactId>jackson-bom</artifactId>
+        <version>${jackson.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
   <properties>
     <maven.compiler.release>17</maven.compiler.release>
     <main.class>com.keyforge.part2.Main</main.class>
-    <jackson.version>2.17.2</jackson.version>
-    <postgresql.version>42.7.4</postgresql.version>
+    <jackson.version>2.18.11</jackson.version>
+    <postgresql.version>42.7.12</postgresql.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <junit.version>5.10.2</junit.version>
   </properties>
