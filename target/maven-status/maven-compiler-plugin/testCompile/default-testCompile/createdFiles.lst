@@ -23,6 +23,7 @@ com\keyforge\part2\ingest\SyslogEventRepositoryTest.class
 com\keyforge\part2\incremental\IncrementalImportServiceTest$Agent.class
 com\keyforge\part2\ingest\WorkItemTableTest.class
 com\keyforge\part2\ingest\IdentitySqlTest.class
+com\keyforge\part2\RestServerTest.class
 com\keyforge\part2\ingest\ProvisioningTxnTableTest.class
 com\keyforge\part2\ingest\AccountEntitlementTableTest$Golden.class
 com\keyforge\part2\ingest\IdentityRequestItemTableTest.class

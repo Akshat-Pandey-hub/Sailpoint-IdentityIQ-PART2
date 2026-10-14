@@ -169,11 +169,21 @@ public final class Main {
 
     public static void main(String[] args) {
         String command = args.length == 0 ? "" : args[0].trim();
+        if (START_REST.equals(command)) {
+            int code = RestServer.startFromEnvironment();
+            if (code != 0) {
+                System.exit(code);
+            }
+            return; // the server's threads keep the JVM running until it is stopped
+        }
         ExtractionMode mode = ExtractionMode.fromArgs(java.util.Arrays.copyOfRange(args, Math.min(1, args.length),
                 args.length));
         String ledgerCommand = mode.isIncremental() ? command + " --incremental" : command;
         System.exit(RunLedger.run(ledgerCommand, () -> dispatch(command, mode)));
     }
+
+    /** Starts the HTTP trigger for the commands below ({@link RestServer}); not itself an import. */
+    static final String START_REST = "start-rest";
 
     /** Runs one full-mode command (see {@link #dispatch(String, ExtractionMode)}). */
     static int dispatch(String command) {
@@ -1054,6 +1064,10 @@ public final class Main {
         System.out.println("                       - created after the watermark: import-audit-event, import-syslog-event,");
         System.out.println("                         import-workitem-archive, import-certification-archive, import-access-history*");
         System.out.println("                       Incremental runs never sweep; full mode stays the default.");
+        System.out.println();
+        System.out.println("REST mode: start-rest   Serve GET /kfagent-ingest/<command>[?mode=incremental] (runs the same command;");
+        System.out.println("                       one at a time). REST_HOST (127.0.0.1), REST_PORT (8200); every request uses");
+        System.out.println("                       HTTP Basic Auth with KFAGENT_USERNAME / KFAGENT_PASSWORD (both required)");
         System.out.println();
         System.out.println("Required env: KFAGENT_BASE_URL, PG_HOST, PG_DATABASE, PG_USERNAME, PG_PASSWORD");
         System.out.println("Optional env: PG_PORT (5432), PG_DEST_SCHEMA (iiq_native_part2), KFAGENT_PAGE_SIZE (500),");

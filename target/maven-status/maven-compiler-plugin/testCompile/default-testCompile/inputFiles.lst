@@ -64,4 +64,5 @@ D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ledger\RunLedgerT
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\MainLedgerTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\reconciliation\ReconciliationFindingRepositoryTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\reconciliation\WorkItemReconciliationTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\RestServerTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\testsupport\RecordingJdbc.java

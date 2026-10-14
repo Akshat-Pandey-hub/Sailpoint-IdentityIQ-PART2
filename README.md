@@ -140,6 +140,37 @@ Every command records one row in `kf_extraction_run`: status, timing, counts and
 | `6` | Completed with row-level failures |
 | `7` | Completeness not confirmed (sweep skipped, or syslog scan incomplete) |
 
+## REST mode
+
+`java -jar target/kfagent-ingest.jar start-rest` starts an HTTP server that runs the same commands on request.
+`GET /kfagent-ingest/<command>` runs `<command>` exactly as the CLI does, and `?mode=incremental` is the same as
+`--incremental`. The run is recorded in `kf_extraction_run` as usual. The response is sent when the command finishes
+and contains its JSON result: run id, exit code, status, counts and error. `GET /kfagent-ingest` lists the commands.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `REST_HOST` | `127.0.0.1` | Bind address. Local only by default. |
+| `REST_PORT` | `8200` | Port. |
+
+**Authentication:** every request must use HTTP Basic Auth with the existing `KFAGENT_USERNAME` and
+`KFAGENT_PASSWORD`, the same credentials Part 2 already sends to the KF Agent. Both are required to start REST mode.
+In Postman, open the Authorization tab, choose Basic Auth, and enter those values. Missing or wrong credentials get
+`401` on every route. The password is never logged or returned.
+
+The KF Agent and PostgreSQL settings are the same as for the CLI.
+
+- **HTTP status:** `200` means the command ran. Check `status`/`success`: exit 6 is `COMPLETED_WITH_FAILURES` and
+  exit 7 is `INCOMPLETE`, both with `success: false`. Other codes: `400` bad request or rejected option (exit 2),
+  `401` missing or wrong credentials, `404` unknown route, `409` another command is running, `502` KF Agent error (exit 4), `500` other
+  failures (exits 1, 3 and 5).
+- **One command at a time.** A request that arrives during a run gets `409`, and nothing is started. This applies only
+  within this server: do not run CLI imports into the same schema at the same time.
+- **No time or record limit.** Large imports keep the request open until they finish. If the caller, a proxy or a
+  tunnel times out first, the command still runs to completion and is recorded in `kf_extraction_run`.
+- **Remote access:** the server speaks plain HTTP, and Basic Auth sends the password with every request, encoded but
+  not encrypted. Only bind a non-loopback `REST_HOST` behind HTTPS termination (a reverse proxy or a TLS tunnel).
+  Never expose the port directly.
+
 ## Project layout
 
 ```

@@ -129,6 +129,15 @@ public final class RunLedger {
         return ctx == null ? null : ctx.runId();
     }
 
+    /**
+     * Read-only view of the current run as {@link #finish} will record it for this exit code (status, counts, error),
+     * or {@code null} outside a run (e.g. after a usage error discarded it). Persists nothing; the run stays open.
+     */
+    public static ExtractionRun snapshot(int exitCode) {
+        RunContext ctx = CURRENT.get();
+        return ctx == null ? null : buildRun(ctx, exitCode, Instant.now());
+    }
+
     /** The current run's id, or a fresh UUID when no run is active (library / test callers). */
     public static String runIdOrNew() {
         String id = currentRunId();

@@ -16,12 +16,14 @@ com\keyforge\part2\ingest\AccessHistoryIdentityEventRepository.class
 com\keyforge\part2\ingest\IdentityRepository$1.class
 com\keyforge\part2\ledger\RunLedger$Sink.class
 com\keyforge\part2\event\EventLinkRepository.class
+com\keyforge\part2\RestServer$Dispatcher.class
 com\keyforge\part2\event\EventType.class
 com\keyforge\part2\ingest\SqlReportRepository$Replaced.class
 com\keyforge\part2\ingest\SnapshotSweepImportService$SnapshotFetcher.class
 com\keyforge\part2\ingest\AccountEntitlementTable.class
 com\keyforge\part2\ingest\EntitlementCertificationStatusReport.class
 com\keyforge\part2\incremental\FamilyIncrementalImportService$Outcome.class
+com\keyforge\part2\RestServer$Settings.class
 com\keyforge\part2\ingest\JsonColumnBinder.class
 com\keyforge\part2\event\EventDeriver$TaskSrc.class
 com\keyforge\part2\ingest\ProvisioningTxnTable.class
@@ -48,6 +50,7 @@ com\keyforge\part2\ingest\SnapshotSweepImportService.class
 com\keyforge\part2\Main$IncrementalFamily.class
 com\keyforge\part2\hash\RecordHash.class
 com\keyforge\part2\ingest\EntitlementTable.class
+com\keyforge\part2\RestServer.class
 com\keyforge\part2\ingest\SoftDeleteSweeper.class
 com\keyforge\part2\ingest\PolicyViolationTable.class
 com\keyforge\part2\reconciliation\WorkItemReconciliation.class
