@@ -1,12 +1,22 @@
 package com.keyforge.part2.http;
 
 import com.keyforge.part2.config.AppConfig;
+import com.keyforge.part2.config.ConfigException;
 
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManagerFactory;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.GeneralSecurityException;
+import java.security.KeyStore;
 import java.time.Duration;
 import java.util.Base64;
 
@@ -16,6 +26,10 @@ import java.util.Base64;
  * Read-only; no SailPoint/IIQ dependency. Optional HTTP Basic Auth is sent only when both
  * {@code KFAGENT_USERNAME} and {@code KFAGENT_PASSWORD} are configured (for an authenticating proxy in
  * front of the agent); the agent itself is unauthenticated.
+ *
+ * <p>When {@code KFAGENT_CLIENT_KEYSTORE} is configured, the client also presents that client certificate during the
+ * TLS handshake (mutual TLS), as a gateway in front of the agent may require (e.g. an ngrok edge with mTLS). The
+ * server is still verified against the JDK's standard trusted CAs. Basic Auth is sent as before, on top of it.
  */
 public final class KfAgentClient {
 
@@ -24,9 +38,40 @@ public final class KfAgentClient {
 
     public KfAgentClient(AppConfig config) {
         this.config = config;
-        this.http = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(config.httpTimeoutSeconds()))
-                .build();
+        HttpClient.Builder builder = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(config.httpTimeoutSeconds()));
+        if (config.hasClientCertificate()) {
+            builder.sslContext(clientCertificateContext(config.kfAgentClientKeystore(),
+                    config.kfAgentClientKeystorePassword().toCharArray()));
+        }
+        this.http = builder.build();
+    }
+
+    /**
+     * A TLS context that presents the client certificate in the PKCS12 file {@code keystorePath} and trusts the JDK's
+     * standard root CAs (which include the CA of a public gateway such as ngrok's edge).
+     *
+     * @throws ConfigException when the file cannot be read or opened with {@code password} (the password is never
+     *                         included in the message)
+     */
+    public static SSLContext clientCertificateContext(String keystorePath, char[] password) {
+        try {
+            KeyStore keyStore = KeyStore.getInstance("PKCS12");
+            try (InputStream in = Files.newInputStream(Path.of(keystorePath))) {
+                keyStore.load(in, password);
+            }
+            KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+            kmf.init(keyStore, password);
+            TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            tmf.init((KeyStore) null); // the JDK's standard trusted CAs
+            SSLContext ssl = SSLContext.getInstance("TLS"); // negotiates TLS 1.3 where the server offers it
+            ssl.init(kmf.getKeyManagers(), tmf.getTrustManagers(), null);
+            return ssl;
+        } catch (IOException | GeneralSecurityException e) {
+            throw new ConfigException("Cannot use the client certificate in KFAGENT_CLIENT_KEYSTORE (" + keystorePath
+                    + "): " + e.getMessage() + ". Check that it is a PKCS12 (.p12) file and that"
+                    + " KFAGENT_CLIENT_KEYSTORE_PASSWORD is its password.");
+        }
     }
 
     /** One fetched page: the raw body plus the agent's {@code X-KF-Source-Count} header ({@code null} if absent). */

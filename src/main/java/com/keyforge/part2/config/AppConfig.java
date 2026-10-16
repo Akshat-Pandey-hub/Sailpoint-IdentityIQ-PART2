@@ -11,7 +11,10 @@ import java.util.List;
  *   <li><b>KF Agent (HTTP source):</b> {@code KFAGENT_BASE_URL} (required, e.g. http://127.0.0.1:8100),
  *       optional {@code KFAGENT_USERNAME}/{@code KFAGENT_PASSWORD} (Basic Auth, only if the agent is put
  *       behind an authenticating proxy), {@code KFAGENT_PAGE_SIZE} (default 500),
- *       {@code HTTP_TIMEOUT_SECONDS} (default 60).</li>
+ *       {@code HTTP_TIMEOUT_SECONDS} (default 60). Optional client certificate (mutual TLS), for an agent reached
+ *       through a gateway that demands one (e.g. an ngrok edge): {@code KFAGENT_CLIENT_KEYSTORE} (path to a PKCS12
+ *       {@code .p12} file holding the certificate and its private key) + {@code KFAGENT_CLIENT_KEYSTORE_PASSWORD};
+ *       both or neither, and only with an {@code https://} base URL. Unset = no client certificate (as before).</li>
  *   <li><b>PostgreSQL (destination):</b> {@code PG_HOST} (required), {@code PG_PORT} (default 5432),
  *       {@code PG_DATABASE} (required), {@code PG_DEST_SCHEMA} (default iiq_native_part2),
  *       {@code PG_USERNAME} (required), {@code PG_PASSWORD} (required).</li>
@@ -24,6 +27,8 @@ public final class AppConfig {
     private final String kfAgentPassword; // nullable
     private final int pageSize;
     private final int httpTimeoutSeconds;
+    private final String kfAgentClientKeystore;         // nullable: no client certificate
+    private final String kfAgentClientKeystorePassword; // nullable together with the keystore
 
     private final String pgHost;
     private final String pgPort;
@@ -33,13 +38,16 @@ public final class AppConfig {
     private final String pgPassword;
 
     private AppConfig(String kfAgentBaseUrl, String kfAgentUsername, String kfAgentPassword, int pageSize,
-                      int httpTimeoutSeconds, String pgHost, String pgPort, String pgDatabase, String pgSchema,
+                      int httpTimeoutSeconds, String kfAgentClientKeystore, String kfAgentClientKeystorePassword,
+                      String pgHost, String pgPort, String pgDatabase, String pgSchema,
                       String pgUsername, String pgPassword) {
         this.kfAgentBaseUrl = kfAgentBaseUrl;
         this.kfAgentUsername = kfAgentUsername;
         this.kfAgentPassword = kfAgentPassword;
         this.pageSize = pageSize;
         this.httpTimeoutSeconds = httpTimeoutSeconds;
+        this.kfAgentClientKeystore = kfAgentClientKeystore;
+        this.kfAgentClientKeystorePassword = kfAgentClientKeystorePassword;
         this.pgHost = pgHost;
         this.pgPort = pgPort;
         this.pgDatabase = pgDatabase;
@@ -90,9 +98,40 @@ public final class AppConfig {
         int pageSize = intOrDefault("KFAGENT_PAGE_SIZE", 500);
         int httpTimeout = intOrDefault("HTTP_TIMEOUT_SECONDS", 60);
 
+        String keystore = nullable("KFAGENT_CLIENT_KEYSTORE");
+        String keystorePassword = nullable("KFAGENT_CLIENT_KEYSTORE_PASSWORD");
+        if (!requireKfAgent) {
+            // database-only commands and the run ledger never call the KF Agent: no certificate to present or validate
+            keystore = null;
+            keystorePassword = null;
+        } else {
+            validateClientCertificate(url, keystore, keystorePassword);
+            keystore = keystore == null ? null : keystore.trim();
+        }
+
         return new AppConfig(url, nullable("KFAGENT_USERNAME"), nullable("KFAGENT_PASSWORD"),
-                pageSize, httpTimeout, pgHost.trim(), pgPort, pgDatabase.trim(), pgSchema,
+                pageSize, httpTimeout, keystore, keystorePassword, pgHost.trim(), pgPort, pgDatabase.trim(), pgSchema,
                 pgUsername.trim(), pgPassword);
+    }
+
+    /** Both or neither; the file must be readable; a certificate is only ever presented over https. */
+    private static void validateClientCertificate(String url, String keystore, String password) {
+        if (keystore == null && password == null) {
+            return;
+        }
+        if (keystore == null || password == null) {
+            throw new ConfigException("KFAGENT_CLIENT_KEYSTORE and KFAGENT_CLIENT_KEYSTORE_PASSWORD must be set together"
+                    + " (only " + (keystore == null ? "KFAGENT_CLIENT_KEYSTORE_PASSWORD" : "KFAGENT_CLIENT_KEYSTORE")
+                    + " is set).");
+        }
+        java.nio.file.Path file = java.nio.file.Path.of(keystore.trim());
+        if (!java.nio.file.Files.isRegularFile(file) || !java.nio.file.Files.isReadable(file)) {
+            throw new ConfigException("KFAGENT_CLIENT_KEYSTORE is not a readable file: " + keystore);
+        }
+        if (!url.startsWith("https://")) {
+            throw new ConfigException("KFAGENT_CLIENT_KEYSTORE is set but KFAGENT_BASE_URL is not https (" + url
+                    + "): a client certificate is only presented over TLS.");
+        }
     }
 
     public String kfAgentBaseUrl() { return kfAgentBaseUrl; }
@@ -101,6 +140,9 @@ public final class AppConfig {
     public boolean hasBasicAuth() { return kfAgentUsername != null && kfAgentPassword != null; }
     public int pageSize() { return pageSize; }
     public int httpTimeoutSeconds() { return httpTimeoutSeconds; }
+    public String kfAgentClientKeystore() { return kfAgentClientKeystore; }
+    public String kfAgentClientKeystorePassword() { return kfAgentClientKeystorePassword; }
+    public boolean hasClientCertificate() { return kfAgentClientKeystore != null; }
 
     public String pgSchema() { return pgSchema; }
     public String pgUsername() { return pgUsername; }
@@ -111,6 +153,7 @@ public final class AppConfig {
     public String describe() {
         return "KF Agent: " + (kfAgentBaseUrl == null ? "(not used)" : kfAgentBaseUrl)
                 + (hasBasicAuth() ? " (basic-auth)" : "")
+                + (hasClientCertificate() ? " (client-cert)" : "")
                 + " | PostgreSQL: " + jdbcUrl() + " (user '" + pgUsername + "', dest schema '" + pgSchema + "')"
                 + " | pageSize=" + pageSize + ", httpTimeout=" + httpTimeoutSeconds + "s";
     }

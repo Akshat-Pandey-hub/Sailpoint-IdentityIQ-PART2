@@ -1,0 +1,8 @@
+# Client certificates and private keys (e.g. the ngrok client certificate) must never be committed.
+*.p12
+*.pfx
+*.key
+*.crt
+*.pem
+# ...except the dummy, test-only keystores used by KfAgentClientTlsTest.
+!src/test/resources/mtls/*.p12
