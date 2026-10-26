@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -20,15 +21,18 @@ class CallerFetchPolicyTest {
     }
 
     @Test
-    void callerScopeIncludesSafeChildAndAppendOnlyImportersButNotSnapshotReplacement() {
+    void callerScopeIncludesSqlPageSnapshotsWithoutEnablingPartialSnapshotReplacement() {
         assertTrue(Main.supportsCallerFetchOptions("import-identity"));
         assertTrue(Main.supportsCallerFetchOptions("import-certification"));
         assertTrue(Main.supportsCallerFetchOptions("import-syslog-event"));
-        assertFalse(Main.supportsCallerFetchOptions("import-entitlement-assignment"));
-        assertFalse(Main.supportsCallerFetchOptions("import-workgroup-members"));
+        assertTrue(Main.supportsCallerFetchOptions("import-entitlement-assignment"));
+        assertTrue(Main.supportsCallerFetchOptions("import-entitlement-certification"));
+        assertTrue(Main.supportsCallerFetchOptions("import-entitlement-certification-status"));
+        assertTrue(Main.supportsCallerFetchOptions("import-workgroup-members"));
         assertTrue(Main.supportsCallerFetchOptions("import-identity-request-item"));
         assertTrue(Main.supportsCallerFetchOptions("import-identity-request-approval"));
         assertTrue(Main.supportsCallerFetchOptions("import-provisioning-item"));
+        assertTrue(Main.supportsCallerFetchOptions("import-access-history"));
         assertFalse(Main.supportsCallerFetchOptions("derive-native-events"));
         assertFalse(Main.supportsCallerFetchOptions("reconcile-native-workitems"));
         assertFalse(Main.supportsCallerFetchOptions("import-not-a-real-command"));
@@ -43,5 +47,9 @@ class CallerFetchPolicyTest {
         assertTrue(Main.supportsCallerModifiedAfter("import-syslog-event"));
         assertFalse(Main.supportsCallerModifiedAfter("import-certification"));
         assertFalse(Main.supportsCallerModifiedAfter("import-entitlement-assignment"));
+        assertTrue(Main.fetchFilterFields("import-access-history").contains("name"));
+        assertFalse(Main.supportsCallerModifiedAfter("import-workgroup-members"));
+        assertTrue(Main.fetchFilterFields("import-entitlement-assignment").isEmpty());
+        assertEquals("entitlement-assignment", Main.fetchResource("import-entitlement-assignment"));
     }
 }

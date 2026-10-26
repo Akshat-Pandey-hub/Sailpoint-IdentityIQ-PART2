@@ -50,6 +50,8 @@ import com.keyforge.part2.ingest.RoleTable;
 import com.keyforge.part2.ingest.SnapshotSweepImportService;
 import com.keyforge.part2.ingest.SoftDeleteSweeper;
 import com.keyforge.part2.ingest.SqlReportImportService;
+import com.keyforge.part2.ingest.SqlReportPageSnapshotImportService;
+import com.keyforge.part2.ingest.SqlReportPageSnapshotRepository;
 import com.keyforge.part2.ingest.SweepPolicies;
 import com.keyforge.part2.ingest.SqlReportRepository;
 import com.keyforge.part2.ingest.SyslogEventImportService;
@@ -277,16 +279,17 @@ public final class Main {
             case "import-policy-violation" -> runImport(PolicyViolationTable.SPEC, options);
             case "import-entitlement-assignment" -> runSqlReport("EntitlementAssignment",
                     EntitlementAssignmentReport.RESOURCE, EntitlementAssignmentReport.TABLE,
-                    EntitlementAssignmentReport.COLUMNS);
+                    EntitlementAssignmentReport.COLUMNS, options);
             case "import-workgroup-member" -> runImport(WorkgroupMemberRepository::new, options);
             case "import-entitlement-certification" -> runSqlReport("EntitlementCertification",
                     EntitlementCertificationReport.RESOURCE, EntitlementCertificationReport.TABLE,
-                    EntitlementCertificationReport.COLUMNS);
+                    EntitlementCertificationReport.COLUMNS, options);
             case "import-entitlement-certification-status" -> runSqlReport("EntitlementCertificationStatus",
                     EntitlementCertificationStatusReport.RESOURCE, EntitlementCertificationStatusReport.TABLE,
-                    EntitlementCertificationStatusReport.COLUMNS);
+                    EntitlementCertificationStatusReport.COLUMNS, options);
             case "import-workgroup-members" -> runSqlReport("WorkgroupMembers",
-                    WorkgroupMembersReport.RESOURCE, WorkgroupMembersReport.TABLE, WorkgroupMembersReport.COLUMNS);
+                    WorkgroupMembersReport.RESOURCE, WorkgroupMembersReport.TABLE, WorkgroupMembersReport.COLUMNS,
+                    options);
             case "import-audit-event" -> runImport(AuditEventRepository::new, options);
             case "import-task-result" -> runImport(TaskResultTable.SPEC, options);
             case "import-task-schedule" -> runImport(TaskScheduleTable.SPEC, options);
@@ -313,10 +316,7 @@ public final class Main {
     }
 
     static boolean supportsCallerFetchOptions(String command) {
-        return command != null && fetchResource(command) != null
-                && !Set.of("import-entitlement-assignment", "import-entitlement-certification",
-                "import-entitlement-certification-status", "import-workgroup-members")
-                .contains(command);
+        return command != null && fetchResource(command) != null;
     }
 
     /** A configured snapshot sweep is safe only when the source request represents the complete population. */
@@ -359,7 +359,7 @@ public final class Main {
                     "instance", "display_value", "attribute_name", "attribute_value", "type", "granted_by_role", "role_id",
                     "request_item_id", "pending_request_item_id", "certification_item_id", "deleted", "effective_date",
                     "extended_to_date", "latest", "compressed", "brief", "full_capture", "patch", "smart_hash", "full_hash",
-                    "json_format", "transform_type", "patch_doc_parent", "created_at", "modified_at", "name");
+                    "json_format", "transform_type", "patch_doc_parent", "created_at", "modified_at");
             case "import-access-history-certification" -> Set.of("source_id", "name", "cert_id", "cert_type", "cert_name",
                     "cert_display_name", "finished", "signed", "created_at", "modified_at");
             case "import-access-history-identity-event", "import-access-history-role-event" -> Set.of(
@@ -401,6 +401,10 @@ public final class Main {
             case "import-access-history-certification" -> AccessHistoryCertificationRepository.RESOURCE;
             case "import-access-history-role-event" -> AccessHistoryRoleEventRepository.RESOURCE;
             case "import-syslog-event" -> SyslogEventRepository.RESOURCE;
+            case "import-entitlement-assignment" -> EntitlementAssignmentReport.RESOURCE;
+            case "import-entitlement-certification" -> EntitlementCertificationReport.RESOURCE;
+            case "import-entitlement-certification-status" -> EntitlementCertificationStatusReport.RESOURCE;
+            case "import-workgroup-members" -> WorkgroupMembersReport.RESOURCE;
             default -> null;
         };
     }
@@ -1081,7 +1085,14 @@ public final class Main {
      * Runs a SQL-report import: fetch the whole report, then replace the table in one transaction (Part 1's
      * replace-all semantics). Same config, exit codes and summary as the entity imports.
      */
-    private static int runSqlReport(String entity, String resource, String table, List<String> columns) {
+    private static int runSqlReport(String entity, String resource, String table, List<String> columns,
+                                    FetchOptions options) {
+        FetchOptions fetchOptions = options == null ? FetchOptions.none() : options;
+        if (!fetchOptions.isEmpty() && (!fetchOptions.hasWindow() || fetchOptions.limit() == null
+                || fetchOptions.modifiedAfter() != null || !fetchOptions.filters().isEmpty())) {
+            RunLedger.discard();
+            return 2;
+        }
         try {
             AppConfig config = AppConfig.load();
             String runId = RunLedger.runIdOrNew();
@@ -1089,11 +1100,24 @@ public final class Main {
             System.out.println("extraction_run_id: " + runId);
 
             KfAgentClient client = new KfAgentClient(config);
-            SqlReportRepository repository = new SqlReportRepository(config.pgSchema(), table, columns);
-            SqlReportImportService service =
-                    new SqlReportImportService(client::fetchPage, resource, repository, config.pageSize());
-
             try (Connection conn = PostgresConnection.open(config)) {
+                if (!fetchOptions.isEmpty()) {
+                    SqlReportPageSnapshotRepository snapshotRepository =
+                            new SqlReportPageSnapshotRepository(config.pgSchema());
+                    SqlReportPageSnapshotImportService snapshotService =
+                            new SqlReportPageSnapshotImportService(client::fetchPage, snapshotRepository);
+                    ImportResult result = snapshotService.run(conn, entity, resource, runId, fetchOptions);
+                    RunLedger.record(counts(snapshotRepository.rowTable(), result, null));
+                    System.out.println();
+                    System.out.println(result.summary());
+                    System.out.println("  snapshot:  " + snapshotService.lastSnapshotId()
+                            + " (append-only page observation; canonical report table unchanged)");
+                    return result.failed() > 0 ? 6 : 0;
+                }
+
+                SqlReportRepository repository = new SqlReportRepository(config.pgSchema(), table, columns);
+                SqlReportImportService service =
+                        new SqlReportImportService(client::fetchPage, resource, repository, config.pageSize());
                 ImportResult result = service.run(conn, entity, runId);
                 RunLedger.record(counts(repository.targetTable(), result, null));
                 System.out.println();

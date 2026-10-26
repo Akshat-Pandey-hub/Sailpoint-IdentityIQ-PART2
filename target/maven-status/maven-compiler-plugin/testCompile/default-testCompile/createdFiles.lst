@@ -92,6 +92,7 @@ com\keyforge\part2\ingest\IdentityRequestItemTableTest.class
 com\keyforge\part2\ingest\IdentityBindingTest.class
 com\keyforge\part2\ingest\WorkItemArchiveRepositoryTest.class
 com\keyforge\part2\event\EventFingerprintTest.class
+com\keyforge\part2\ingest\SqlReportPageSnapshotImportServiceTest.class
 com\keyforge\part2\MainLedgerTest.class
 com\keyforge\part2\event\EventLinkDeriverTest.class
 com\keyforge\part2\ingest\SnapshotSweepImportServiceTest$Db.class
@@ -133,6 +134,7 @@ com\keyforge\part2\incremental\EventIncrementalImportTest.class
 com\keyforge\part2\ingest\PolicyConstraintTableTest$Golden.class
 com\keyforge\part2\ingest\IdentityRoleTableTest$Golden.class
 com\keyforge\part2\ingest\CertificationArchiveRepositoryTest$Golden.class
+com\keyforge\part2\ingest\SqlReportPageSnapshotImportServiceTest$JdbcStub.class
 com\keyforge\part2\ingest\TaskScheduleTableTest$Golden.class
 com\keyforge\part2\ingest\IdentityRequestApprovalTableTest$Golden.class
 com\keyforge\part2\ingest\PolicyConstraintTableTest$1.class

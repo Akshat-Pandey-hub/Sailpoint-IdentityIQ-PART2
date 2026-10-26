@@ -187,7 +187,8 @@ class RestServerTest {
         assertEquals(400, get("/kfagent-ingest/import-identity?mode=full&mode=incremental").statusCode());
         assertEquals(400, get("/kfagent-ingest/import-identity?unknown_filter=x").statusCode());
         assertEquals(400, get("/kfagent-ingest/import-certification?modifiedAfter=2026-10-20T00%3A00%3A00Z").statusCode());
-        assertEquals(400, get("/kfagent-ingest/import-entitlement-assignment?start=0&limit=2").statusCode());
+        assertEquals(400, get("/kfagent-ingest/import-entitlement-assignment?report_name=test").statusCode());
+        assertEquals(400, get("/kfagent-ingest/import-workgroup-members?modifiedAfter=2026-10-20T00%3A00%3A00Z").statusCode());
         assertEquals(400, get("/kfagent-ingest/derive-native-events?start=0&limit=2").statusCode());
         assertEquals(400, get("/kfagent-ingest/reconcile-native-workitems?type=x").statusCode());
         assertEquals(400, get("/kfagent-ingest/import-identity?start=2147483647&limit=1").statusCode());
@@ -210,13 +211,32 @@ class RestServerTest {
         assertEquals(200, get("/kfagent-ingest/import-provisioning-item?start=4&limit=3").statusCode());
         assertEquals(200, get("/kfagent-ingest/import-syslog-event?start=0&limit=2").statusCode());
         assertEquals(200, get("/kfagent-ingest/import-syslog-event?modifiedAfter=2026-10-20T00%3A00%3A00Z").statusCode());
+        assertEquals(200, get("/kfagent-ingest/import-access-history?start=0&limit=2").statusCode());
 
         assertEquals(List.of(
                 "import-identity-request-item|FULL|0|2|null",
                 "import-identity-request-approval|FULL|null|null|2026-10-20T00:00:00Z",
                 "import-provisioning-item|FULL|4|3|null",
                 "import-syslog-event|FULL|0|2|null",
-                "import-syslog-event|FULL|null|null|2026-10-20T00:00:00Z"), requests);
+                "import-syslog-event|FULL|null|null|2026-10-20T00:00:00Z",
+                "import-access-history|FULL|0|2|null"), requests);
+    }
+
+    @Test
+    void sqlReportPageOptionsReachDispatcherButOtherScopeIsRejected() throws Exception {
+        List<String> requests = Collections.synchronizedList(new ArrayList<>());
+        startFetch((command, mode, options) -> {
+            requests.add(command + "|" + options.start() + "|" + options.limit());
+            return 0;
+        });
+
+        assertEquals(200, get("/kfagent-ingest/import-entitlement-assignment?start=0&limit=2").statusCode());
+        assertEquals(200, get("/kfagent-ingest/import-workgroup-members?start=2&limit=2").statusCode());
+        assertEquals(200, get("/kfagent-ingest/import-entitlement-certification?start=4&limit=2").statusCode());
+        assertEquals(200, get("/kfagent-ingest/import-entitlement-certification-status?start=6&limit=2").statusCode());
+        assertEquals(400, get("/kfagent-ingest/import-entitlement-assignment?user_name=spadmin").statusCode());
+        assertEquals(List.of("import-entitlement-assignment|0|2", "import-workgroup-members|2|2",
+                "import-entitlement-certification|4|2", "import-entitlement-certification-status|6|2"), requests);
     }
 
     @Test

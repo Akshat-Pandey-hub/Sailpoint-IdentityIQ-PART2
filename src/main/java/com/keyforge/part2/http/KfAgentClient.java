@@ -110,7 +110,7 @@ public final class KfAgentClient {
     }
 
     /** Caller-scoped read: omitted window parameters intentionally let Part 1 return its complete filtered result. */
-    public Page fetch(String resource, com.keyforge.part2.http.FetchOptions options) {
+    public Page fetch(String resource, FetchOptions options) {
         java.util.List<String> query = new java.util.ArrayList<>();
         if (options.start() != null) {
             query.add("start=" + options.start());
@@ -122,6 +122,11 @@ public final class KfAgentClient {
                 + (query.isEmpty() ? "" : "?" + String.join("&", query));
         HttpResponse<String> resp = get(url);
         return new Page(resp.body(), sourceCount(resp.headers().firstValue(SOURCE_COUNT_HEADER).orElse(null)));
+    }
+
+    /** Raw body of one caller-selected page, used by SQL-report page snapshots. */
+    public String fetchPage(String resource, FetchOptions options) {
+        return fetch(resource, options).body();
     }
 
     private static String encode(String value) {

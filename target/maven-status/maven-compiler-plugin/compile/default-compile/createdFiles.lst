@@ -11,6 +11,7 @@ com\keyforge\part2\reconciliation\ReconciliationFindingRepository.class
 com\keyforge\part2\ingest\EntitlementAssignmentReport.class
 com\keyforge\part2\ingest\AuditEventRepository.class
 com\keyforge\part2\incremental\WatermarkService.class
+com\keyforge\part2\ingest\SqlReportPageSnapshotRepository.class
 com\keyforge\part2\incremental\WatermarkRepository.class
 com\keyforge\part2\ingest\SweepPolicies$SweepConfig.class
 com\keyforge\part2\ingest\AccessHistoryIdentityEventRepository.class
@@ -33,6 +34,7 @@ com\keyforge\part2\incremental\IncrementalCursor.class
 com\keyforge\part2\ingest\IdentityRequestApprovalTable.class
 com\keyforge\part2\ingest\RoleTable.class
 com\keyforge\part2\event\EventDeriver.class
+com\keyforge\part2\ingest\SqlReportPageSnapshotImportService$PageFetcher.class
 com\keyforge\part2\ingest\IdentityRepository.class
 com\keyforge\part2\ingest\SweepPolicy.class
 com\keyforge\part2\ingest\IdentityImportService.class
@@ -76,6 +78,7 @@ com\keyforge\part2\Main.class
 com\keyforge\part2\ingest\WorkItemTable.class
 com\keyforge\part2\ingest\BusinessHash.class
 com\keyforge\part2\http\KfAgentClient$KfAgentHttpException.class
+com\keyforge\part2\ingest\SqlReportPageSnapshotImportService.class
 com\keyforge\part2\ingest\SweepPolicies$Completeness.class
 com\keyforge\part2\db\PostgresConnection.class
 com\keyforge\part2\incremental\FamilyIncrementalImportService.class
@@ -129,6 +132,7 @@ com\keyforge\part2\ledger\RunLedgerRepository.class
 com\keyforge\part2\ingest\SnapshotSweepImportService$Outcome.class
 com\keyforge\part2\ingest\RoleEntitlementRepository$Edge.class
 com\keyforge\part2\ingest\WorkgroupTable.class
+com\keyforge\part2\ingest\SqlReportPageSnapshotRepository$StoredSnapshot.class
 com\keyforge\part2\incremental\ExtractionMode.class
 com\keyforge\part2\incremental\IncrementalImportService$Outcome.class
 com\keyforge\part2\ingest\PolicyConstraintTable.class

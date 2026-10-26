@@ -96,6 +96,7 @@ to later offsets. `REST_MAX_FETCH_LIMIT` caps caller page size (default `10000`)
 GET /kfagent-ingest/import-identity?start=0&limit=100
 GET /kfagent-ingest/import-identity?start=100&limit=100
 GET /kfagent-ingest/import-identity?name=spadmin&inactive=false
+GET /kfagent-ingest/import-entitlement-assignment?start=0&limit=100
 ```
 
 Without `start`/`limit`, supported filters and a caller-supplied `modifiedAfter` are forwarded to Part 1; Part 1 performs
@@ -108,13 +109,14 @@ resource supports it. It is a caller-bounded fetch and does not update Part 2's 
 These caller-scoped requests reuse the existing entity writers but are always partial views: they never run a deletion
 sweep or advance a watermark. This includes syslog events (append-only/deduplicated) and the request/provisioning child
 resources (upserted independently for the selected response); these scoped requests bypass their complete-scan and
-parent-family orchestration paths. Scope remains rejected for SQL-report replacement commands because their Part 2
-tables have only generated row-number keys and no safe partial-result upsert key. Derived and reconciliation commands do not
+parent-family orchestration paths. SQL-report commands accept explicit `start`/`limit` pages and append each response to
+`kf_sql_report_page_snapshot` plus `kf_sql_report_page_snapshot_row`. Each invocation has its own run-linked snapshot;
+the canonical report tables and their full replace-all path are untouched. The snapshot rows are raw JSONB because the
+report projections do not provide a verified stable row key. SQL-report filters and `modifiedAfter` remain unsupported.
+Derived and reconciliation commands do not
 fetch a Part 1 resource and reject fetch options. Omit all fetch options to retain the existing full-import path,
 including its established paged import loops and verified-snapshot behavior. `mode=incremental` continues to use Part 2's
-stored watermark and overlap rules; it cannot be combined with explicit caller fetch options. SQL-report routes reject caller scope options:
-their current table has a generated row-number key and only supports a transactional full replace, so an upsert of a
-partial report row cannot be made safe from the available fields.
+stored watermark and overlap rules; it cannot be combined with explicit caller fetch options.
 
 Identity upserts store a SHA-256 `record_hash` of the mapped business values. A new identity is inserted, a changed or
 reappearing soft-deleted identity is updated, and an unchanged live identity is skipped without refreshing its extraction

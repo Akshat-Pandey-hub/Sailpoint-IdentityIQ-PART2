@@ -96,7 +96,8 @@ class IdentityRepositoryPostgresTest {
                 assertEquals(1, changed.skipped());
 
                 try (Statement st = conn.createStatement()) {
-                    st.execute("UPDATE " + schema + ".kf_identity SET is_deleted=true, deleted_at=now()");
+                    st.execute("UPDATE " + schema + ".kf_identity SET is_deleted=true, deleted_at=now() WHERE userid='"
+                            + userid + "'::uuid");
                 }
                 ImportResult revived = service.run(conn, "revived-run");
                 assertEquals(1, revived.updated());
