@@ -106,8 +106,10 @@ command, and values are URL-encoded when Part 2 calls Part 1. `modifiedAfter` is
 resource supports it. It is a caller-bounded fetch and does not update Part 2's managed watermark.
 
 These caller-scoped requests reuse the existing entity writers but are always partial views: they never run a deletion
-sweep or advance a watermark. Scope is rejected for SQL-report replacement commands, the complete-scan-guarded syslog
-import, and request/provisioning child commands imported with a parent. Derived and reconciliation commands do not
+sweep or advance a watermark. This includes syslog events (append-only/deduplicated) and the request/provisioning child
+resources (upserted independently for the selected response); these scoped requests bypass their complete-scan and
+parent-family orchestration paths. Scope remains rejected for SQL-report replacement commands because their Part 2
+tables have only generated row-number keys and no safe partial-result upsert key. Derived and reconciliation commands do not
 fetch a Part 1 resource and reject fetch options. Omit all fetch options to retain the existing full-import path,
 including its established paged import loops and verified-snapshot behavior. `mode=incremental` continues to use Part 2's
 stored watermark and overlap rules; it cannot be combined with explicit caller fetch options. SQL-report routes reject caller scope options:

@@ -20,17 +20,28 @@ class CallerFetchPolicyTest {
     }
 
     @Test
-    void callerScopeIsLimitedToIndependentlySafeResourceImporters() {
+    void callerScopeIncludesSafeChildAndAppendOnlyImportersButNotSnapshotReplacement() {
         assertTrue(Main.supportsCallerFetchOptions("import-identity"));
         assertTrue(Main.supportsCallerFetchOptions("import-certification"));
-        assertFalse(Main.supportsCallerFetchOptions("import-syslog-event"));
+        assertTrue(Main.supportsCallerFetchOptions("import-syslog-event"));
         assertFalse(Main.supportsCallerFetchOptions("import-entitlement-assignment"));
         assertFalse(Main.supportsCallerFetchOptions("import-workgroup-members"));
-        assertFalse(Main.supportsCallerFetchOptions("import-identity-request-item"));
-        assertFalse(Main.supportsCallerFetchOptions("import-identity-request-approval"));
-        assertFalse(Main.supportsCallerFetchOptions("import-provisioning-item"));
+        assertTrue(Main.supportsCallerFetchOptions("import-identity-request-item"));
+        assertTrue(Main.supportsCallerFetchOptions("import-identity-request-approval"));
+        assertTrue(Main.supportsCallerFetchOptions("import-provisioning-item"));
         assertFalse(Main.supportsCallerFetchOptions("derive-native-events"));
         assertFalse(Main.supportsCallerFetchOptions("reconcile-native-workitems"));
         assertFalse(Main.supportsCallerFetchOptions("import-not-a-real-command"));
+    }
+
+    @Test
+    void callerModifiedAfterUsesOnlyExistingEndpointCapabilities() {
+        assertTrue(Main.supportsCallerModifiedAfter("import-identity"));
+        assertTrue(Main.supportsCallerModifiedAfter("import-identity-request-item"));
+        assertTrue(Main.supportsCallerModifiedAfter("import-identity-request-approval"));
+        assertTrue(Main.supportsCallerModifiedAfter("import-provisioning-item"));
+        assertTrue(Main.supportsCallerModifiedAfter("import-syslog-event"));
+        assertFalse(Main.supportsCallerModifiedAfter("import-certification"));
+        assertFalse(Main.supportsCallerModifiedAfter("import-entitlement-assignment"));
     }
 }

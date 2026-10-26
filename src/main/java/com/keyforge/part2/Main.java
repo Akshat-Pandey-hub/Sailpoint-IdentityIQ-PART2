@@ -315,9 +315,8 @@ public final class Main {
     static boolean supportsCallerFetchOptions(String command) {
         return command != null && fetchResource(command) != null
                 && !Set.of("import-entitlement-assignment", "import-entitlement-certification",
-                "import-entitlement-certification-status", "import-workgroup-members", SYSLOG_COMMAND)
-                .contains(command)
-                && !INCREMENTAL_CHILD_OF.containsKey(command);
+                "import-entitlement-certification-status", "import-workgroup-members")
+                .contains(command);
     }
 
     /** A configured snapshot sweep is safe only when the source request represents the complete population. */

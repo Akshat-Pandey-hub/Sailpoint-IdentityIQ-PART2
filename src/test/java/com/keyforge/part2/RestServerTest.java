@@ -188,15 +188,35 @@ class RestServerTest {
         assertEquals(400, get("/kfagent-ingest/import-identity?unknown_filter=x").statusCode());
         assertEquals(400, get("/kfagent-ingest/import-certification?modifiedAfter=2026-10-20T00%3A00%3A00Z").statusCode());
         assertEquals(400, get("/kfagent-ingest/import-entitlement-assignment?start=0&limit=2").statusCode());
-        assertEquals(400, get("/kfagent-ingest/import-syslog-event?start=0&limit=2").statusCode());
-        assertEquals(400, get("/kfagent-ingest/import-identity-request-item?start=0&limit=2").statusCode());
-        assertEquals(400, get("/kfagent-ingest/import-provisioning-item?modifiedAfter=2026-10-20T00%3A00%3A00Z").statusCode());
         assertEquals(400, get("/kfagent-ingest/derive-native-events?start=0&limit=2").statusCode());
         assertEquals(400, get("/kfagent-ingest/reconcile-native-workitems?type=x").statusCode());
         assertEquals(400, get("/kfagent-ingest/import-identity?start=2147483647&limit=1").statusCode());
         assertEquals(400, get("/kfagent-ingest/import-identity?start=0&start=1&limit=2").statusCode());
         assertTrue(dispatched.isEmpty());
         assertTrue(recorded.isEmpty());
+    }
+
+    @Test
+    void childAndSyslogScopedOptionsReachDispatcher() throws Exception {
+        List<String> requests = Collections.synchronizedList(new ArrayList<>());
+        startFetch((command, mode, options) -> {
+            requests.add(command + "|" + mode + "|" + options.start() + "|" + options.limit()
+                    + "|" + options.modifiedAfter());
+            return 0;
+        });
+
+        assertEquals(200, get("/kfagent-ingest/import-identity-request-item?start=0&limit=2").statusCode());
+        assertEquals(200, get("/kfagent-ingest/import-identity-request-approval?modifiedAfter=2026-10-20T00%3A00%3A00Z").statusCode());
+        assertEquals(200, get("/kfagent-ingest/import-provisioning-item?start=4&limit=3").statusCode());
+        assertEquals(200, get("/kfagent-ingest/import-syslog-event?start=0&limit=2").statusCode());
+        assertEquals(200, get("/kfagent-ingest/import-syslog-event?modifiedAfter=2026-10-20T00%3A00%3A00Z").statusCode());
+
+        assertEquals(List.of(
+                "import-identity-request-item|FULL|0|2|null",
+                "import-identity-request-approval|FULL|null|null|2026-10-20T00:00:00Z",
+                "import-provisioning-item|FULL|4|3|null",
+                "import-syslog-event|FULL|0|2|null",
+                "import-syslog-event|FULL|null|null|2026-10-20T00:00:00Z"), requests);
     }
 
     @Test
