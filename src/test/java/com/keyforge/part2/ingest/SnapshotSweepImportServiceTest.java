@@ -198,6 +198,22 @@ class SnapshotSweepImportServiceTest {
     private static final SweepPolicies.SweepConfig ROWS =
             config(SweepPolicy.SWEEP_PROTECT_FAILED_KEYS, SweepPolicies.Completeness.ROW_COUNT);
 
+    @Test
+    void snapshotSweepRejectsAnyCallerScopedOptionsBeforeFetchingOrSweeping() {
+        Db db = new Db().live(A, B);
+        Writer writer = new Writer(db, true);
+        SnapshotSweepImportService.SnapshotFetcher fetcher = resource -> {
+            throw new AssertionError("scoped snapshot fetch must be rejected before source fetch");
+        };
+
+        assertThrows(IllegalArgumentException.class, () -> new SnapshotSweepImportService(fetcher, writer, ROWS,
+                new SoftDeleteSweeper("s"), false,
+                new com.keyforge.part2.http.FetchOptions(null, null, null, Map.of("type", "employee"))));
+        assertEquals(new Row(false, null), db.committed.get(A));
+        assertEquals(new Row(false, null), db.committed.get(B));
+        assertTrue(db.sweepSql.isEmpty());
+    }
+
     private static SnapshotSweepImportService.Outcome run(Db db, Writer writer, SweepPolicies.SweepConfig config,
                                                           String body, Integer verified, boolean incremental)
             throws SQLException {

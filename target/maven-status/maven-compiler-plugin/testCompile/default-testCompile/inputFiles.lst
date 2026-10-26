@@ -1,3 +1,4 @@
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\CallerFetchPolicyTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ChangedIncrementalDispatchTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\config\ClientCertificateConfigTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\event\DeriveCommandConfigTest.java
@@ -35,6 +36,7 @@ D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\EntityImpo
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\GroupDefinitionTableTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\IdentityBindingTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\IdentityEntitlementTableTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\IdentityRepositoryPostgresTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\IdentityRequestApprovalTableTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\IdentityRequestItemTableTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\IdentityRequestTableTest.java

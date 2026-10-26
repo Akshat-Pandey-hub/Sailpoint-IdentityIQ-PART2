@@ -2,6 +2,7 @@ package com.keyforge.part2.ingest;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.keyforge.part2.http.FetchOptions;
 import com.keyforge.part2.http.KfAgentClient;
 
 import java.sql.Connection;
@@ -62,6 +63,15 @@ public final class SqlReportImportService {
         }
         lastDeleted = replaced.deleted();
         return result;
+    }
+
+    /** SQL-report replacement is valid only for a complete, unscoped source snapshot. */
+    public ImportResult run(Connection conn, String entity, String extractionRunId, FetchOptions options)
+            throws SQLException {
+        if (options != null && !options.isEmpty()) {
+            throw new IllegalArgumentException("SQL-report replacement cannot run for a caller-scoped import");
+        }
+        return run(conn, entity, extractionRunId);
     }
 
     /** Rows removed by the last {@link #run} (the previous snapshot). */

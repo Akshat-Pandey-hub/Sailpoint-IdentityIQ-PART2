@@ -45,6 +45,16 @@ class EntitlementAssignmentReportTest {
             EntitlementAssignmentReport.TABLE, EntitlementAssignmentReport.COLUMNS);
 
     @Test
+    void callerScopedReportIsRejectedBeforeAnyFetchOrReplacement() {
+        SqlReportImportService service = new SqlReportImportService(
+                (resource, start, limit) -> { throw new AssertionError("must reject before fetching"); },
+                EntitlementAssignmentReport.RESOURCE, repo, 100);
+
+        assertThrows(IllegalArgumentException.class, () -> service.run(null, "report", "run-scoped",
+                new com.keyforge.part2.http.FetchOptions(0, 10, null, Map.of())));
+    }
+
+    @Test
     void ddlMatchesIiqNativeTextColumnsAndIdentityId() {
         String ddl = repo.createTableSql();
         List<String> cols = new ArrayList<>();

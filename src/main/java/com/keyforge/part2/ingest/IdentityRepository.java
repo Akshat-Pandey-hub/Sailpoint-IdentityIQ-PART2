@@ -18,13 +18,13 @@ import java.util.StringJoiner;
  * Plain-JDBC persistence for {@code <schema>.kf_identity}, reproducing Part 1's identity semantics against a
  * configurable DESTINATION schema: {@code userid} (uuid) PK = {@code canonicalUuid(source_id)} (with the
  * deterministic fallback), {@code INSERT … ON CONFLICT (userid) DO UPDATE}, the 7 generated source-metadata
- * columns, and NO {@code record_hash}. Self-creating schema+table. All business values are bound from the
+ * columns, and a business {@code record_hash} used to skip unchanged writes. Self-creating schema+table. All business values are bound from the
  * JSON row with parameterized SQL and per-kind casts; the schema identifier is validated (never a bound
  * param). Idempotent: a re-run updates in place, the {@code userid} never changes.
  */
 public final class IdentityRepository {
 
-    public enum Outcome { INSERTED, UPDATED }
+    public enum Outcome { INSERTED, UPDATED, SKIPPED }
 
     private final String schema;
     private final String table;
@@ -42,15 +42,16 @@ public final class IdentityRepository {
         return table;
     }
 
-    /** Create the destination schema + kf_identity table if absent (never alters a populated table's data). */
+    /** Create or safely migrate the destination identity table. */
     public void ensureSchemaAndTable(Connection conn) throws SQLException {
         try (Statement st = conn.createStatement()) {
             st.execute("CREATE SCHEMA IF NOT EXISTS " + schema);
             st.execute(createTableSql);
+            st.execute("ALTER TABLE " + table + " ADD COLUMN IF NOT EXISTS record_hash text");
         }
     }
 
-    /** Upsert one identity JSON row. Returns whether a new row was inserted or an existing one updated. */
+    /** Upsert one identity row; a no-row RETURNING result means the existing row was unchanged and is skipped. */
     public Outcome upsert(Connection conn, JsonNode row, String extractionRunId) throws SQLException {
         String sourceId = text(row, "source_id");
         String name = text(row, "name");
@@ -62,12 +63,14 @@ public final class IdentityRepository {
             for (ColumnSpec c : IdentityTable.BUSINESS) {
                 bind(ps, i++, c, row.get(c.name));
             }
+            ps.setString(i++, BusinessHash.allColumns(row, IdentityTable.BUSINESS));
             ps.setString(i++, IdentityTable.SOURCE_SYSTEM);
             ps.setString(i++, IdentityTable.SOURCE_INTERFACE);
             ps.setString(i++, IdentityTable.SOURCE_OBJECT_TYPE);
             ps.setString(i, extractionRunId);
             try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() && rs.getBoolean(1) ? Outcome.INSERTED : Outcome.UPDATED;
+                if (!rs.next()) return Outcome.SKIPPED;
+                return rs.getBoolean(1) ? Outcome.INSERTED : Outcome.UPDATED;
             }
         }
     }
@@ -131,6 +134,7 @@ public final class IdentityRepository {
         for (ColumnSpec c : IdentityTable.BUSINESS) {
             sb.append(",\n    ").append(c.name).append(' ').append(c.kind.ddlType);
         }
+        sb.append(",\n    record_hash text");
         sb.append(",\n    source_system text");
         sb.append(",\n    source_interface text");
         sb.append(",\n    source_object_type text");
@@ -151,6 +155,7 @@ public final class IdentityRepository {
             cols.add(c.name);
             vals.add(c.kind.placeholder);
         }
+        cols.add("record_hash"); vals.add("?");
         for (String meta : List.of("source_system", "source_interface", "source_object_type", "extraction_run_id")) {
             cols.add(meta);
             vals.add("?");
@@ -164,6 +169,7 @@ public final class IdentityRepository {
         for (ColumnSpec c : IdentityTable.BUSINESS) {
             setClause.add(c.name + " = EXCLUDED." + c.name);
         }
+        setClause.add("record_hash = EXCLUDED.record_hash");
         for (String meta : List.of("source_system", "source_interface", "source_object_type", "extraction_run_id")) {
             setClause.add(meta + " = EXCLUDED." + meta);
         }
@@ -171,8 +177,10 @@ public final class IdentityRepository {
         setClause.add("is_deleted = false");
         setClause.add("deleted_at = null");
 
-        return "INSERT INTO " + table + " (" + String.join(", ", cols) + ") VALUES (" + String.join(", ", vals) + ") "
-                + "ON CONFLICT (" + IdentityTable.PK + ") DO UPDATE SET " + setClause + " RETURNING (xmax = 0)";
+        return "INSERT INTO " + table + " AS identity_row (" + String.join(", ", cols) + ") VALUES (" + String.join(", ", vals) + ") "
+                + "ON CONFLICT (" + IdentityTable.PK + ") DO UPDATE SET " + setClause
+                + " WHERE identity_row.record_hash IS DISTINCT FROM EXCLUDED.record_hash OR identity_row.is_deleted"
+                + " RETURNING (xmax = 0)";
     }
 
     /** Exposed for tests: the generated upsert SQL. */

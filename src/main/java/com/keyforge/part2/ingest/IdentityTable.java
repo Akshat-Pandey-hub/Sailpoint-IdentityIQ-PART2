@@ -7,7 +7,7 @@ import java.util.List;
  * NativeIdentityRepository). The BUSINESS columns are exactly the fields the {@code GET /kfagent/identities}
  * response provides, under the same names — so mapping is 1:1 (no renames). The primary key
  * {@code userid uuid} and the 7 source-metadata columns are NOT in the response; Part 2 generates them.
- * {@code kf_identity} intentionally has NO {@code record_hash} column.
+ * {@code record_hash} is Part 2's hash of the mapped business values and is not a SailPoint response field.
  */
 public final class IdentityTable {
 

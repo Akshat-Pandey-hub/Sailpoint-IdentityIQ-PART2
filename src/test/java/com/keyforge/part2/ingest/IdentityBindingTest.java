@@ -11,11 +11,14 @@ import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Exercises the real {@link IdentityRepository#upsert} against a recording JDBC stub (java.lang.reflect
@@ -76,12 +79,41 @@ class IdentityBindingTest {
         // a field entirely absent from the JSON -> SQL NULL (e.g. score)
         assertSame(NULL, bound.get(idx("score")), "absent field -> SQL NULL");
 
-        // metadata params come right after the business columns, in order
-        int metaBase = 2 + IdentityTable.BUSINESS.size();
+        // lineage metadata follows the business fields and the new hash parameter.
+        int hashIndex = 2 + IdentityTable.BUSINESS.size();
+        assertEquals(BusinessHash.allColumns(sampleIdentity(), IdentityTable.BUSINESS), bound.get(hashIndex));
+        int metaBase = hashIndex + 1;
         assertEquals("IdentityIQ", bound.get(metaBase));
         assertEquals("native_iiq_java_api", bound.get(metaBase + 1));
         assertEquals("sailpoint.object.Identity", bound.get(metaBase + 2));
         assertEquals("run-123", bound.get(metaBase + 3));
+    }
+
+    @Test
+    void updateAndNoReturnedRowAreClassifiedAsUpdatedAndSkipped() throws Exception {
+        IdentityRepository repo = new IdentityRepository("iiq_native_part2");
+        assertEquals(IdentityRepository.Outcome.UPDATED,
+                repo.upsert(recordingConnection(new LinkedHashMap<>(), true, false), sampleIdentity(), "run-2"));
+        assertEquals(IdentityRepository.Outcome.SKIPPED,
+                repo.upsert(recordingConnection(new LinkedHashMap<>(), false, false), sampleIdentity(), "run-3"));
+    }
+
+    @Test
+    void ensureSchemaAddsHashToAnExistingIdentityTable() throws Exception {
+        List<String> statements = new java.util.ArrayList<>();
+        Statement statement = (Statement) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{Statement.class}, (proxy, method, args) -> {
+                    if (method.getName().equals("execute")) statements.add((String) args[0]);
+                    return defaultFor(method);
+                });
+        Connection conn = (Connection) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{Connection.class}, (proxy, method, args) ->
+                        method.getName().equals("createStatement") ? statement : defaultFor(method));
+
+        new IdentityRepository("iiq_native_part2").ensureSchemaAndTable(conn);
+
+        assertTrue(statements.contains(
+                "ALTER TABLE iiq_native_part2.kf_identity ADD COLUMN IF NOT EXISTS record_hash text"));
     }
 
     private static int idx(String column) {
@@ -96,9 +128,14 @@ class IdentityBindingTest {
     // ── recording JDBC stubs via dynamic proxy ──
 
     private static Connection recordingConnection(Map<Integer, Object> bound) {
+        return recordingConnection(bound, true, true);
+    }
+
+    private static Connection recordingConnection(Map<Integer, Object> bound, boolean hasReturnedRow,
+                                                  boolean inserted) {
         PreparedStatement ps = (PreparedStatement) Proxy.newProxyInstance(
                 IdentityBindingTest.class.getClassLoader(), new Class<?>[]{PreparedStatement.class},
-                new PsHandler(bound));
+                new PsHandler(bound, hasReturnedRow, inserted));
         return (Connection) Proxy.newProxyInstance(
                 IdentityBindingTest.class.getClassLoader(), new Class<?>[]{Connection.class},
                 (proxy, method, args) -> "prepareStatement".equals(method.getName()) ? ps : defaultFor(method));
@@ -106,7 +143,13 @@ class IdentityBindingTest {
 
     private static final class PsHandler implements InvocationHandler {
         private final Map<Integer, Object> bound;
-        PsHandler(Map<Integer, Object> bound) { this.bound = bound; }
+        private final boolean hasReturnedRow;
+        private final boolean inserted;
+        PsHandler(Map<Integer, Object> bound, boolean hasReturnedRow, boolean inserted) {
+            this.bound = bound;
+            this.hasReturnedRow = hasReturnedRow;
+            this.inserted = inserted;
+        }
 
         @Override
         public Object invoke(Object proxy, Method method, Object[] args) {
@@ -116,7 +159,7 @@ class IdentityBindingTest {
                 case "setNull" -> bound.put((Integer) args[0], NULL);
                 case "executeQuery" -> {
                     return (ResultSet) Proxy.newProxyInstance(getClass().getClassLoader(),
-                            new Class<?>[]{ResultSet.class}, new RsHandler());
+                            new Class<?>[]{ResultSet.class}, new RsHandler(hasReturnedRow, inserted));
                 }
                 default -> { /* close(), etc. */ }
             }
@@ -126,16 +169,22 @@ class IdentityBindingTest {
 
     /** One-row result whose single column is TRUE (simulates RETURNING xmax=0 -> inserted). */
     private static final class RsHandler implements InvocationHandler {
+        private final boolean hasReturnedRow;
+        private final boolean inserted;
         private boolean advanced = false;
+        RsHandler(boolean hasReturnedRow, boolean inserted) {
+            this.hasReturnedRow = hasReturnedRow;
+            this.inserted = inserted;
+        }
         @Override
         public Object invoke(Object proxy, Method method, Object[] args) {
             switch (method.getName()) {
                 case "next" -> {
-                    boolean first = !advanced;
+                    boolean first = !advanced && hasReturnedRow;
                     advanced = true;
                     return first;
                 }
-                case "getBoolean" -> { return Boolean.TRUE; }
+                case "getBoolean" -> { return inserted; }
                 default -> { return defaultFor(method); }
             }
         }

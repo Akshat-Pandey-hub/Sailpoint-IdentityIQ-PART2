@@ -3,16 +3,15 @@ package com.keyforge.part2.ingest;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Verifies the generated DDL + upsert SQL match the established kf_identity contract (no live DB needed). */
+/** Verifies generated identity DDL and conditional unchanged-row upsert SQL without a live DB. */
 class IdentitySqlTest {
 
     private final IdentityRepository repo = new IdentityRepository("iiq_native_part2");
 
     @Test
-    void createTableHasUuidPkMetadataAndNoRecordHash() {
+    void createTableHasUuidPkMetadataAndRecordHash() {
         String ddl = repo.createTableSql();
         assertTrue(ddl.contains("iiq_native_part2.kf_identity"));
         assertTrue(ddl.contains("userid uuid PRIMARY KEY"));
@@ -28,15 +27,15 @@ class IdentitySqlTest {
         assertTrue(ddl.contains("inactive boolean"));
         assertTrue(ddl.contains("attributes jsonb"));
         assertTrue(ddl.contains("created_at timestamp with time zone"));
-        // kf_identity must NOT have record_hash
-        assertFalse(ddl.contains("record_hash"), "kf_identity has no record_hash column");
+        assertTrue(ddl.contains("record_hash text"));
     }
 
     @Test
     void upsertConflictsOnUseridAndReturnsInsertFlag() {
         String sql = repo.upsertSql();
-        assertTrue(sql.startsWith("INSERT INTO iiq_native_part2.kf_identity ("));
+        assertTrue(sql.startsWith("INSERT INTO iiq_native_part2.kf_identity AS identity_row ("));
         assertTrue(sql.contains("ON CONFLICT (userid) DO UPDATE SET"));
+        assertTrue(sql.contains("WHERE identity_row.record_hash IS DISTINCT FROM EXCLUDED.record_hash OR identity_row.is_deleted"));
         assertTrue(sql.contains("RETURNING (xmax = 0)"));
         // typed casts present
         assertTrue(sql.contains("?::uuid"));
@@ -59,17 +58,17 @@ class IdentitySqlTest {
         int nCols = cols.split(",").length;
         int nVals = vals.split(",").length;
         assertEquals(nCols, nVals, "column list and VALUES list must have equal length");
-        // userid + 41 business + 4 metadata + extracted_at/is_deleted/deleted_at = 49 columns
-        assertEquals(1 + IdentityTable.BUSINESS.size() + 4 + 3, nCols);
+        // userid + business + record_hash + 4 metadata + extracted_at/is_deleted/deleted_at.
+        assertEquals(1 + IdentityTable.BUSINESS.size() + 1 + 4 + 3, nCols);
     }
 
     @Test
     void parameterPlaceholdersMatchBoundParameters() {
-        // bound params = userid(1) + each business column(1) + 4 metadata text params.
+        // bound params = userid(1) + business + record_hash + 4 metadata text params.
         // (extracted_at/is_deleted/deleted_at are literals, not params.)
         String sql = repo.upsertSql();
         String vals = sql.substring(sql.indexOf("VALUES (") + "VALUES (".length(), sql.indexOf(") ON CONFLICT"));
         long qMarks = vals.chars().filter(ch -> ch == '?').count();
-        assertEquals(1 + IdentityTable.BUSINESS.size() + 4, qMarks, "? count = bound params");
+        assertEquals(1 + IdentityTable.BUSINESS.size() + 1 + 4, qMarks, "? count = bound params");
     }
 }

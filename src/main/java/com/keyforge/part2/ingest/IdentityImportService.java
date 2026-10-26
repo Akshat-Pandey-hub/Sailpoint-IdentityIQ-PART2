@@ -53,10 +53,10 @@ public final class IdentityImportService {
                 String ref = refOf(row);
                 try {
                     IdentityRepository.Outcome o = repository.upsert(conn, row, extractionRunId);
-                    if (o == IdentityRepository.Outcome.INSERTED) {
-                        result.countInserted();
-                    } else {
-                        result.countUpdated();
+                    switch (o) {
+                        case INSERTED -> result.countInserted();
+                        case UPDATED -> result.countUpdated();
+                        case SKIPPED -> result.countSkipped();
                     }
                 } catch (SQLException | RuntimeException e) {
                     result.countFailure(ref, e.getMessage());
@@ -81,10 +81,10 @@ public final class IdentityImportService {
         for (JsonNode row : page) {
             result.countFetched(1);
             try {
-                if (repository.upsert(conn, row, extractionRunId) == IdentityRepository.Outcome.INSERTED) {
-                    result.countInserted();
-                } else {
-                    result.countUpdated();
+                switch (repository.upsert(conn, row, extractionRunId)) {
+                    case INSERTED -> result.countInserted();
+                    case UPDATED -> result.countUpdated();
+                    case SKIPPED -> result.countSkipped();
                 }
             } catch (SQLException | RuntimeException e) {
                 result.countFailure(refOf(row), e.getMessage());

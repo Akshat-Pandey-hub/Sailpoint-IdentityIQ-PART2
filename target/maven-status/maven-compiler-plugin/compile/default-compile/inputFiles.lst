@@ -14,6 +14,7 @@ D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\event\EventRow.ja
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\event\EventType.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\hash\HashValues.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\hash\RecordHash.java
+D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\http\FetchOptions.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\http\KfAgentClient.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\id\CanonicalIds.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\incremental\ExtractionMode.java

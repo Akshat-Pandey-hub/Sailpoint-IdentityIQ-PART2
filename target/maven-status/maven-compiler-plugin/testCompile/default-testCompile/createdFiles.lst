@@ -73,6 +73,7 @@ com\keyforge\part2\ingest\WorkItemTableTest$1.class
 com\keyforge\part2\ingest\IdentityRequestApprovalTableTest$1.class
 com\keyforge\part2\ingest\CertificationItemTableTest$1.class
 com\keyforge\part2\incremental\IncrementalImportServiceTest$Db.class
+com\keyforge\part2\CallerFetchPolicyTest.class
 com\keyforge\part2\incremental\IncrementalImportServiceTest.class
 com\keyforge\part2\ingest\CertificationArchiveRepositoryTest.class
 com\keyforge\part2\event\EventDerivationServiceTest.class
@@ -103,6 +104,7 @@ com\keyforge\part2\ingest\GroupDefinitionTableTest.class
 com\keyforge\part2\incremental\EventIncrementalImportTest$AppendWriter.class
 com\keyforge\part2\ingest\IdentityRoleTableTest.class
 com\keyforge\part2\reconciliation\WorkItemReconciliationTest.class
+com\keyforge\part2\ingest\IdentityRepositoryPostgresTest.class
 com\keyforge\part2\incremental\FamilyIncrementalImportServiceTest$Agent.class
 com\keyforge\part2\event\EventDerivationServiceTest$Db.class
 com\keyforge\part2\ingest\IdentityRequestItemTableTest$Golden.class

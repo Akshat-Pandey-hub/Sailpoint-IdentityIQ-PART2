@@ -3,6 +3,7 @@ package com.keyforge.part2.ingest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.keyforge.part2.http.KfAgentClient;
+import com.keyforge.part2.http.FetchOptions;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -55,6 +56,15 @@ public final class SnapshotSweepImportService {
      */
     public SnapshotSweepImportService(SnapshotFetcher fetcher, EntityWriter writer, SweepPolicies.SweepConfig config,
                                       SoftDeleteSweeper sweeper, boolean incremental) {
+        this(fetcher, writer, config, sweeper, incremental, FetchOptions.none());
+    }
+
+    /** A snapshot sweep is only valid for an unscoped, complete source scan. */
+    public SnapshotSweepImportService(SnapshotFetcher fetcher, EntityWriter writer, SweepPolicies.SweepConfig config,
+                                      SoftDeleteSweeper sweeper, boolean incremental, FetchOptions options) {
+        if (options != null && !options.isEmpty()) {
+            throw new IllegalArgumentException("snapshot deletion sweep cannot run for a caller-scoped import");
+        }
         this.fetcher = fetcher;
         this.writer = writer;
         this.config = config;

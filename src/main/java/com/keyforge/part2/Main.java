@@ -313,9 +313,16 @@ public final class Main {
     }
 
     static boolean supportsCallerFetchOptions(String command) {
-        return command != null && command.startsWith("import-") && !Set.of(
-                "import-entitlement-assignment", "import-entitlement-certification",
-                "import-entitlement-certification-status", "import-workgroup-members").contains(command);
+        return command != null && fetchResource(command) != null
+                && !Set.of("import-entitlement-assignment", "import-entitlement-certification",
+                "import-entitlement-certification-status", "import-workgroup-members", SYSLOG_COMMAND)
+                .contains(command)
+                && !INCREMENTAL_CHILD_OF.containsKey(command);
+    }
+
+    /** A configured snapshot sweep is safe only when the source request represents the complete population. */
+    static boolean shouldRunSnapshotSweep(FetchOptions options, boolean sweepConfigured) {
+        return sweepConfigured && (options == null || options.isEmpty());
     }
 
     /** Part 1 applies exact AND filters to response scalar fields; JSON/technical fields are excluded. */
@@ -505,8 +512,11 @@ public final class Main {
             }
             @Override public EntityRepository.Outcome upsert(Connection conn, JsonNode row, String runId)
                     throws SQLException {
-                return repository.upsert(conn, row, runId) == IdentityRepository.Outcome.INSERTED
-                        ? EntityRepository.Outcome.INSERTED : EntityRepository.Outcome.UPDATED;
+                return switch (repository.upsert(conn, row, runId)) {
+                    case INSERTED -> EntityRepository.Outcome.INSERTED;
+                    case UPDATED -> EntityRepository.Outcome.UPDATED;
+                    case SKIPPED -> EntityRepository.Outcome.SKIPPED;
+                };
             }
             @Override public String ref(JsonNode row) {
                 return "identity " + row.path("name").asText(null) + " (" + row.path("source_id").asText(null) + ")";
@@ -797,26 +807,19 @@ public final class Main {
             Optional<SweepPolicies.SweepConfig> sweep = SweepPolicies.configFor(writer.targetTable());
 
             try (Connection conn = PostgresConnection.open(config)) {
-                if (!options.isEmpty()) {
-                    // A caller page/filter is a partial source view: reuse the writer but categorically bypass sweeps.
-                    ImportResult result = new EntityImportService(client, writer, config.pageSize())
-                            .run(conn, runId, options);
+                if (!shouldRunSnapshotSweep(options, sweep.isPresent())) {
+                    // Scoped requests and tables without sweep policies use the existing ordinary writer path.
+                    EntityImportService importer = new EntityImportService(client, writer, config.pageSize());
+                    ImportResult result = options.isEmpty() ? importer.run(conn, runId)
+                            : importer.run(conn, runId, options);
                     RunLedger.record(counts(writer.targetTable(), result, null));
                     System.out.println();
                     System.out.println(result.summary());
-                    System.out.println("  fetch:     caller-scoped partial import; no deletion sweep");
-                    return result.failed() > 0 ? 6 : 0;
-                }
-                if (sweep.isEmpty()) {
-                    // not swept: the ordinary paged import, unchanged
-                    ImportResult result = new EntityImportService(client, writer, config.pageSize()).run(conn, runId);
-                    RunLedger.record(counts(writer.targetTable(), result, null));
-                    System.out.println();
-                    System.out.println(result.summary());
+                    if (!options.isEmpty()) System.out.println("  fetch:     caller-scoped partial import; no deletion sweep");
                     return result.failed() > 0 ? 6 : 0;
                 }
                 SnapshotSweepImportService.Outcome outcome = new SnapshotSweepImportService(client::fetchSnapshot,
-                        writer, sweep.get(), new SoftDeleteSweeper(config.pgSchema()), false).run(conn, runId);
+                        writer, sweep.get(), new SoftDeleteSweeper(config.pgSchema()), false, options).run(conn, runId);
                 RunLedger.record(counts(writer.targetTable(), outcome.result(), outcome.sweep()));
                 System.out.println();
                 System.out.println(outcome.result().summary());

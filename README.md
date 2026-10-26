@@ -98,19 +98,26 @@ GET /kfagent-ingest/import-identity?start=100&limit=100
 GET /kfagent-ingest/import-identity?name=spadmin&inactive=false
 ```
 
-Without `start`/`limit`, supported filters and a caller-supplied `modifiedAfter` are forwarded to Part 1 and Part 2
-imports the single response Part 1 returns using that endpoint's defaults; Part 2 does not request later offsets.
-Callers that need more matching rows should request successive explicit pages. Filters use Part 1's exact scalar-field
+Without `start`/`limit`, supported filters and a caller-supplied `modifiedAfter` are forwarded to Part 1; Part 1 performs
+its source-side scan and returns the complete matching result in one response, which Part 2 imports once. For an
+explicit window, Part 1 returns only that page and Part 2 does not request later offsets. Filters use Part 1's exact scalar-field
 matching semantics and are ANDed; structured JSON and technical fields are rejected. Filter names are validated per
 command, and values are URL-encoded when Part 2 calls Part 1. `modifiedAfter` is accepted only for commands whose Part 1
 resource supports it. It is a caller-bounded fetch and does not update Part 2's managed watermark.
 
 These caller-scoped requests reuse the existing entity writers but are always partial views: they never run a deletion
-sweep or advance a watermark. Omit all fetch options to retain the existing full-import path, including its established
-paged import loops and verified-snapshot behavior. `mode=incremental` continues to use Part 2's stored watermark and
-overlap rules; it cannot be combined with explicit caller fetch options. SQL-report routes reject caller scope options:
+sweep or advance a watermark. Scope is rejected for SQL-report replacement commands, the complete-scan-guarded syslog
+import, and request/provisioning child commands imported with a parent. Derived and reconciliation commands do not
+fetch a Part 1 resource and reject fetch options. Omit all fetch options to retain the existing full-import path,
+including its established paged import loops and verified-snapshot behavior. `mode=incremental` continues to use Part 2's
+stored watermark and overlap rules; it cannot be combined with explicit caller fetch options. SQL-report routes reject caller scope options:
 their current table has a generated row-number key and only supports a transactional full replace, so an upsert of a
 partial report row cannot be made safe from the available fields.
+
+Identity upserts store a SHA-256 `record_hash` of the mapped business values. A new identity is inserted, a changed or
+reappearing soft-deleted identity is updated, and an unchanged live identity is skipped without refreshing its extraction
+metadata. Existing identity tables are migrated with `ADD COLUMN IF NOT EXISTS`; rows with a null hash are updated once
+to initialize it. Hash-based skip behavior is limited to identities in this change.
 
 **Identity and access**
 
