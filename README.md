@@ -86,6 +86,32 @@ The same commands also run directly from the command line: `java -jar target/kfa
 Every route is `GET /kfagent-ingest/<command>`, where `<command>` is the CLI command name shown below. Each import
 fetches from the matching KF Agent endpoint and writes the table shown.
 
+### Caller-controlled fetch scope
+
+Import routes accept source-side fetch options for entity resources that support them. `start` is a zero-based offset
+and must be supplied together with `limit`; that request imports exactly one Part 1 response page and does not continue
+to later offsets. `REST_MAX_FETCH_LIMIT` caps caller page size (default `10000`). For example:
+
+```http
+GET /kfagent-ingest/import-identity?start=0&limit=100
+GET /kfagent-ingest/import-identity?start=100&limit=100
+GET /kfagent-ingest/import-identity?name=spadmin&inactive=false
+```
+
+Without `start`/`limit`, supported filters and a caller-supplied `modifiedAfter` are forwarded to Part 1 and Part 2
+imports the single response Part 1 returns using that endpoint's defaults; Part 2 does not request later offsets.
+Callers that need more matching rows should request successive explicit pages. Filters use Part 1's exact scalar-field
+matching semantics and are ANDed; structured JSON and technical fields are rejected. Filter names are validated per
+command, and values are URL-encoded when Part 2 calls Part 1. `modifiedAfter` is accepted only for commands whose Part 1
+resource supports it. It is a caller-bounded fetch and does not update Part 2's managed watermark.
+
+These caller-scoped requests reuse the existing entity writers but are always partial views: they never run a deletion
+sweep or advance a watermark. Omit all fetch options to retain the existing full-import path, including its established
+paged import loops and verified-snapshot behavior. `mode=incremental` continues to use Part 2's stored watermark and
+overlap rules; it cannot be combined with explicit caller fetch options. SQL-report routes reject caller scope options:
+their current table has a generated row-number key and only supports a transactional full replace, so an upsert of a
+partial report row cannot be made safe from the available fields.
+
 **Identity and access**
 
 | Command | Fetches | Writes |

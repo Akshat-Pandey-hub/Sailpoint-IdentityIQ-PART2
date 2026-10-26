@@ -8,6 +8,7 @@ import com.keyforge.part2.event.EventRepository;
 import com.keyforge.part2.config.ConfigException;
 import com.keyforge.part2.db.PostgresConnection;
 import com.keyforge.part2.http.KfAgentClient;
+import com.keyforge.part2.http.FetchOptions;
 import com.keyforge.part2.ingest.AccountEntitlementTable;
 import com.keyforge.part2.ingest.AccountTable;
 import com.keyforge.part2.ingest.AccessHistoryCertificationRepository;
@@ -27,6 +28,8 @@ import com.keyforge.part2.ingest.EntitlementTable;
 import com.keyforge.part2.ingest.EntityImportService;
 import com.keyforge.part2.ingest.EntityRepository;
 import com.keyforge.part2.ingest.EntitySpec;
+import com.keyforge.part2.ingest.ColumnSpec;
+import com.keyforge.part2.ingest.IdentityTable;
 import com.keyforge.part2.ingest.IdentityImportService;
 import com.keyforge.part2.ingest.IdentityRequestApprovalTable;
 import com.keyforge.part2.ingest.IdentityRequestItemTable;
@@ -80,6 +83,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 
 /**
@@ -195,6 +199,19 @@ public final class Main {
      * opt-in ({@code --incremental}) and only for the entities whose KF Agent endpoint supports {@code modifiedAfter}.
      */
     static int dispatch(String command, ExtractionMode mode) {
+        return dispatch(command, mode, FetchOptions.none());
+    }
+
+    /**
+     * Runs one command and returns its exit code; every import is recorded in kf_extraction_run. Incremental mode is
+     * opt-in ({@code --incremental}) and only for the entities whose KF Agent endpoint supports {@code modifiedAfter}.
+     */
+    static int dispatch(String command, ExtractionMode mode, FetchOptions options) {
+        if (options == null) options = FetchOptions.none();
+        if (!options.isEmpty() && (mode.isIncremental() || !supportsCallerFetchOptions(command))) {
+            RunLedger.discard();
+            return 2;
+        }
         if (mode.isIncremental()) {
             Function<String, EntityWriter> writer = INCREMENTAL_WRITERS.get(command);
             if (writer != null) {
@@ -233,35 +250,35 @@ public final class Main {
             return 2;
         }
         return switch (command) {
-            case "import-identity" -> runImportIdentity();
-            case "import-entitlement" -> runImport(EntitlementTable.SPEC);
-            case "import-application" -> runImport(ApplicationTable.SPEC);
-            case "import-account" -> runImport(AccountTable.SPEC);
-            case "import-workgroup" -> runImport(WorkgroupTable.SPEC);
-            case "import-role" -> runImport(RoleTable.SPEC);
-            case "import-identity-role" -> runImport(IdentityRoleTable.SPEC);
-            case "import-identity-entitlement" -> runImport(IdentityEntitlementTable.SPEC);
-            case "import-account-entitlement" -> runImport(AccountEntitlementTable.SPEC);
-            case "import-role-entitlement" -> runImport(RoleEntitlementRepository::new);
-            case "import-role-hierarchy" -> runImport(RoleHierarchyRepository::new);
-            case "import-identity-request" -> runImport(IdentityRequestTable.SPEC);
-            case "import-identity-request-item" -> runImport(IdentityRequestItemTable.SPEC);
-            case "import-identity-request-approval" -> runImport(IdentityRequestApprovalTable.SPEC);
-            case "import-policy" -> runImport(PolicyTable.SPEC);
-            case "import-provisioning-item" -> runImport(ProvisioningItemRepository::new);
-            case "import-provisioning-transaction" -> runImport(ProvisioningTxnTable.SPEC);
-            case "import-work-item" -> runImport(WorkItemTable.SPEC);
-            case "import-workflow-definition" -> runImport(WorkflowDefinitionRepository::new);
-            case "import-certification" -> runImport(CertificationTable.SPEC);
-            case "import-certification-entity" -> runImport(CertificationEntityTable.SPEC);
-            case "import-certification-item" -> runImport(CertificationItemTable.SPEC);
-            case "import-certification-archive" -> runImport(CertificationArchiveRepository::new);
-            case "import-policy-constraint" -> runImport(PolicyConstraintTable.SPEC);
-            case "import-policy-violation" -> runImport(PolicyViolationTable.SPEC);
+            case "import-identity" -> runImportIdentity(options);
+            case "import-entitlement" -> runImport(EntitlementTable.SPEC, options);
+            case "import-application" -> runImport(ApplicationTable.SPEC, options);
+            case "import-account" -> runImport(AccountTable.SPEC, options);
+            case "import-workgroup" -> runImport(WorkgroupTable.SPEC, options);
+            case "import-role" -> runImport(RoleTable.SPEC, options);
+            case "import-identity-role" -> runImport(IdentityRoleTable.SPEC, options);
+            case "import-identity-entitlement" -> runImport(IdentityEntitlementTable.SPEC, options);
+            case "import-account-entitlement" -> runImport(AccountEntitlementTable.SPEC, options);
+            case "import-role-entitlement" -> runImport(RoleEntitlementRepository::new, options);
+            case "import-role-hierarchy" -> runImport(RoleHierarchyRepository::new, options);
+            case "import-identity-request" -> runImport(IdentityRequestTable.SPEC, options);
+            case "import-identity-request-item" -> runImport(IdentityRequestItemTable.SPEC, options);
+            case "import-identity-request-approval" -> runImport(IdentityRequestApprovalTable.SPEC, options);
+            case "import-policy" -> runImport(PolicyTable.SPEC, options);
+            case "import-provisioning-item" -> runImport(ProvisioningItemRepository::new, options);
+            case "import-provisioning-transaction" -> runImport(ProvisioningTxnTable.SPEC, options);
+            case "import-work-item" -> runImport(WorkItemTable.SPEC, options);
+            case "import-workflow-definition" -> runImport(WorkflowDefinitionRepository::new, options);
+            case "import-certification" -> runImport(CertificationTable.SPEC, options);
+            case "import-certification-entity" -> runImport(CertificationEntityTable.SPEC, options);
+            case "import-certification-item" -> runImport(CertificationItemTable.SPEC, options);
+            case "import-certification-archive" -> runImport(CertificationArchiveRepository::new, options);
+            case "import-policy-constraint" -> runImport(PolicyConstraintTable.SPEC, options);
+            case "import-policy-violation" -> runImport(PolicyViolationTable.SPEC, options);
             case "import-entitlement-assignment" -> runSqlReport("EntitlementAssignment",
                     EntitlementAssignmentReport.RESOURCE, EntitlementAssignmentReport.TABLE,
                     EntitlementAssignmentReport.COLUMNS);
-            case "import-workgroup-member" -> runImport(WorkgroupMemberRepository::new);
+            case "import-workgroup-member" -> runImport(WorkgroupMemberRepository::new, options);
             case "import-entitlement-certification" -> runSqlReport("EntitlementCertification",
                     EntitlementCertificationReport.RESOURCE, EntitlementCertificationReport.TABLE,
                     EntitlementCertificationReport.COLUMNS);
@@ -270,19 +287,20 @@ public final class Main {
                     EntitlementCertificationStatusReport.COLUMNS);
             case "import-workgroup-members" -> runSqlReport("WorkgroupMembers",
                     WorkgroupMembersReport.RESOURCE, WorkgroupMembersReport.TABLE, WorkgroupMembersReport.COLUMNS);
-            case "import-audit-event" -> runImport(AuditEventRepository::new);
-            case "import-task-result" -> runImport(TaskResultTable.SPEC);
-            case "import-task-schedule" -> runImport(TaskScheduleTable.SPEC);
-            case "import-workitem-archive" -> runImport(WorkItemArchiveRepository::new);
-            case "import-group-definition" -> runImport(GroupDefinitionTable.SPEC);
-            case "import-access-history" -> runImport(AccessHistoryEntitlementRepository::new);
+            case "import-audit-event" -> runImport(AuditEventRepository::new, options);
+            case "import-task-result" -> runImport(TaskResultTable.SPEC, options);
+            case "import-task-schedule" -> runImport(TaskScheduleTable.SPEC, options);
+            case "import-workitem-archive" -> runImport(WorkItemArchiveRepository::new, options);
+            case "import-group-definition" -> runImport(GroupDefinitionTable.SPEC, options);
+            case "import-access-history" -> runImport(AccessHistoryEntitlementRepository::new, options);
             case "import-access-history-identity-event" ->
-                    runImport(AccessHistoryIdentityEventRepository::new);
+                    runImport(AccessHistoryIdentityEventRepository::new, options);
             case "import-access-history-certification" ->
-                    runImport(AccessHistoryCertificationRepository::new);
+                    runImport(AccessHistoryCertificationRepository::new, options);
             case "import-access-history-role-event" ->
-                    runImport(AccessHistoryRoleEventRepository::new);
-            case "import-syslog-event" -> runSyslogImport();
+                    runImport(AccessHistoryRoleEventRepository::new, options);
+            case "import-syslog-event" -> options.isEmpty() ? runSyslogImport()
+                    : runImport(SyslogEventRepository::new, options);
             case "reconcile-native-workitems" -> runReconcileWorkItems();
             case "derive-native-events" -> runDeriveNativeEvents();
             case "derive-native-event-links" -> runDeriveNativeEventLinks();
@@ -291,6 +309,121 @@ public final class Main {
                 printUsage();
                 yield 2;
             }
+        };
+    }
+
+    static boolean supportsCallerFetchOptions(String command) {
+        return command != null && command.startsWith("import-") && !Set.of(
+                "import-entitlement-assignment", "import-entitlement-certification",
+                "import-entitlement-certification-status", "import-workgroup-members").contains(command);
+    }
+
+    /** Part 1 applies exact AND filters to response scalar fields; JSON/technical fields are excluded. */
+    static Set<String> fetchFilterFields(String command) {
+        if ("import-identity".equals(command)) {
+            return IdentityTable.BUSINESS.stream().filter(c -> c.kind != ColumnSpec.Kind.JSONB
+                    && c.kind != ColumnSpec.Kind.JSON_TEXT).map(c -> c.name).collect(java.util.stream.Collectors.toUnmodifiableSet());
+        }
+        EntitySpec spec = fetchSpec(command);
+        if (spec == null) return switch (command) {
+            case "import-role-entitlement" -> Set.of("source_role_id", "role_name", "entitlement_type", "application_id",
+                    "application_name", "profile_ordinal", "constraint_path", "filter_expression", "filter_operation",
+                    "attribute_name", "attribute_value", "permission_target", "permission_rights", "permission_annotation");
+            case "import-role-hierarchy" -> Set.of("source_role_id", "role_name", "related_role_source_id",
+                    "related_role_name", "relationship_type");
+            case "import-provisioning-item" -> Set.of("txn_source_id", "identity_name", "item_type", "operation",
+                    "application_name", "native_identity", "instance", "account_operation", "name", "value",
+                    "assignment_id", "assignment", "permission_target", "permission_rights", "request_id", "item_index");
+            case "import-workflow-definition" -> Set.of("source_id", "name", "type", "handler", "description",
+                    "task_type", "created_at", "modified_at");
+            case "import-certification-archive" -> Set.of("source_id", "name", "certification_id",
+                    "certification_group_id", "creator_name", "owner_name", "comments", "signed", "expiration",
+                    "created_at", "modified_at", "archived_ts");
+            case "import-workgroup-member" -> Set.of("workgroup_id", "workgroup_name", "identity_id", "identity_name",
+                    "first_name", "last_name", "member_is_workgroup");
+            case "import-audit-event" -> Set.of("source_id", "action", "audit_source", "target", "application",
+                    "account_name", "instance", "attribute_name", "attribute_value", "interface_name", "server_host",
+                    "client_host", "tracking_id", "string1", "string2", "string3", "string4", "created_at");
+            case "import-workitem-archive" -> Set.of("source_id", "work_item_id", "name", "type", "state", "level",
+                    "requester", "assignee", "owner_name", "completer", "completion_comments", "is_signed", "target_class",
+                    "target_id", "target_name", "identity_request_id", "certification_id", "certification_entity_id",
+                    "certification_item_id", "entity_type", "created_at", "modified_at", "expiration_ts", "archived_ts");
+            case "import-access-history" -> Set.of("source_id", "name", "entity_id", "entity_name", "identity_id",
+                    "identity_name", "identity_entitlement_id", "application_id", "application_name", "native_identity",
+                    "instance", "display_value", "attribute_name", "attribute_value", "type", "granted_by_role", "role_id",
+                    "request_item_id", "pending_request_item_id", "certification_item_id", "deleted", "effective_date",
+                    "extended_to_date", "latest", "compressed", "brief", "full_capture", "patch", "smart_hash", "full_hash",
+                    "json_format", "transform_type", "patch_doc_parent", "created_at", "modified_at", "name");
+            case "import-access-history-certification" -> Set.of("source_id", "name", "cert_id", "cert_type", "cert_name",
+                    "cert_display_name", "finished", "signed", "created_at", "modified_at");
+            case "import-access-history-identity-event", "import-access-history-role-event" -> Set.of(
+                    "source_id", "name", "entity_id", "entity_name", "defined_entity_name", "event_type", "event_category",
+                    "event_source_type", "event_date", "prev_capture_id", "capture_id", "audit_event_id", "property_name",
+                    "old_value", "new_value", "account_id", "acct_app_id", "acct_app_name", "acct_app_instance",
+                    "acct_display_name", "acct_native_id", "pending_request_item_id", "request_item_id", "identity_request_id",
+                    "identity_entitlement_id", "created_at", "modified_at", "qry_property1", "qry_property2", "qry_property3",
+                    "qry_property4", "qry_property5", "qry_property6", "qry_property7", "qry_property8", "qry_property9", "qry_property10");
+            case "import-syslog-event" -> Set.of("source_id", "quick_key", "event_level", "server", "username", "thread",
+                    "classname", "line_number", "message", "stacktrace", "created_at");
+            default -> Set.of();
+        };
+        return spec.allBusiness().stream().filter(c -> c.kind != ColumnSpec.Kind.JSONB
+                && c.kind != ColumnSpec.Kind.JSON_TEXT).map(c -> c.name).collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
+    static boolean supportsCallerModifiedAfter(String command) {
+        return INCREMENTAL_WRITERS.containsKey(command) || INCREMENTAL_FAMILIES.containsKey(command)
+                || INCREMENTAL_CHILD_OF.containsKey(command) || CHANGED_INCREMENTAL_WRITERS.containsKey(command)
+                || EVENT_INCREMENTAL_WRITERS.containsKey(command) || SYSLOG_COMMAND.equals(command);
+    }
+
+    static String fetchResource(String command) {
+        EntitySpec spec = fetchSpec(command);
+        if (spec != null) return spec.resource();
+        return switch (command) {
+            case "import-identity" -> "identities";
+            case "import-role-entitlement" -> RoleEntitlementRepository.RESOURCE;
+            case "import-role-hierarchy" -> RoleHierarchyRepository.RESOURCE;
+            case "import-provisioning-item" -> ProvisioningItemRepository.RESOURCE;
+            case "import-workflow-definition" -> WorkflowDefinitionRepository.RESOURCE;
+            case "import-certification-archive" -> CertificationArchiveRepository.RESOURCE;
+            case "import-workgroup-member" -> WorkgroupMemberRepository.RESOURCE;
+            case "import-audit-event" -> AuditEventRepository.RESOURCE;
+            case "import-workitem-archive" -> WorkItemArchiveRepository.RESOURCE;
+            case "import-access-history" -> AccessHistoryEntitlementRepository.RESOURCE;
+            case "import-access-history-identity-event" -> AccessHistoryIdentityEventRepository.RESOURCE;
+            case "import-access-history-certification" -> AccessHistoryCertificationRepository.RESOURCE;
+            case "import-access-history-role-event" -> AccessHistoryRoleEventRepository.RESOURCE;
+            case "import-syslog-event" -> SyslogEventRepository.RESOURCE;
+            default -> null;
+        };
+    }
+
+    private static EntitySpec fetchSpec(String command) {
+        return switch (command) {
+            case "import-entitlement" -> EntitlementTable.SPEC;
+            case "import-application" -> ApplicationTable.SPEC;
+            case "import-account" -> AccountTable.SPEC;
+            case "import-workgroup" -> WorkgroupTable.SPEC;
+            case "import-role" -> RoleTable.SPEC;
+            case "import-identity-role" -> IdentityRoleTable.SPEC;
+            case "import-identity-entitlement" -> IdentityEntitlementTable.SPEC;
+            case "import-account-entitlement" -> AccountEntitlementTable.SPEC;
+            case "import-identity-request" -> IdentityRequestTable.SPEC;
+            case "import-identity-request-item" -> IdentityRequestItemTable.SPEC;
+            case "import-identity-request-approval" -> IdentityRequestApprovalTable.SPEC;
+            case "import-policy" -> PolicyTable.SPEC;
+            case "import-provisioning-transaction" -> ProvisioningTxnTable.SPEC;
+            case "import-work-item" -> WorkItemTable.SPEC;
+            case "import-certification" -> CertificationTable.SPEC;
+            case "import-certification-entity" -> CertificationEntityTable.SPEC;
+            case "import-certification-item" -> CertificationItemTable.SPEC;
+            case "import-policy-constraint" -> PolicyConstraintTable.SPEC;
+            case "import-policy-violation" -> PolicyViolationTable.SPEC;
+            case "import-task-result" -> TaskResultTable.SPEC;
+            case "import-task-schedule" -> TaskScheduleTable.SPEC;
+            case "import-group-definition" -> GroupDefinitionTable.SPEC;
+            default -> null;
         };
     }
 
@@ -598,6 +731,10 @@ public final class Main {
     }
 
     private static int runImportIdentity() {
+        return runImportIdentity(FetchOptions.none());
+    }
+
+    private static int runImportIdentity(FetchOptions options) {
         try {
             AppConfig config = AppConfig.load();
             String runId = RunLedger.runIdOrNew();
@@ -609,7 +746,7 @@ public final class Main {
             IdentityImportService service = new IdentityImportService(client, repository, config.pageSize());
 
             try (Connection conn = PostgresConnection.open(config)) {
-                ImportResult result = service.run(conn, runId);
+                ImportResult result = service.run(conn, runId, options);
                 RunLedger.record(counts(repository.targetTable(), result, null));
                 System.out.println();
                 System.out.println(result.summary());
@@ -639,8 +776,16 @@ public final class Main {
         return runImport(schema -> new EntityRepository(schema, spec));
     }
 
+    private static int runImport(EntitySpec spec, FetchOptions options) {
+        return runImport(schema -> new EntityRepository(schema, spec), options);
+    }
+
     /** Runs an import through the writer built for the configured destination schema. */
     private static int runImport(Function<String, EntityWriter> writerForSchema) {
+        return runImport(writerForSchema, FetchOptions.none());
+    }
+
+    private static int runImport(Function<String, EntityWriter> writerForSchema, FetchOptions options) {
         try {
             AppConfig config = AppConfig.load();
             String runId = RunLedger.runIdOrNew();
@@ -652,6 +797,16 @@ public final class Main {
             Optional<SweepPolicies.SweepConfig> sweep = SweepPolicies.configFor(writer.targetTable());
 
             try (Connection conn = PostgresConnection.open(config)) {
+                if (!options.isEmpty()) {
+                    // A caller page/filter is a partial source view: reuse the writer but categorically bypass sweeps.
+                    ImportResult result = new EntityImportService(client, writer, config.pageSize())
+                            .run(conn, runId, options);
+                    RunLedger.record(counts(writer.targetTable(), result, null));
+                    System.out.println();
+                    System.out.println(result.summary());
+                    System.out.println("  fetch:     caller-scoped partial import; no deletion sweep");
+                    return result.failed() > 0 ? 6 : 0;
+                }
                 if (sweep.isEmpty()) {
                     // not swept: the ordinary paged import, unchanged
                     ImportResult result = new EntityImportService(client, writer, config.pageSize()).run(conn, runId);

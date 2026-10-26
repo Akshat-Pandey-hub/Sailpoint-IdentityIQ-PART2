@@ -3,6 +3,7 @@ package com.keyforge.part2.ingest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.keyforge.part2.http.KfAgentClient;
+import com.keyforge.part2.http.FetchOptions;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -56,6 +57,29 @@ public final class EntityImportService {
                 break;
             }
             start += pageSize;
+        }
+        return result;
+    }
+
+    /** Imports exactly the caller-selected source result; partial requests never continue paging or sweep. */
+    public ImportResult run(Connection conn, String extractionRunId, FetchOptions options) throws SQLException {
+        if (options == null || options.isEmpty()) return run(conn, extractionRunId);
+        conn.setAutoCommit(true);
+        repository.ensureSchemaAndTable(conn);
+        ImportResult result = new ImportResult(repository.entity(), repository.targetTable());
+        JsonNode page = parseArray(repository.resource(), client.fetch(repository.resource(), options).body());
+        result.countPage();
+        for (JsonNode row : page) {
+            result.countFetched(1);
+            try {
+                switch (repository.upsert(conn, row, extractionRunId)) {
+                    case INSERTED -> result.countInserted();
+                    case UPDATED -> result.countUpdated();
+                    case SKIPPED -> result.countSkipped();
+                }
+            } catch (SQLException | RuntimeException e) {
+                result.countFailure(repository.ref(row), e.getMessage());
+            }
         }
         return result;
     }

@@ -70,6 +70,11 @@ class RestServerTest {
         server.start();
     }
 
+    private void startFetch(RestServer.FetchDispatcher dispatcher) throws Exception {
+        server = new RestServer(new RestServer.Settings("127.0.0.1", 0, USER, PASSWORD), dispatcher);
+        server.start();
+    }
+
     private static String basic(String user, String password) {
         return "Basic " + Base64.getEncoder().encodeToString((user + ":" + password).getBytes(StandardCharsets.UTF_8));
     }
@@ -180,8 +185,53 @@ class RestServerTest {
         assertEquals(400, get("/kfagent-ingest/import-identity?mode=delta-ish").statusCode());
         assertEquals(400, get("/kfagent-ingest/import-identity?limit=10").statusCode());
         assertEquals(400, get("/kfagent-ingest/import-identity?mode=full&mode=incremental").statusCode());
+        assertEquals(400, get("/kfagent-ingest/import-identity?unknown_filter=x").statusCode());
+        assertEquals(400, get("/kfagent-ingest/import-certification?modifiedAfter=2026-10-20T00%3A00%3A00Z").statusCode());
+        assertEquals(400, get("/kfagent-ingest/import-entitlement-assignment?start=0&limit=2").statusCode());
         assertTrue(dispatched.isEmpty());
         assertTrue(recorded.isEmpty());
+    }
+
+    @Test
+    void callerPageAndIdentityFiltersReachDispatcherAndAreReported() throws Exception {
+        AtomicReference<com.keyforge.part2.http.FetchOptions> received = new AtomicReference<>();
+        startFetch((command, mode, options) -> {
+            dispatched.add(command + "|" + mode);
+            received.set(options);
+            RunLedger.record(new RunContext.EntityCount("kf_identity", 2, 1, 1, 0, 0, null, null, null));
+            return 0;
+        });
+
+        HttpResponse<String> response = get("/kfagent-ingest/import-identity?start=100&limit=100&name=spadmin&inactive=false");
+        JsonNode body = json(response);
+
+        assertEquals(200, response.statusCode());
+        assertEquals("import-identity|FULL", dispatched.get(0));
+        assertEquals(100, received.get().start());
+        assertEquals(100, received.get().limit());
+        assertEquals("spadmin", received.get().filters().get("name"));
+        assertEquals("false", received.get().filters().get("inactive"));
+        assertEquals("identities", body.get("fetch_options").get("resource").asText());
+        assertEquals(200, body.get("next_offset").asInt());
+        assertEquals(2, body.get("records_received").asInt());
+    }
+
+    @Test
+    void managedIncrementalRemainsSeparateAndRejectsCallerTimestamp() throws Exception {
+        start((command, mode) -> { dispatched.add(command + "|" + mode); return 0; });
+        assertEquals(200, get("/kfagent-ingest/import-identity?mode=incremental").statusCode());
+        assertEquals(400, get("/kfagent-ingest/import-identity?mode=incremental&start=0&limit=10").statusCode());
+        assertEquals(List.of("import-identity|INCREMENTAL"), dispatched);
+    }
+
+    @Test
+    void callerModifiedAfterStaysFullModeAndDoesNotBecomeManagedIncremental() throws Exception {
+        AtomicReference<com.keyforge.part2.http.FetchOptions> received = new AtomicReference<>();
+        AtomicReference<ExtractionMode> modeSeen = new AtomicReference<>();
+        startFetch((command, mode, options) -> { received.set(options); modeSeen.set(mode); return 0; });
+        assertEquals(200, get("/kfagent-ingest/import-identity?modifiedAfter=2026-10-20T00%3A00%3A00Z").statusCode());
+        assertEquals("2026-10-20T00:00:00Z", received.get().modifiedAfter());
+        assertEquals(ExtractionMode.FULL, modeSeen.get());
     }
 
     @Test

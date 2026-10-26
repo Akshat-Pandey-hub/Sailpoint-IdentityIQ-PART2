@@ -3,6 +3,7 @@ package com.keyforge.part2;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.keyforge.part2.config.ConfigException;
 import com.keyforge.part2.incremental.ExtractionMode;
+import com.keyforge.part2.http.FetchOptions;
 import com.keyforge.part2.ledger.ExtractionRun;
 import com.keyforge.part2.ledger.RunLedger;
 import com.sun.net.httpserver.HttpExchange;
@@ -18,6 +19,8 @@ import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -60,6 +63,11 @@ final class RestServer {
     @FunctionalInterface
     interface Dispatcher {
         int dispatch(String command, ExtractionMode mode);
+    }
+
+    @FunctionalInterface
+    interface FetchDispatcher {
+        int dispatch(String command, ExtractionMode mode, FetchOptions options);
     }
 
     /** Bind address, port (0 = any free port) and the Basic Auth credentials every request must present. */
@@ -113,6 +121,7 @@ final class RestServer {
 
     private final Settings settings;
     private final Dispatcher dispatcher;
+    private final FetchDispatcher fetchDispatcher;
     private final AtomicBoolean busy = new AtomicBoolean();
     private HttpServer server;
     private ExecutorService executor;
@@ -120,12 +129,21 @@ final class RestServer {
     RestServer(Settings settings, Dispatcher dispatcher) {
         this.settings = settings;
         this.dispatcher = dispatcher;
+        this.fetchDispatcher = (command, mode, options) -> options.isEmpty()
+                ? dispatcher.dispatch(command, mode) : 2;
+    }
+
+    RestServer(Settings settings, FetchDispatcher dispatcher) {
+        this.settings = settings;
+        this.dispatcher = null;
+        this.fetchDispatcher = dispatcher;
     }
 
     /** {@code start-rest}: starts the server and returns 0 (it keeps running until the JVM is stopped), or 3 / 1. */
     static int startFromEnvironment() {
         try {
-            RestServer rest = new RestServer(Settings.fromEnvironment(), Main::dispatch);
+            RestServer rest = new RestServer(Settings.fromEnvironment(),
+                    (command, mode, options) -> Main.dispatch(command, mode, options));
             rest.start();
             Runtime.getRuntime().addShutdownHook(new Thread(rest::stop, "rest-shutdown"));
             System.out.println("[rest] listening on http://" + rest.settings.host() + ":" + rest.port() + BASE_PATH
@@ -177,7 +195,7 @@ final class RestServer {
             }
             if (path.equals(BASE_PATH) || path.equals(BASE_PATH + "/")) {
                 Map<String, Object> body = new LinkedHashMap<>();
-                body.put("usage", "GET " + BASE_PATH + "/<command>[?mode=incremental]");
+                body.put("usage", "GET " + BASE_PATH + "/<command>[?mode=full|incremental&start=<offset>&limit=<count>&<supported-filter>=<value>&modifiedAfter=<instant>]");
                 body.put("commands", COMMANDS);
                 send(ex, 200, body);
                 return;
@@ -187,9 +205,9 @@ final class RestServer {
                 send(ex, 404, error("unknown route " + path + "; see GET " + BASE_PATH + " for the commands"));
                 return;
             }
-            ExtractionMode mode;
+            RequestOptions request;
             try {
-                mode = modeFrom(ex.getRequestURI().getRawQuery());
+                request = requestFrom(ex.getRequestURI().getRawQuery(), command);
             } catch (IllegalArgumentException e) {
                 send(ex, 400, error(e.getMessage()));
                 return;
@@ -200,8 +218,10 @@ final class RestServer {
             }
             Map<String, Object> result;
             try {
-                System.out.println("[rest] GET " + path + " -> " + command + (mode.isIncremental() ? " --incremental" : ""));
-                result = execute(command, mode);
+                System.out.println("[rest] GET " + path + " -> " + command
+                        + (request.mode().isIncremental() ? " --incremental" : "")
+                        + (request.fetchOptions().isEmpty() ? "" : " [caller fetch options]"));
+                result = execute(command, request.mode(), request.fetchOptions());
             } finally {
                 busy.set(false);
             }
@@ -219,6 +239,10 @@ final class RestServer {
 
     /** Runs the command exactly as {@link Main#main} does, on this thread, and builds the response from its run. */
     Map<String, Object> execute(String command, ExtractionMode mode) {
+        return execute(command, mode, FetchOptions.none());
+    }
+
+    Map<String, Object> execute(String command, ExtractionMode mode, FetchOptions options) {
         String ledgerCommand = mode.isIncremental() ? command + " --incremental" : command;
         String[] runId = new String[1];
         ExtractionRun[] run = new ExtractionRun[1];
@@ -227,7 +251,7 @@ final class RestServer {
         try {
             exitCode = RunLedger.run(ledgerCommand, () -> {
                 runId[0] = RunLedger.currentRunId();
-                int code = dispatcher.dispatch(command, mode);
+                int code = fetchDispatcher.dispatch(command, mode, options);
                 run[0] = RunLedger.snapshot(code); // null when the dispatcher discarded the run (usage error)
                 return code;
             });
@@ -240,6 +264,18 @@ final class RestServer {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("command", command);
         body.put("mode", mode.isIncremental() ? "incremental" : "full");
+        if (!options.isEmpty()) {
+            Map<String, Object> requested = new LinkedHashMap<>();
+            requested.put("resource", Main.fetchResource(command));
+            requested.put("start", options.start());
+            requested.put("limit", options.limit());
+            requested.put("modifiedAfter", options.modifiedAfter());
+            requested.put("filters", options.filters());
+            body.put("fetch_options", requested);
+            if (options.hasWindow()) {
+                body.put("next_offset", options.start() + options.limit());
+            }
+        }
         body.put("exit_code", exitCode);
         ExtractionRun r = run[0];
         String status = r != null ? r.status() : exitCode == 2 ? "REJECTED" : "FAILED";
@@ -255,6 +291,7 @@ final class RestServer {
             body.put("window_start", r.windowStart() == null ? null : r.windowStart().toString());
             body.put("window_end", r.windowEnd() == null ? null : r.windowEnd().toString());
             body.put("extracted", r.extracted());
+            if (!options.isEmpty()) body.put("records_received", r.extracted());
             body.put("inserted", r.inserted());
             body.put("updated", r.updated());
             body.put("failed", r.failed());
@@ -316,6 +353,86 @@ final class RestServer {
             }
         }
         return mode;
+    }
+
+    private record RequestOptions(ExtractionMode mode, FetchOptions fetchOptions) { }
+
+    /** Parse only parameters explicitly supported by the selected Part 1 resource. */
+    static RequestOptions requestFrom(String rawQuery, String command) {
+        ExtractionMode mode = ExtractionMode.FULL;
+        Integer start = null;
+        Integer limit = null;
+        String modifiedAfter = null;
+        Map<String, String> filters = new LinkedHashMap<>();
+        Set<String> seen = new LinkedHashSet<>();
+        Set<String> filterFields = Main.fetchFilterFields(command);
+        boolean supportsModifiedAfter = Main.supportsCallerModifiedAfter(command);
+        boolean supportsFetch = Main.supportsCallerFetchOptions(command);
+        if (rawQuery != null && !rawQuery.isEmpty()) {
+            for (String pair : rawQuery.split("&")) {
+                if (pair.isEmpty()) continue;
+                int eq = pair.indexOf('=');
+                String key = URLDecoder.decode(eq < 0 ? pair : pair.substring(0, eq), StandardCharsets.UTF_8);
+                String value = URLDecoder.decode(eq < 0 ? "" : pair.substring(eq + 1), StandardCharsets.UTF_8);
+                if (!seen.add(key)) throw new IllegalArgumentException("query parameter '" + key + "' given more than once");
+                switch (key) {
+                    case "mode" -> {
+                        if (value.equalsIgnoreCase("incremental")) mode = ExtractionMode.INCREMENTAL;
+                        else if (value.equalsIgnoreCase("full")) mode = ExtractionMode.FULL;
+                        else throw new IllegalArgumentException("mode must be 'full' or 'incremental' but was '" + value + "'");
+                    }
+                    case "start" -> {
+                        if (!supportsFetch) throw new IllegalArgumentException("caller fetch options are not supported for '" + command + "'");
+                        start = parseNonNegativeInt("start", value);
+                    }
+                    case "limit" -> {
+                        if (!supportsFetch) throw new IllegalArgumentException("caller fetch options are not supported for '" + command + "'");
+                        limit = parsePositiveInt("limit", value);
+                        int max = maxFetchLimit();
+                        if (limit > max) throw new IllegalArgumentException("limit exceeds REST_MAX_FETCH_LIMIT (" + max + ")");
+                    }
+                    case "modifiedAfter" -> {
+                        if (!supportsFetch) throw new IllegalArgumentException("caller fetch options are not supported for '" + command + "'");
+                        if (!supportsModifiedAfter) throw new IllegalArgumentException("'modifiedAfter' is not supported by Part 1 resource for '" + command + "'");
+                        try { java.time.Instant.parse(value); }
+                        catch (RuntimeException e) { throw new IllegalArgumentException("modifiedAfter must be an ISO-8601 instant"); }
+                        modifiedAfter = value;
+                    }
+                    default -> {
+                        if (!supportsFetch) throw new IllegalArgumentException("caller fetch options are not supported for '" + command + "'");
+                        if (!filterFields.contains(key)) throw new IllegalArgumentException("unsupported query parameter/filter '" + key + "' for '" + command + "'");
+                        filters.put(key, value);
+                    }
+                }
+            }
+        }
+        if ((start == null) != (limit == null)) throw new IllegalArgumentException("start and limit must be supplied together");
+        if (start != null && start > Integer.MAX_VALUE - limit) throw new IllegalArgumentException("start + limit overflows the supported offset range");
+        FetchOptions fetch = new FetchOptions(start, limit, modifiedAfter, filters);
+        if (mode.isIncremental() && !fetch.isEmpty()) throw new IllegalArgumentException("mode=incremental cannot be combined with caller fetch options; omit them to use the managed watermark");
+        return new RequestOptions(mode, fetch);
+    }
+
+    private static int maxFetchLimit() {
+        String raw = System.getenv("REST_MAX_FETCH_LIMIT");
+        if (raw == null || raw.isBlank()) raw = System.getProperty("REST_MAX_FETCH_LIMIT", "10000");
+        try {
+            int n = Integer.parseInt(raw.trim());
+            if (n <= 0) throw new NumberFormatException();
+            return n;
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("REST_MAX_FETCH_LIMIT must be a positive integer");
+        }
+    }
+
+    private static int parseNonNegativeInt(String name, String raw) {
+        try { int n = Integer.parseInt(raw); if (n < 0) throw new NumberFormatException(); return n; }
+        catch (NumberFormatException e) { throw new IllegalArgumentException(name + " must be a non-negative 32-bit integer"); }
+    }
+
+    private static int parsePositiveInt(String name, String raw) {
+        try { int n = Integer.parseInt(raw); if (n <= 0) throw new NumberFormatException(); return n; }
+        catch (NumberFormatException e) { throw new IllegalArgumentException(name + " must be a positive 32-bit integer"); }
     }
 
     /** {@code Authorization: Basic base64(user:password)} matching the configured credentials (constant-time). */

@@ -109,6 +109,25 @@ public final class KfAgentClient {
         return new Page(resp.body(), sourceCount(resp.headers().firstValue(SOURCE_COUNT_HEADER).orElse(null)));
     }
 
+    /** Caller-scoped read: omitted window parameters intentionally let Part 1 return its complete filtered result. */
+    public Page fetch(String resource, com.keyforge.part2.http.FetchOptions options) {
+        java.util.List<String> query = new java.util.ArrayList<>();
+        if (options.start() != null) {
+            query.add("start=" + options.start());
+            query.add("limit=" + options.limit());
+        }
+        if (options.modifiedAfter() != null) query.add("modifiedAfter=" + encode(options.modifiedAfter()));
+        options.filters().forEach((key, value) -> query.add(encode(key) + "=" + encode(value)));
+        String url = config.kfAgentBaseUrl() + "/kfagent/" + resource
+                + (query.isEmpty() ? "" : "?" + String.join("&", query));
+        HttpResponse<String> resp = get(url);
+        return new Page(resp.body(), sourceCount(resp.headers().firstValue(SOURCE_COUNT_HEADER).orElse(null)));
+    }
+
+    private static String encode(String value) {
+        return java.net.URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
     /** A whole-population response: the raw body plus the {@value #VERIFIED_SOURCE_COUNT_HEADER} header (or null). */
     public record Snapshot(String body, Integer verifiedSourceCount) { }
 

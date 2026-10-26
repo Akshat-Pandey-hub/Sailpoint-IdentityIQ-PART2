@@ -3,6 +3,7 @@ package com.keyforge.part2.ingest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.keyforge.part2.http.KfAgentClient;
+import com.keyforge.part2.http.FetchOptions;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -65,6 +66,29 @@ public final class IdentityImportService {
                 break; // last (short) page
             }
             start += pageSize;
+        }
+        return result;
+    }
+
+    /** Imports exactly the caller-selected source result; partial requests never continue paging or sweep. */
+    public ImportResult run(Connection conn, String extractionRunId, FetchOptions options) throws SQLException {
+        if (options == null || options.isEmpty()) return run(conn, extractionRunId);
+        conn.setAutoCommit(true);
+        repository.ensureSchemaAndTable(conn);
+        ImportResult result = new ImportResult("Identity", repository.targetTable());
+        JsonNode page = parseArray(client.fetch(RESOURCE, options).body());
+        result.countPage();
+        for (JsonNode row : page) {
+            result.countFetched(1);
+            try {
+                if (repository.upsert(conn, row, extractionRunId) == IdentityRepository.Outcome.INSERTED) {
+                    result.countInserted();
+                } else {
+                    result.countUpdated();
+                }
+            } catch (SQLException | RuntimeException e) {
+                result.countFailure(refOf(row), e.getMessage());
+            }
         }
         return result;
     }

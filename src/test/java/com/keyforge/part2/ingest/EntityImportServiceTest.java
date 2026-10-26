@@ -45,6 +45,12 @@ class EntityImportServiceTest {
             if (errorBody != null) {
                 body = errorBody;
                 status = 500;
+            } else if (q.equals("start=100&limit=1&application_name=App+Name")) {
+                body = "[" + row("7f0001019eb91d3c819f01f0c4127ef5") + "]";
+            } else if (q.equals("start=0&limit=1")) {
+                body = "[" + row("7f0001019eb91d3c819f01f0c4127ef6") + "]";
+            } else if (q.equals("modifiedAfter=2026-10-20T00:00:00Z")) {
+                body = "[" + row("7f0001019eb91d3c819f01f0c4127ef7") + "]";
             } else if (q.startsWith("start=0&")) {
                 body = "[" + row("7f0001019eb91d3c819f01f0c4127ef1") + "," + row(RecordingJdbc.FAIL_ON) + "]";
             } else if (q.startsWith("start=2&")) {
@@ -112,5 +118,41 @@ class EntityImportServiceTest {
                 () -> service(cfg).run(new RecordingJdbc().connection(), "run-1"));
         assertTrue(e.getMessage().contains("/kfagent/entitlements"), e.getMessage());
         assertTrue(e.getMessage().contains("500"), e.getMessage());
+    }
+
+    @Test
+    void callerWindowRequestsExactlyThatOnePageWithEncodedFilterAndUsesTheExistingWriter() throws Exception {
+        AppConfig cfg = AppConfig.load();
+        RecordingJdbc jdbc = new RecordingJdbc();
+        com.keyforge.part2.http.FetchOptions options = new com.keyforge.part2.http.FetchOptions(
+                100, 1, null, java.util.Map.of("application_name", "App Name"));
+
+        ImportResult result = service(cfg).run(jdbc.connection(), "run-page", options);
+
+        assertEquals(List.of("start=100&limit=1&application_name=App+Name"), queries,
+                "caller page is forwarded exactly; the full-import loop must not request later pages");
+        assertEquals(1, result.pages());
+        assertEquals(1, result.fetched());
+        assertEquals(1, result.inserted());
+        assertEquals("iiq_native_part2.kf_entitlement", result.targetTable());
+    }
+
+    @Test
+    void callerFirstPageDoesNotContinueToLaterPages() throws Exception {
+        AppConfig cfg = AppConfig.load();
+        ImportResult result = service(cfg).run(new RecordingJdbc().connection(), "run-first-page",
+                new com.keyforge.part2.http.FetchOptions(0, 1, null, java.util.Map.of()));
+        assertEquals(List.of("start=0&limit=1"), queries);
+        assertEquals(1, result.fetched());
+    }
+
+    @Test
+    void callerModifiedAfterIsForwardedAsOneBoundedFetch() throws Exception {
+        AppConfig cfg = AppConfig.load();
+        ImportResult result = service(cfg).run(new RecordingJdbc().connection(), "run-filtered",
+                new com.keyforge.part2.http.FetchOptions(null, null, "2026-10-20T00:00:00Z", java.util.Map.of()));
+        // ':' is a legal query character, so the URI builder keeps it literal while preserving the timestamp.
+        assertEquals(List.of("modifiedAfter=2026-10-20T00:00:00Z"), queries);
+        assertEquals(1, result.fetched());
     }
 }
