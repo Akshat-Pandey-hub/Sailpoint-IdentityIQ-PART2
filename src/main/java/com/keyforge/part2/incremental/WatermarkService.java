@@ -53,6 +53,19 @@ public final class WatermarkService {
         return stored.minus(overlap);
     }
 
+    /**
+     * The watermark a paged run may store: the newest change time it loaded, but never later than when the run started.
+     * Offset pages are read one request at a time, so an object that changes while they are read can move into a window
+     * that was already read and be passed over; it then has a change time after {@code runStart}, and keeping the
+     * watermark at or before {@code runStart} makes the next run (bound = watermark − overlap) read it.
+     */
+    public static Instant capAtRunStart(Instant maxLoaded, Instant runStart) {
+        if (maxLoaded == null || runStart == null) {
+            return maxLoaded;
+        }
+        return maxLoaded.isAfter(runStart) ? runStart : maxLoaded;
+    }
+
     /** Part 1 {@code WatermarkService.shouldAdvance}: zero row failures and an actual value to store. */
     public static boolean shouldAdvance(int failed, Instant newWatermark) {
         return failed == 0 && newWatermark != null;

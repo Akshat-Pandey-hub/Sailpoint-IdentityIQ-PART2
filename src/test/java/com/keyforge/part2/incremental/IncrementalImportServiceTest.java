@@ -163,11 +163,11 @@ class IncrementalImportServiceTest {
         }
 
         @Override
-        public KfAgentClient.Snapshot fetch(String resource, String modifiedAfterIso) {
+        public String fetchPage(String resource, int start, int limit, String modifiedAfterIso) {
             assertEquals("identities", resource);
             bounds.add(modifiedAfterIso);
             if (failure != null) throw failure;
-            return new KfAgentClient.Snapshot(body, null);
+            return start == 0 ? body : "[]"; // every test body fits in the first (short) page
         }
     }
 
@@ -289,6 +289,45 @@ class IncrementalImportServiceTest {
         assertFalse(o.advanced(), "the forward-only write refused the older value");
         assertEquals(T3, db.watermarks.get("native:kf_x")[1]);
         assertEquals("run-fast", db.watermarks.get("native:kf_x")[2]);
+    }
+
+    @Test
+    void changedRowsArePagedWithTheBoundOnEveryPage() throws Exception {
+        Db db = new Db();
+        db.watermarks.put("native:kf_x", new Object[]{"modified", T1, "run-1"});
+        List<String> all = List.of("{\"id\":\"a\",\"modified_at\":\"" + T2 + "\"}",
+                "{\"id\":\"b\",\"modified_at\":\"" + T2 + "\"}", "{\"id\":\"c\",\"modified_at\":\"" + T3 + "\"}");
+        List<String> calls = new ArrayList<>();
+        IncrementalImportService.Fetcher pages = (resource, start, limit, after) -> {
+            calls.add(start + "/" + limit + "/" + after);
+            return "[" + String.join(",", all.subList(Math.min(start, all.size()),
+                    Math.min(start + limit, all.size()))) + "]";
+        };
+        IncrementalImportService.Outcome o = new IncrementalImportService(pages, new Writer(db),
+                new WatermarkService("s"), OVERLAP, IncrementalCursor.MODIFIED, 2,
+                java.time.Clock.systemUTC()).run(db.connection(), "run-2");
+
+        String bound = T1.minus(OVERLAP).toString();
+        assertEquals(List.of("0/2/" + bound, "2/2/" + bound), calls,
+                "next start = start + rows received; the short page ends the read; bound on every page");
+        assertEquals(2, o.result().pages());
+        assertEquals(3, o.result().inserted());
+        assertTrue(o.advanced());
+        assertEquals(T3, db.watermarks.get("native:kf_x")[1]);
+    }
+
+    @Test
+    void theWatermarkNeverPassesTheTimeTheRunStarted() throws Exception {
+        Db db = new Db();
+        // the run starts at T2; a row changed at T3 (while pages were being read) is loaded
+        java.time.Clock startedAtT2 = java.time.Clock.fixed(T2, ZoneOffset.UTC);
+        IncrementalImportService.Outcome o = new IncrementalImportService(new Agent(rows("a", T1, "b", T3)),
+                new Writer(db), new WatermarkService("s"), OVERLAP, IncrementalCursor.MODIFIED, 500, startedAtT2)
+                .run(db.connection(), "run-1");
+
+        assertEquals(T2, o.fetchedAt());
+        assertEquals(T2, o.newWatermark(), "capped at the run start, so the next run re-reads changes made during it");
+        assertEquals(T2, db.watermarks.get("native:kf_x")[1]);
     }
 
     @Test

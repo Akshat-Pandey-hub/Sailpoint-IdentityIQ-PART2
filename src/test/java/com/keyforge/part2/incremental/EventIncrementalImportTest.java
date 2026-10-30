@@ -155,10 +155,10 @@ class EventIncrementalImportTest {
         }
 
         @Override
-        public KfAgentClient.Snapshot fetch(String resource, String modifiedAfterIso) {
+        public String fetchPage(String resource, int start, int limit, String modifiedAfterIso) {
             assertEquals("audit-events", resource);
             bounds.add(modifiedAfterIso);
-            return new KfAgentClient.Snapshot(body, null);
+            return start == 0 ? body : "[]"; // every test body fits in the first (short) page
         }
     }
 

@@ -33,13 +33,29 @@ set PG_USERNAME=<user>
 set PG_PASSWORD=<password>
 ```
 
-The KF Agent credentials serve two purposes:
+The KF Agent credentials are required (the KF Agent answers any call without them with `401`). They serve two purposes:
 - Part 2 uses them to call the KF Agent.
 - The REST service uses them to check every incoming request.
 
+Only `derive-native-events`, `derive-native-event-links` and `reconcile-native-workitems` run without them: they read
+tables that are already loaded and never call the KF Agent.
+
 Optional settings and their defaults:
 - `REST_HOST` (`127.0.0.1`) and `REST_PORT` (`8200`): where the REST service listens.
-- `KFAGENT_PAGE_SIZE` (`500`) and `HTTP_TIMEOUT_SECONDS` (`60`): paging and timeout for KF Agent calls.
+- `KFAGENT_PAGE_SIZE` (`500`) and `HTTP_TIMEOUT_SECONDS` (`60`): page size and timeout for KF Agent calls.
+- `KFAGENT_REPORT_PAGE_SIZE` (`200000`, also the maximum): rows per request for the SQL reports. The KF Agent re-runs a
+  report's query for every page, so reports are read in large pages.
+
+### How Part 2 reads from the KF Agent
+
+Every import reads its Part 1 resource page by page with `start`/`limit`; Part 1 serves each window directly, without
+reading or counting the whole entity. The next `start` is the previous `start` plus the rows received, and a page shorter
+than the page size (or empty) is the end. This is the same for full imports, incremental runs (each page also carries
+`modifiedAfter`) and syslog. No import asks Part 1 for a whole entity in one response.
+
+Deleted IIQ objects are not marked `is_deleted` by these paged imports yet: Part 1 never reports a deletion (a deleted
+object simply stops appearing), and the earlier deletion sweep depended on a counted whole-entity read. Marking deletions
+from paged reads is a separate, pending change.
 
 **2. Start the REST service:**
 
@@ -99,8 +115,8 @@ GET /kfagent-ingest/import-identity?name=spadmin&inactive=false
 GET /kfagent-ingest/import-entitlement-assignment?start=0&limit=100
 ```
 
-Without `start`/`limit`, supported filters and a caller-supplied `modifiedAfter` are forwarded to Part 1; Part 1 performs
-its source-side scan and returns the complete matching result in one response, which Part 2 imports once. For an
+With filters or a caller-supplied `modifiedAfter` but no `start`/`limit`, they are forwarded to Part 1, which returns the
+complete matching result in one response; Part 2 imports it once. For an
 explicit window, Part 1 returns only that page and Part 2 does not request later offsets. Filters use Part 1's exact scalar-field
 matching semantics and are ANDed; structured JSON and technical fields are rejected. Filter names are validated per
 command, and values are URL-encoded when Part 2 calls Part 1. `modifiedAfter` is accepted only for commands whose Part 1
@@ -109,13 +125,11 @@ resource supports it. It is a caller-bounded fetch and does not update Part 2's 
 These caller-scoped requests reuse the existing entity writers but are always partial views: they never run a deletion
 sweep or advance a watermark. This includes syslog events (append-only/deduplicated) and the request/provisioning child
 resources (upserted independently for the selected response); these scoped requests bypass their complete-scan and
-parent-family orchestration paths. SQL-report commands accept explicit `start`/`limit` pages and append each response to
-`kf_sql_report_page_snapshot` plus `kf_sql_report_page_snapshot_row`. Each invocation has its own run-linked snapshot;
-the canonical report tables and their full replace-all path are untouched. The snapshot rows are raw JSONB because the
-report projections do not provide a verified stable row key. SQL-report filters and `modifiedAfter` remain unsupported.
+parent-family orchestration paths. SQL-report commands accept `start`/`limit`, filters on any report column and
+`modifiedAfter` exactly like Part 1, and write the response into the report's own table (see **SQL reports** below).
 Derived and reconciliation commands do not
-fetch a Part 1 resource and reject fetch options. Omit all fetch options to retain the existing full-import path,
-including its established paged import loops and verified-snapshot behavior. `mode=incremental` continues to use Part 2's
+fetch a Part 1 resource and reject fetch options. Omit all fetch options to run the full import, which pages through the
+whole resource (see "How Part 2 reads from the KF Agent"). `mode=incremental` continues to use Part 2's
 stored watermark and overlap rules; it cannot be combined with explicit caller fetch options.
 
 Identity upserts store a SHA-256 `record_hash` of the mapped business values. A new identity is inserted, a changed or
@@ -171,7 +185,7 @@ to initialize it. Hash-based skip behavior is limited to identities in this chan
 | Command | Fetches | Writes |
 |---|---|---|
 | `import-audit-event` | Audit events | `kf_audit_event` |
-| `import-syslog-event` | System log events (paged, checked for completeness) | `kf_syslog_event` |
+| `import-syslog-event` | System log events (paged) | `kf_syslog_event` |
 | `import-task-result` | Task results | `kf_task_result` |
 | `import-task-schedule` | Task schedules | `kf_task_schedule` |
 | `import-access-history` | Historical entitlement captures | `kf_access_hist_entitlement` |
@@ -181,14 +195,26 @@ to initialize it. Hash-based skip behavior is limited to identities in this chan
 
 `kf_task_result` and `kf_task_schedule` are upserted, not appended.
 
-**SQL reports** (the whole table is replaced in one transaction on each run)
+**SQL reports**
 
-| Command | Fetches | Writes |
-|---|---|---|
-| `import-entitlement-assignment` | Who holds which entitlement, with identity/account details | `kf_entitlement_assignment` |
-| `import-entitlement-certification` | Certification history of each identity entitlement | `kf_entitlement_certification` |
-| `import-entitlement-certification-status` | Latest certification status of each identity entitlement | `kf_entitlement_certification_status` |
-| `import-workgroup-members` | Workgroup membership report | `kf_workgroup_members` |
+| Command | Fetches | Writes | Row key (uuid derived from) |
+|---|---|---|---|
+| `import-entitlement-assignment` | Who holds which entitlement, with identity/account details | `kf_entitlement_assignment` | identity_id, application_name, account_name, entitlement_attribute, entitlement_value, role_id, identity_request_id, request_operation |
+| `import-entitlement-certification` | Certification history of each identity entitlement | `kf_entitlement_certification` | user_id, application_name, account_name, entitlement_attribute, entitlement_value |
+| `import-entitlement-certification-status` | Latest certification status of each identity entitlement | `kf_entitlement_certification_status` | user_id, application_name, account_name, entitlement_attribute, entitlement_value |
+| `import-workgroup-members` | Workgroup membership report | `kf_workgroup_members` | workgroup_name, user_name |
+
+A report returns no row id, so each row's uuid is derived from the columns that identify it (above): the same report
+row always gets the same uuid. Report tables carry the same lineage columns as the entity tables (`record_hash`,
+`source_system`, `source_interface` = `native_iiq_jdbc`, `source_object_type` = `sql_report.<reportId>`,
+`src_natural_key`, `extraction_run_id`, `extracted_at`, `is_deleted`, `deleted_at`).
+
+- Every row is inserted when new, updated when a value changed, and skipped when unchanged, so calling the same page
+  again never adds rows.
+- A full run (no options) pages through the report with `KFAGENT_REPORT_PAGE_SIZE`; after it read every page with no
+  failed row, rows the report no longer returns are marked `is_deleted = true` (never removed).
+- Two rows of one run with the same key columns are reported as a failed row instead of overwriting each other.
+- A table from the earlier row-numbered layout is renamed to `<table>_legacy` (kept) and recreated with the uuid key.
 
 **Derived data and reconciliation** (these read tables already loaded; they don't call the KF Agent)
 
@@ -210,6 +236,10 @@ REST: GET http://127.0.0.1:8200/kfagent-ingest/import-identity?mode=incremental
 ```
 
 - **Unsupported commands:** requesting incremental mode is rejected and nothing runs.
-- **First run:** the first incremental run of a command fetches everything and sets the baseline.
+- **Paged:** every page carries `modifiedAfter` together with `start`/`limit`.
+- **First run:** the first incremental run of a command pages through everything and sets the baseline.
+- **Watermark:** it advances only when every page loaded with no row failure, to the newest change time loaded but
+  never later than the time the run started. An object that changed while the pages were being read is therefore read
+  again by the next run instead of being skipped.
 - **No deletion sweeps:** incremental runs never mark deleted rows. Full mode, the default, is still needed
   periodically.

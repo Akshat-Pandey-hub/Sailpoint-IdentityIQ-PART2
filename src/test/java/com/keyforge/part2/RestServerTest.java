@@ -188,7 +188,7 @@ class RestServerTest {
         assertEquals(400, get("/kfagent-ingest/import-identity?unknown_filter=x").statusCode());
         assertEquals(400, get("/kfagent-ingest/import-certification?modifiedAfter=2026-10-20T00%3A00%3A00Z").statusCode());
         assertEquals(400, get("/kfagent-ingest/import-entitlement-assignment?report_name=test").statusCode());
-        assertEquals(400, get("/kfagent-ingest/import-workgroup-members?modifiedAfter=2026-10-20T00%3A00%3A00Z").statusCode());
+        assertEquals(400, get("/kfagent-ingest/import-workgroup-members?member_id=x").statusCode());
         assertEquals(400, get("/kfagent-ingest/derive-native-events?start=0&limit=2").statusCode());
         assertEquals(400, get("/kfagent-ingest/reconcile-native-workitems?type=x").statusCode());
         assertEquals(400, get("/kfagent-ingest/import-identity?start=2147483647&limit=1").statusCode());
@@ -223,10 +223,11 @@ class RestServerTest {
     }
 
     @Test
-    void sqlReportPageOptionsReachDispatcherButOtherScopeIsRejected() throws Exception {
+    void sqlReportPagesFiltersAndModifiedAfterReachDispatcherLikePartOne() throws Exception {
         List<String> requests = Collections.synchronizedList(new ArrayList<>());
         startFetch((command, mode, options) -> {
-            requests.add(command + "|" + options.start() + "|" + options.limit());
+            requests.add(command + "|" + options.start() + "|" + options.limit() + "|" + options.filters()
+                    + "|" + options.modifiedAfter());
             return 0;
         });
 
@@ -234,9 +235,14 @@ class RestServerTest {
         assertEquals(200, get("/kfagent-ingest/import-workgroup-members?start=2&limit=2").statusCode());
         assertEquals(200, get("/kfagent-ingest/import-entitlement-certification?start=4&limit=2").statusCode());
         assertEquals(200, get("/kfagent-ingest/import-entitlement-certification-status?start=6&limit=2").statusCode());
-        assertEquals(400, get("/kfagent-ingest/import-entitlement-assignment?user_name=spadmin").statusCode());
-        assertEquals(List.of("import-entitlement-assignment|0|2", "import-workgroup-members|2|2",
-                "import-entitlement-certification|4|2", "import-entitlement-certification-status|6|2"), requests);
+        assertEquals(200, get("/kfagent-ingest/import-entitlement-assignment?user_name=spadmin").statusCode());
+        assertEquals(200, get("/kfagent-ingest/import-workgroup-members?modifiedAfter=2026-10-20T00%3A00%3A00Z").statusCode());
+        assertEquals(400, get("/kfagent-ingest/import-entitlement-assignment?report_name=x").statusCode(),
+                "a name that is not a report column is rejected before Part 1 is called");
+        assertEquals(List.of("import-entitlement-assignment|0|2|{}|null", "import-workgroup-members|2|2|{}|null",
+                "import-entitlement-certification|4|2|{}|null", "import-entitlement-certification-status|6|2|{}|null",
+                "import-entitlement-assignment|null|null|{user_name=spadmin}|null",
+                "import-workgroup-members|null|null|{}|2026-10-20T00:00:00Z"), requests);
     }
 
     @Test

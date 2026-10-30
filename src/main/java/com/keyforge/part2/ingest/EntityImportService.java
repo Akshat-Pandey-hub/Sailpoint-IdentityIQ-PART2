@@ -56,7 +56,7 @@ public final class EntityImportService {
             if (inPage < pageSize) {
                 break;
             }
-            start += pageSize;
+            start += inPage; // Part 1: next start = start + rows received
         }
         return result;
     }

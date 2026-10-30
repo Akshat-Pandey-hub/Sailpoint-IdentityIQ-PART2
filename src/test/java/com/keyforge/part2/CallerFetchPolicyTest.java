@@ -12,15 +12,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CallerFetchPolicyTest {
 
     @Test
-    void onlyAnUnscopedFullRunMayUseSnapshotSweep() {
-        assertTrue(Main.shouldRunSnapshotSweep(FetchOptions.none(), true));
-        assertFalse(Main.shouldRunSnapshotSweep(new FetchOptions(0, 10, null, Map.of()), true));
-        assertFalse(Main.shouldRunSnapshotSweep(new FetchOptions(null, null, null, Map.of("type", "employee")), true));
-        assertFalse(Main.shouldRunSnapshotSweep(new FetchOptions(null, null, "2026-10-20T00:00:00Z", Map.of()), true));
-        assertFalse(Main.shouldRunSnapshotSweep(FetchOptions.none(), false));
-    }
-
-    @Test
     void callerScopeIncludesSqlPageSnapshotsWithoutEnablingPartialSnapshotReplacement() {
         assertTrue(Main.supportsCallerFetchOptions("import-identity"));
         assertTrue(Main.supportsCallerFetchOptions("import-certification"));
@@ -46,10 +37,13 @@ class CallerFetchPolicyTest {
         assertTrue(Main.supportsCallerModifiedAfter("import-provisioning-item"));
         assertTrue(Main.supportsCallerModifiedAfter("import-syslog-event"));
         assertFalse(Main.supportsCallerModifiedAfter("import-certification"));
-        assertFalse(Main.supportsCallerModifiedAfter("import-entitlement-assignment"));
         assertTrue(Main.fetchFilterFields("import-access-history").contains("name"));
-        assertFalse(Main.supportsCallerModifiedAfter("import-workgroup-members"));
-        assertTrue(Main.fetchFilterFields("import-entitlement-assignment").isEmpty());
+        // SQL reports: Part 1 binds modifiedAfter inside the report SQL and filters on any report column
+        assertTrue(Main.supportsCallerModifiedAfter("import-entitlement-assignment"));
+        assertTrue(Main.supportsCallerModifiedAfter("import-workgroup-members"));
+        assertEquals(java.util.Set.copyOf(com.keyforge.part2.ingest.WorkgroupMembersReport.COLUMNS),
+                Main.fetchFilterFields("import-workgroup-members"));
+        assertTrue(Main.fetchFilterFields("import-entitlement-assignment").contains("identity_id"));
         assertEquals("entitlement-assignment", Main.fetchResource("import-entitlement-assignment"));
     }
 }

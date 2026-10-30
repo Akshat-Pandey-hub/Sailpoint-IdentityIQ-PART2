@@ -23,9 +23,9 @@ import java.util.Base64;
 /**
  * Thin HTTP client for the Part 1 KF Agent REST endpoints. GETs one page of a resource
  * ({@code <base>/kfagent/<resource>?start=&limit=}) and returns the raw JSON body (a bare JSON array).
- * Read-only; no SailPoint/IIQ dependency. Optional HTTP Basic Auth is sent only when both
- * {@code KFAGENT_USERNAME} and {@code KFAGENT_PASSWORD} are configured (for an authenticating proxy in
- * front of the agent); the agent itself is unauthenticated.
+ * Read-only; no SailPoint/IIQ dependency. Every request carries HTTP Basic Auth from {@code KFAGENT_USERNAME} and
+ * {@code KFAGENT_PASSWORD}, which {@link AppConfig#load()} requires: the KF Agent answers any request without it
+ * with 401.
  *
  * <p>When {@code KFAGENT_CLIENT_KEYSTORE} is configured, the client also presents that client certificate during the
  * TLS handshake (mutual TLS), as a gateway in front of the agent may require (e.g. an ngrok edge with mTLS). The

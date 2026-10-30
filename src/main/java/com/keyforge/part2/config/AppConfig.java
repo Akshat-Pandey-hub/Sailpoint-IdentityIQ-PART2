@@ -9,9 +9,11 @@ import java.util.List;
  *
  * <ul>
  *   <li><b>KF Agent (HTTP source):</b> {@code KFAGENT_BASE_URL} (required, e.g. http://127.0.0.1:8100),
- *       optional {@code KFAGENT_USERNAME}/{@code KFAGENT_PASSWORD} (Basic Auth, only if the agent is put
- *       behind an authenticating proxy), {@code KFAGENT_PAGE_SIZE} (default 500),
- *       {@code HTTP_TIMEOUT_SECONDS} (default 60). Optional client certificate (mutual TLS), for an agent reached
+ *       {@code KFAGENT_USERNAME}/{@code KFAGENT_PASSWORD} (required: the KF Agent answers every request without HTTP
+ *       Basic Auth with 401), {@code KFAGENT_PAGE_SIZE} (default 500), {@code KFAGENT_REPORT_PAGE_SIZE} (default and
+ *       maximum {@value #MAX_REPORT_PAGE_SIZE}: rows per SQL-report request, since the KF Agent re-runs the report
+ *       query for every page), {@code HTTP_TIMEOUT_SECONDS} (default 60). Optional client certificate (mutual TLS),
+ *       for an agent reached
  *       through a gateway that demands one (e.g. an ngrok edge): {@code KFAGENT_CLIENT_KEYSTORE} (path to a PKCS12
  *       {@code .p12} file holding the certificate and its private key) + {@code KFAGENT_CLIENT_KEYSTORE_PASSWORD};
  *       both or neither, and only with an {@code https://} base URL. Unset = no client certificate (as before).</li>
@@ -22,10 +24,14 @@ import java.util.List;
  */
 public final class AppConfig {
 
+    /** The KF Agent's largest SQL-report page ({@code limit}). */
+    public static final int MAX_REPORT_PAGE_SIZE = 200000;
+
     private final String kfAgentBaseUrl;
-    private final String kfAgentUsername; // nullable
-    private final String kfAgentPassword; // nullable
+    private final String kfAgentUsername; // null only for database-only commands
+    private final String kfAgentPassword; // null only for database-only commands
     private final int pageSize;
+    private final int reportPageSize;
     private final int httpTimeoutSeconds;
     private final String kfAgentClientKeystore;         // nullable: no client certificate
     private final String kfAgentClientKeystorePassword; // nullable together with the keystore
@@ -38,13 +44,14 @@ public final class AppConfig {
     private final String pgPassword;
 
     private AppConfig(String kfAgentBaseUrl, String kfAgentUsername, String kfAgentPassword, int pageSize,
-                      int httpTimeoutSeconds, String kfAgentClientKeystore, String kfAgentClientKeystorePassword,
-                      String pgHost, String pgPort, String pgDatabase, String pgSchema,
-                      String pgUsername, String pgPassword) {
+                      int reportPageSize, int httpTimeoutSeconds, String kfAgentClientKeystore,
+                      String kfAgentClientKeystorePassword, String pgHost, String pgPort, String pgDatabase,
+                      String pgSchema, String pgUsername, String pgPassword) {
         this.kfAgentBaseUrl = kfAgentBaseUrl;
         this.kfAgentUsername = kfAgentUsername;
         this.kfAgentPassword = kfAgentPassword;
         this.pageSize = pageSize;
+        this.reportPageSize = reportPageSize;
         this.httpTimeoutSeconds = httpTimeoutSeconds;
         this.kfAgentClientKeystore = kfAgentClientKeystore;
         this.kfAgentClientKeystorePassword = kfAgentClientKeystorePassword;
@@ -72,6 +79,8 @@ public final class AppConfig {
     private static AppConfig load(boolean requireKfAgent) {
         List<String> missing = new ArrayList<>();
         String base = requireKfAgent ? required("KFAGENT_BASE_URL", missing) : nullable("KFAGENT_BASE_URL");
+        String username = requireKfAgent ? required("KFAGENT_USERNAME", missing) : null;
+        String password = requireKfAgent ? required("KFAGENT_PASSWORD", missing) : null;
         String pgHost = required("PG_HOST", missing);
         String pgDatabase = required("PG_DATABASE", missing);
         String pgUsername = required("PG_USERNAME", missing);
@@ -96,6 +105,14 @@ public final class AppConfig {
         String pgPort = orDefault("PG_PORT", "5432");
         String pgSchema = SchemaName.validate(orDefault("PG_DEST_SCHEMA", SchemaName.DEFAULT));
         int pageSize = intOrDefault("KFAGENT_PAGE_SIZE", 500);
+        if (pageSize <= 0) {
+            throw new ConfigException("KFAGENT_PAGE_SIZE must be a positive integer but was: " + pageSize);
+        }
+        int reportPageSize = intOrDefault("KFAGENT_REPORT_PAGE_SIZE", MAX_REPORT_PAGE_SIZE);
+        if (reportPageSize <= 0 || reportPageSize > MAX_REPORT_PAGE_SIZE) {
+            throw new ConfigException("KFAGENT_REPORT_PAGE_SIZE must be between 1 and " + MAX_REPORT_PAGE_SIZE
+                    + " (the KF Agent's SQL-report maximum) but was: " + reportPageSize);
+        }
         int httpTimeout = intOrDefault("HTTP_TIMEOUT_SECONDS", 60);
 
         String keystore = nullable("KFAGENT_CLIENT_KEYSTORE");
@@ -109,9 +126,8 @@ public final class AppConfig {
             keystore = keystore == null ? null : keystore.trim();
         }
 
-        return new AppConfig(url, nullable("KFAGENT_USERNAME"), nullable("KFAGENT_PASSWORD"),
-                pageSize, httpTimeout, keystore, keystorePassword, pgHost.trim(), pgPort, pgDatabase.trim(), pgSchema,
-                pgUsername.trim(), pgPassword);
+        return new AppConfig(url, username, password, pageSize, reportPageSize, httpTimeout, keystore,
+                keystorePassword, pgHost.trim(), pgPort, pgDatabase.trim(), pgSchema, pgUsername.trim(), pgPassword);
     }
 
     /** Both or neither; the file must be readable; a certificate is only ever presented over https. */
@@ -139,6 +155,7 @@ public final class AppConfig {
     public String kfAgentPassword() { return kfAgentPassword; }
     public boolean hasBasicAuth() { return kfAgentUsername != null && kfAgentPassword != null; }
     public int pageSize() { return pageSize; }
+    public int reportPageSize() { return reportPageSize; }
     public int httpTimeoutSeconds() { return httpTimeoutSeconds; }
     public String kfAgentClientKeystore() { return kfAgentClientKeystore; }
     public String kfAgentClientKeystorePassword() { return kfAgentClientKeystorePassword; }
@@ -155,7 +172,8 @@ public final class AppConfig {
                 + (hasBasicAuth() ? " (basic-auth)" : "")
                 + (hasClientCertificate() ? " (client-cert)" : "")
                 + " | PostgreSQL: " + jdbcUrl() + " (user '" + pgUsername + "', dest schema '" + pgSchema + "')"
-                + " | pageSize=" + pageSize + ", httpTimeout=" + httpTimeoutSeconds + "s";
+                + " | pageSize=" + pageSize + ", reportPageSize=" + reportPageSize
+                + ", httpTimeout=" + httpTimeoutSeconds + "s";
     }
 
     // ── resolution helpers (env → system property) ──

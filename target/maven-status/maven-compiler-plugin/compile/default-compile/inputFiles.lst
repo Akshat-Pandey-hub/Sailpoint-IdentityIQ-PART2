@@ -68,9 +68,8 @@ D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\RoleTable.
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\SnapshotSweepImportService.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\SoftDeleteSweeper.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\SqlReportImportService.java
-D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\SqlReportPageSnapshotImportService.java
-D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\SqlReportPageSnapshotRepository.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\SqlReportRepository.java
+D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\SqlReportSpec.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\SweepEvidence.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\SweepPolicies.java
 D:\Sailpoint-IdentityIQ-Part2\src\main\java\com\keyforge\part2\ingest\SweepPolicy.java

@@ -27,9 +27,6 @@ D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\Certificat
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\CertificationEntityTableTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\CertificationItemTableTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\CertificationTableTest.java
-D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\EntitlementAssignmentReportTest.java
-D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\EntitlementCertificationReportTest.java
-D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\EntitlementCertificationStatusReportTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\EntitlementParityTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\EntitlementRepositoryTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\EntityImportServiceTest.java
@@ -52,8 +49,8 @@ D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\RoleHierar
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\RoleTableTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\SnapshotSweepImportServiceTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\SoftDeleteSweeperTest.java
-D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\SqlReportPageSnapshotImportServiceTest.java
-D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\SqlReportPageSnapshotRepositoryPostgresTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\SqlReportImportServiceTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\SqlReportTablesTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\SweepPoliciesTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\SyslogEventImportServiceTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\SyslogEventRepositoryTest.java
@@ -61,7 +58,6 @@ D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\TaskResult
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\TaskScheduleTableTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\WorkflowDefinitionRepositoryTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\WorkgroupMemberRepositoryTest.java
-D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\WorkgroupMembersReportTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\WorkgroupTableTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\WorkItemArchiveRepositoryTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\WorkItemTableTest.java

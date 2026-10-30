@@ -6,8 +6,8 @@ import java.util.List;
  * {@code GET /kfagent/entitlement-certification-status} → {@code kf_entitlement_certification_status}: Part 1's
  * SQL-report "Query 4" (registered report id {@code entitlementCertificationStatus}), one row per IIQ identity
  * entitlement plus its latest certification. Stored as the query result, exactly as Part 1's
- * {@code ENTITLEMENT_CERTIFICATION_STATUS_COLUMNS}: 14 text columns in SELECT-alias order, replace-all per run (same
- * {@link SqlReportRepository} contract as {@link EntitlementAssignmentReport}).
+ * {@code ENTITLEMENT_CERTIFICATION_STATUS_COLUMNS}: 14 text columns in SELECT-alias order, stored keyed by
+ * {@link #KEY_COLUMNS} (see {@link SqlReportRepository}).
  *
  * <p>Relationships are values inside each row, not keys: {@code user_id} (identity name) / {@code manager_user_id}
  * (manager name) / {@code application_name} / {@code account_name} (native identity) / {@code entitlement_attribute} /
@@ -18,7 +18,7 @@ import java.util.List;
  * to the account or NULL: {@code last_certification_name} = certification name, {@code last_certified_date} = action
  * decision date, {@code certifier} = action actor name, {@code certification_decision} = action status, and
  * {@code never_certified} = 'YES' when no such item exists. Dates are text as IIQ's
- * {@code to_timestamp(epoch-ms / 1000.0)} renders them. The row's {@code id} is a database row number only.
+ * {@code to_timestamp(epoch-ms / 1000.0)} renders them. The row's uuid {@code entitlementcertificationstatusid} is derived from {@link #KEY_COLUMNS}.
  */
 public final class EntitlementCertificationStatusReport {
 
@@ -34,4 +34,14 @@ public final class EntitlementCertificationStatusReport {
             "entitlement_attribute", "entitlement_value", "entitlement_assigned_date",
             "last_certification_name", "last_certified_date", "certifier", "certification_decision",
             "never_certified");
+
+    public static final String PK = "entitlementcertificationstatusid";
+
+    /** The columns that identify one report row (unique in the report result); the row uuid is derived from them. */
+    public static final List<String> KEY_COLUMNS = List.of(
+            "user_id", "application_name", "account_name", "entitlement_attribute",
+            "entitlement_value");
+
+    public static final SqlReportSpec SPEC = new SqlReportSpec("EntitlementCertificationStatus", "entitlementCertificationStatus",
+            RESOURCE, TABLE, PK, COLUMNS, KEY_COLUMNS);
 }

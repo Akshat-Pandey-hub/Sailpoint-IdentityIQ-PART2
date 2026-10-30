@@ -26,8 +26,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  */
 class EntityImportServiceTest {
 
-    private static final String[] KEYS = {"KFAGENT_BASE_URL", "PG_HOST", "PG_DATABASE", "PG_USERNAME",
-            "PG_PASSWORD", "PG_DEST_SCHEMA", "KFAGENT_PAGE_SIZE"};
+    private static final String[] KEYS = {"KFAGENT_BASE_URL", "KFAGENT_USERNAME", "KFAGENT_PASSWORD", "PG_HOST",
+            "PG_DATABASE", "PG_USERNAME", "PG_PASSWORD", "PG_DEST_SCHEMA", "KFAGENT_PAGE_SIZE"};
 
     private HttpServer server;
     private final List<String> queries = new ArrayList<>();
@@ -67,6 +67,8 @@ class EntityImportServiceTest {
         });
         server.start();
         System.setProperty("KFAGENT_BASE_URL", "http://127.0.0.1:" + server.getAddress().getPort());
+        System.setProperty("KFAGENT_USERNAME", "agent-user");
+        System.setProperty("KFAGENT_PASSWORD", "agent-pass");
         System.setProperty("PG_HOST", "unused");
         System.setProperty("PG_DATABASE", "unused");
         System.setProperty("PG_USERNAME", "unused");

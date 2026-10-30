@@ -43,8 +43,9 @@ class IdentityRepositoryPostgresTest {
         String schema = "kf_identity_it_" + UUID.randomUUID().toString().replace("-", "");
         String userid = CanonicalIds.identityUserid("7f0001019714176881971476c14808ec", "Alice.Admin");
         Map<String, String> previous = new LinkedHashMap<>();
-        for (String key : new String[]{"KFAGENT_BASE_URL", "PG_HOST", "PG_DATABASE", "PG_USERNAME", "PG_PASSWORD",
-                "PG_DEST_SCHEMA", "KFAGENT_PAGE_SIZE"}) previous.put(key, System.getProperty(key));
+        for (String key : new String[]{"KFAGENT_BASE_URL", "KFAGENT_USERNAME", "KFAGENT_PASSWORD", "PG_HOST",
+                "PG_DATABASE", "PG_USERNAME", "PG_PASSWORD", "PG_DEST_SCHEMA", "KFAGENT_PAGE_SIZE"})
+            previous.put(key, System.getProperty(key));
 
         HttpServer server = null;
         try {
@@ -66,6 +67,8 @@ class IdentityRepositoryPostgresTest {
             server.start();
 
             System.setProperty("KFAGENT_BASE_URL", "http://127.0.0.1:" + server.getAddress().getPort());
+            System.setProperty("KFAGENT_USERNAME", "agent-user");
+            System.setProperty("KFAGENT_PASSWORD", "agent-pass");
             System.setProperty("PG_HOST", "unused");
             System.setProperty("PG_DATABASE", "unused");
             System.setProperty("PG_USERNAME", "unused");

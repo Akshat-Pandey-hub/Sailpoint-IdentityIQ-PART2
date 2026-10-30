@@ -21,8 +21,9 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  */
 class ClientCertificateConfigTest {
 
-    private static final String[] KEYS = {"KFAGENT_BASE_URL", "KFAGENT_CLIENT_KEYSTORE",
-            "KFAGENT_CLIENT_KEYSTORE_PASSWORD", "PG_HOST", "PG_DATABASE", "PG_USERNAME", "PG_PASSWORD"};
+    private static final String[] KEYS = {"KFAGENT_BASE_URL", "KFAGENT_USERNAME", "KFAGENT_PASSWORD",
+            "KFAGENT_CLIENT_KEYSTORE", "KFAGENT_CLIENT_KEYSTORE_PASSWORD", "PG_HOST", "PG_DATABASE", "PG_USERNAME",
+            "PG_PASSWORD", "KFAGENT_REPORT_PAGE_SIZE"};
     private static final String SECRET = "s3cret-keystore-pass";
     private final Map<String, String> saved = new HashMap<>();
 
@@ -34,6 +35,8 @@ class ClientCertificateConfigTest {
             saved.put(k, System.getProperty(k));
             System.clearProperty(k);
         }
+        System.setProperty("KFAGENT_USERNAME", "agent-user");
+        System.setProperty("KFAGENT_PASSWORD", "agent-pass");
         System.setProperty("PG_HOST", "localhost");
         System.setProperty("PG_DATABASE", "db");
         System.setProperty("PG_USERNAME", "u");
@@ -49,6 +52,35 @@ class ClientCertificateConfigTest {
 
     static String keystore() throws Exception {
         return Path.of(ClientCertificateConfigTest.class.getResource("/mtls/client.p12").toURI()).toString();
+    }
+
+    @Test
+    void kfAgentCredentialsAreRequiredToCallTheAgent() {
+        System.setProperty("KFAGENT_BASE_URL", "http://127.0.0.1:8100");
+        System.clearProperty("KFAGENT_PASSWORD");
+        ConfigException e = assertThrows(ConfigException.class, AppConfig::load);
+        assertTrue(e.getMessage().contains("KFAGENT_PASSWORD"), e.getMessage());
+
+        System.setProperty("KFAGENT_PASSWORD", "agent-pass");
+        System.clearProperty("KFAGENT_USERNAME");
+        e = assertThrows(ConfigException.class, AppConfig::load);
+        assertTrue(e.getMessage().contains("KFAGENT_USERNAME"), e.getMessage());
+
+        AppConfig db = AppConfig.loadDatabaseOnly();
+        assertFalse(db.hasBasicAuth(), "database-only commands never call the agent and need no credentials");
+    }
+
+    @Test
+    void sqlReportPageSizeDefaultsToTheAgentMaximumAndIsBounded() {
+        System.setProperty("KFAGENT_BASE_URL", "http://127.0.0.1:8100");
+        assertEquals(AppConfig.MAX_REPORT_PAGE_SIZE, AppConfig.load().reportPageSize());
+        assertTrue(AppConfig.load().hasBasicAuth());
+        System.setProperty("KFAGENT_REPORT_PAGE_SIZE", "50000");
+        assertEquals(50000, AppConfig.load().reportPageSize());
+        System.setProperty("KFAGENT_REPORT_PAGE_SIZE", "200001");
+        assertThrows(ConfigException.class, AppConfig::load);
+        System.setProperty("KFAGENT_REPORT_PAGE_SIZE", "0");
+        assertThrows(ConfigException.class, AppConfig::load);
     }
 
     @Test

@@ -17,18 +17,21 @@ import static com.keyforge.part2.hash.HashValues.text;
  * the KF Agent serves each page directly instead of re-scanning the whole population per request.
  *
  * <p>Each page is fetched, checked, written row by row and released; only counters and the last ordering key are kept,
- * never the population. Guards, in order:
+ * never the population. The KF Agent serves each {@code start}/{@code limit} page directly without counting the
+ * population, so a page normally carries NO {@code X-KF-Source-Count}; Part 1 sends it only on a full unpaged read.
+ * Paging therefore follows Part 1's contract: next {@code start} = previous {@code start} + rows received, and a page
+ * shorter than the page size (or empty) is the end. Guards, in order:
  * <ol>
- *   <li><b>Source count required.</b> Every page must carry {@code X-KF-Source-Count}. A KF Agent that does not send it
- *       (an older Part 1) cannot prove completeness, so the run is refused.</li>
- *   <li><b>Baseline + shrink.</b> The first page's count is the population this scan must cover. A later page reporting
- *       FEWER events than the highest seen means events were removed mid-scan, so the offset window may have shifted
- *       past rows: fatal. Growth (new events at the tail) is benign.</li>
+ *   <li><b>Source count, when reported.</b> A page without {@code X-KF-Source-Count} is read normally. When a page does
+ *       report it, the first reported count is the baseline the scan must cover, and a later page reporting FEWER
+ *       events than the highest seen means events were removed mid-scan, so the offset window may have shifted past
+ *       rows: fatal. Growth (new events at the tail) is benign.</li>
  *   <li><b>Overlap / order.</b> The agent orders by (created, id). A row whose (created, source_id) is not strictly after
  *       the previous row's is an overlap or out-of-order row: it is still appended (idempotent) but NOT credited toward
  *       the baseline, so duplicates can never mask a gap.</li>
  *   <li><b>Termination.</b> The scan ends on an empty page or a page shorter than the page size.</li>
- *   <li><b>Completeness.</b> Distinct in-order rows must reach the baseline; otherwise the scan is incomplete.</li>
+ *   <li><b>Completeness, when a baseline was reported.</b> Distinct in-order rows must reach it; otherwise the scan is
+ *       incomplete.</li>
  * </ol>
  * A failed guard throws {@link IncompleteScanException} carrying the partial result. Rows already appended stay (they
  * are immutable events and a re-run skips them), but the run is reported as failed, never as a complete import.
@@ -109,10 +112,10 @@ public final class SyslogEventImportService {
             if (rows.size() == 0 || rows.size() < pageSize) {
                 break;
             }
-            start += pageSize;
+            start += rows.size();
         }
 
-        if (inOrderRows < baselineSourceCount) {
+        if (baselineSourceCount >= 0 && inOrderRows < baselineSourceCount) {
             throw new IncompleteScanException("Incomplete SyslogEvent scan: baseline source count "
                     + baselineSourceCount + ", distinct in-order rows read " + inOrderRows
                     + (overlapRows > 0 ? " (plus " + overlapRows + " overlapping/out-of-order)" : ""), result);
@@ -122,9 +125,7 @@ public final class SyslogEventImportService {
 
     private void checkSourceCount(Integer count, int start, ImportResult result) {
         if (count == null || count < 0) {
-            throw new IncompleteScanException("KF Agent /kfagent/" + repository.resource() + "?start=" + start
-                    + " did not report " + KfAgentClient.SOURCE_COUNT_HEADER + "; completeness cannot be verified"
-                    + " (update and restart the Part 1 KF Agent)", result);
+            return; // page reads do not report a count; nothing to check for this page
         }
         if (baselineSourceCount < 0) {
             baselineSourceCount = count;
@@ -168,7 +169,7 @@ public final class SyslogEventImportService {
         return root;
     }
 
-    /** The first page's source count (the population the scan had to cover); -1 before the first page. */
+    /** The first reported source count (the population the scan had to cover); -1 when no page reported one. */
     public int baselineSourceCount() {
         return baselineSourceCount;
     }

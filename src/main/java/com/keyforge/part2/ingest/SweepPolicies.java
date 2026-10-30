@@ -9,7 +9,7 @@ import java.util.Set;
  * The sweep policy registry. A table sweeps only if it is listed in {@link #CONFIGS}; every other table is
  * {@link SweepPolicy#NEVER}. Tables in {@link #NEVER_SWEEP_TABLES} can never be given another policy
  * ({@link SoftDeleteSweeper.Target} rejects it): append-only events / histories / archives are immutable, SQL-report
- * tables are replaced as a whole, and governance-owned tables are not source mirrors.
+ * tables mark their own deleted rows ({@link SqlReportImportService}), and governance-owned tables are not source mirrors.
  *
  * <p>Enabled = exactly the tables Part 1 sweeps whose KF Agent endpoint reports a VERIFIED source count
  * ({@code X-KF-Verified-Source-Count}: the response came from one full internal scan whose complete-scan guard passed).
@@ -46,7 +46,7 @@ public final class SweepPolicies {
             "kf_audit_event", "kf_syslog_event", "kf_certification_archive", "kf_workitem_archive",
             "kf_access_hist_entitlement", "kf_access_hist_identity_event", "kf_access_hist_role_event",
             "kf_access_hist_certification",
-            // SQL-report tables (replace-all snapshots)
+            // SQL-report tables (their own full run marks rows the report no longer returns; see SqlReportImportService)
             "kf_entitlement_assignment", "kf_workgroup_members", "kf_entitlement_certification",
             "kf_entitlement_certification_status",
             // governance-owned tables

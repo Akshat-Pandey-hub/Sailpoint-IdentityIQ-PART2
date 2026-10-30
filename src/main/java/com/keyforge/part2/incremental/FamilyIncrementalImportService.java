@@ -2,12 +2,12 @@ package com.keyforge.part2.incremental;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.keyforge.part2.http.KfAgentClient;
 import com.keyforge.part2.ingest.EntityWriter;
 import com.keyforge.part2.ingest.ImportResult;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -20,14 +20,15 @@ import java.util.List;
  * the KF Agent returns the children of the parents changed after the bound.
  * <ol>
  *   <li>read the family watermark; bound = watermark − overlap, or none on the first run (full baseline);</li>
- *   <li>fetch the parent and EVERY child dataset with that same bound, and parse them all, before writing anything:
- *       an HTTP / JSON error therefore writes nothing and leaves the watermark unchanged;</li>
- *   <li>upsert the parent rows, then each child dataset, through the same writers as their full imports;</li>
- *   <li>advance the shared watermark to {@code max(coalesce(modified_at, created_at))} of the parent table ONLY if no
- *       row in the parent or any child failed. Rows already written stay (idempotent upserts), and the unchanged
- *       watermark makes the next run re-read the same window, so a failed child can never be skipped.</li>
+ *   <li>page the parent, then each child dataset, with that same bound ({@code modifiedAfter} + {@code start}/
+ *       {@code limit}, next start = start + rows received, a short page ends a dataset), upserting each page through
+ *       the same writers as their full imports. Only one page is held in memory at a time;</li>
+ *   <li>advance the shared watermark to {@code max(coalesce(modified_at, created_at))} of the parent table, capped at
+ *       the run's start ({@link WatermarkService#capAtRunStart}), ONLY if no row in the parent or any child failed and
+ *       no request failed. Rows already written stay (idempotent upserts), and an unchanged watermark makes the next
+ *       run re-read the same window, so a failed page or child can never be skipped.</li>
  * </ol>
- * Never sweeps (the periodic full imports detect deletions).
+ * Never sweeps.
  */
 public final class FamilyIncrementalImportService {
 
@@ -44,9 +45,9 @@ public final class FamilyIncrementalImportService {
     /**
      * @param results      one result per writer: the parent first, then the children in order
      * @param stored       the family watermark before the run ({@code null} = first run)
-     * @param bound        the {@code modifiedAfter} sent to every dataset ({@code null} = full fetch)
-     * @param fetchedAt    when the first fetch was issued
-     * @param newWatermark {@code max(coalesce(modified_at, created_at))} of the parent table after the load
+     * @param bound        the {@code modifiedAfter} sent to every dataset ({@code null} = full read)
+     * @param fetchedAt    when the run started fetching
+     * @param newWatermark the watermark this run computed
      * @param advanced     whether the stored watermark moved (or was first set)
      */
     public record Outcome(List<ImportResult> results, String key, Instant stored, Instant bound, Instant fetchedAt,
@@ -62,16 +63,27 @@ public final class FamilyIncrementalImportService {
     private final List<EntityWriter> children;
     private final WatermarkService watermarks;
     private final Duration overlap;
+    private final int pageSize;
+    private final Clock clock;
     private final ObjectMapper mapper = new ObjectMapper();
 
     public FamilyIncrementalImportService(IncrementalImportService.Fetcher fetcher, EntityWriter parent,
                                           List<EntityWriter> children, WatermarkService watermarks,
                                           Duration overlap) {
+        this(fetcher, parent, children, watermarks, overlap, IncrementalImportService.DEFAULT_PAGE_SIZE,
+                Clock.systemUTC());
+    }
+
+    public FamilyIncrementalImportService(IncrementalImportService.Fetcher fetcher, EntityWriter parent,
+                                          List<EntityWriter> children, WatermarkService watermarks,
+                                          Duration overlap, int pageSize, Clock clock) {
         this.fetcher = fetcher;
         this.parent = parent;
         this.children = List.copyOf(children);
         this.watermarks = watermarks;
         this.overlap = overlap;
+        this.pageSize = pageSize > 0 ? pageSize : IncrementalImportService.DEFAULT_PAGE_SIZE;
+        this.clock = clock;
     }
 
     public Outcome run(Connection conn, String extractionRunId) throws SQLException {
@@ -87,59 +99,46 @@ public final class FamilyIncrementalImportService {
         Instant stored = watermarks.readKey(conn, key);
         Instant bound = WatermarkService.effectiveBound(stored, ExtractionMode.INCREMENTAL, overlap);
         String boundIso = bound == null ? null : bound.toString();
-        Instant fetchedAt = Instant.now();
+        Instant fetchedAt = clock.instant();
 
-        // 1. fetch and parse everything first: any HTTP / JSON failure throws here, before a single write
-        List<JsonNode> payloads = new ArrayList<>();
-        for (EntityWriter w : all) {
-            payloads.add(parseArray(w, fetcher.fetch(w.resource(), boundIso).body()));
-        }
-
-        // 2. write the parent, then each child dataset
+        // page the parent, then each child dataset; any HTTP / JSON failure throws before the watermark step
         List<ImportResult> results = new ArrayList<>();
-        for (int i = 0; i < all.size(); i++) {
-            results.add(write(conn, all.get(i), payloads.get(i), extractionRunId));
+        for (EntityWriter w : all) {
+            results.add(load(conn, w, boundIso, extractionRunId));
         }
 
-        // 3. the shared watermark moves only if nothing failed anywhere in the family
+        // the shared watermark moves only if nothing failed anywhere in the family
         int failed = results.stream().mapToInt(ImportResult::failed).sum();
-        Instant newWatermark = watermarks.maxValue(conn, parent.targetTable(), IncrementalCursor.CHANGED);
+        Instant newWatermark = WatermarkService.capAtRunStart(
+                watermarks.maxValue(conn, parent.targetTable(), IncrementalCursor.CHANGED), fetchedAt);
         boolean advanced = watermarks.advanceKeyIfSuccessful(conn, key, newWatermark, failed, extractionRunId,
                 IncrementalCursor.CHANGED);
         return new Outcome(results, key, stored, bound, fetchedAt, newWatermark, advanced);
     }
 
-    private static ImportResult write(Connection conn, EntityWriter writer, JsonNode rows, String runId) {
+    private ImportResult load(Connection conn, EntityWriter writer, String boundIso, String runId) {
         ImportResult result = new ImportResult(writer.entity(), writer.targetTable());
-        result.countPage();
-        for (JsonNode row : rows) {
-            result.countFetched(1);
-            try {
-                switch (writer.upsert(conn, row, runId)) {
-                    case INSERTED -> result.countInserted();
-                    case UPDATED -> result.countUpdated();
-                    case SKIPPED -> result.countSkipped();
+        int start = 0;
+        while (true) {
+            JsonNode rows = IncrementalImportService.parseArray(writer.resource(),
+                    fetcher.fetchPage(writer.resource(), start, pageSize, boundIso), mapper);
+            result.countPage();
+            for (JsonNode row : rows) {
+                result.countFetched(1);
+                try {
+                    switch (writer.upsert(conn, row, runId)) {
+                        case INSERTED -> result.countInserted();
+                        case UPDATED -> result.countUpdated();
+                        case SKIPPED -> result.countSkipped();
+                    }
+                } catch (SQLException | RuntimeException e) {
+                    result.countFailure(writer.ref(row), e.getMessage());
                 }
-            } catch (SQLException | RuntimeException e) {
-                result.countFailure(writer.ref(row), e.getMessage());
             }
+            if (rows.size() < pageSize) {
+                return result;
+            }
+            start += rows.size();
         }
-        return result;
-    }
-
-    private JsonNode parseArray(EntityWriter writer, String body) {
-        JsonNode root;
-        try {
-            root = mapper.readTree(body == null ? "" : body);
-        } catch (Exception e) {
-            throw new KfAgentClient.KfAgentHttpException(
-                    "KF Agent /kfagent/" + writer.resource() + " did not return JSON: " + e.getMessage());
-        }
-        if (root == null || !root.isArray()) {
-            String note = (root != null && root.has("error")) ? (": " + root.get("error").asText()) : "";
-            throw new KfAgentClient.KfAgentHttpException(
-                    "KF Agent /kfagent/" + writer.resource() + " returned a non-array response" + note);
-        }
-        return root;
     }
 }

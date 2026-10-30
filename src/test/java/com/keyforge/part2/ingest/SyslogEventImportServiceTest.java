@@ -195,16 +195,21 @@ class SyslogEventImportServiceTest {
     }
 
     @Test
-    void aMissingSourceCountHeaderRefusesTheRunBeforeWritingAnything() {
+    void pageReadsWithoutASourceCountImportEveryPage() throws Exception {
         List<String> log = new ArrayList<>();
         Agent agent = new Agent(25, log);
-        agent.countForPage = p -> null; // an older KF Agent
+        agent.countForPage = p -> null; // Part 1 page reads never send X-KF-Source-Count
         MemoryWriter writer = new MemoryWriter(log);
         SyslogEventImportService svc = new SyslogEventImportService(agent, writer, 10);
-        SyslogEventImportService.IncompleteScanException e =
-                assertThrows(SyslogEventImportService.IncompleteScanException.class, () -> svc.run(conn(), "run-7"));
-        assertTrue(e.getMessage().contains(KfAgentClient.SOURCE_COUNT_HEADER));
-        assertTrue(writer.table.isEmpty(), "nothing written without a completeness baseline");
+
+        ImportResult r = svc.run(conn(), "run-7");
+
+        assertEquals(3, r.pages(), "10 + 10 + 5, ending on the short page");
+        assertEquals(25, r.inserted());
+        assertEquals(25, writer.table.size());
+        assertEquals(-1, svc.baselineSourceCount(), "no count was reported");
+        assertEquals(List.of("fetch 0", "fetch 10", "fetch 20"),
+                log.stream().filter(s -> s.startsWith("fetch")).toList(), "next start = start + rows received");
     }
 
     @Test

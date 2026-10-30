@@ -47,11 +47,9 @@ import com.keyforge.part2.ingest.ProvisioningTxnTable;
 import com.keyforge.part2.ingest.RoleEntitlementRepository;
 import com.keyforge.part2.ingest.RoleHierarchyRepository;
 import com.keyforge.part2.ingest.RoleTable;
-import com.keyforge.part2.ingest.SnapshotSweepImportService;
 import com.keyforge.part2.ingest.SoftDeleteSweeper;
 import com.keyforge.part2.ingest.SqlReportImportService;
-import com.keyforge.part2.ingest.SqlReportPageSnapshotImportService;
-import com.keyforge.part2.ingest.SqlReportPageSnapshotRepository;
+import com.keyforge.part2.ingest.SqlReportSpec;
 import com.keyforge.part2.ingest.SweepPolicies;
 import com.keyforge.part2.ingest.SqlReportRepository;
 import com.keyforge.part2.ingest.SyslogEventImportService;
@@ -133,15 +131,15 @@ import java.util.function.Function;
  *  import-policy-violation
  *                       Fetch GET /kfagent/policy-violations and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_violation
  *  import-entitlement-assignment
- *                       Fetch GET /kfagent/entitlement-assignment (SQL report) and REPLACE &lt;PG_DEST_SCHEMA&gt;.kf_entitlement_assignment
+ *                       Fetch GET /kfagent/entitlement-assignment (SQL report) and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_entitlement_assignment
  *  import-workgroup-member
  *                       Fetch GET /kfagent/workgroupmember and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_workgroup_member
  *  import-entitlement-certification
- *                       Fetch GET /kfagent/entitlement-certification (SQL report) and REPLACE &lt;PG_DEST_SCHEMA&gt;.kf_entitlement_certification
+ *                       Fetch GET /kfagent/entitlement-certification (SQL report) and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_entitlement_certification
  *  import-entitlement-certification-status
- *                       Fetch GET /kfagent/entitlement-certification-status (SQL report) and REPLACE &lt;PG_DEST_SCHEMA&gt;.kf_entitlement_certification_status
+ *                       Fetch GET /kfagent/entitlement-certification-status (SQL report) and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_entitlement_certification_status
  *  import-workgroup-members
- *                       Fetch GET /kfagent/workgroup-members (SQL report) and REPLACE &lt;PG_DEST_SCHEMA&gt;.kf_workgroup_members
+ *                       Fetch GET /kfagent/workgroup-members (SQL report) and upsert into &lt;PG_DEST_SCHEMA&gt;.kf_workgroup_members
  *  import-audit-event
  *                       Fetch GET /kfagent/audit-events and append into &lt;PG_DEST_SCHEMA&gt;.kf_audit_event
  *  import-task-result
@@ -161,12 +159,11 @@ import java.util.function.Function;
  *  import-access-history-role-event
  *                       Fetch GET /kfagent/access-history/role-events and append into &lt;PG_DEST_SCHEMA&gt;.kf_access_hist_role_event
  *  import-syslog-event
- *                       Page GET /kfagent/syslog-events (complete-scan guarded) and append into &lt;PG_DEST_SCHEMA&gt;.kf_syslog_event</pre>
+ *                       Page GET /kfagent/syslog-events and append into &lt;PG_DEST_SCHEMA&gt;.kf_syslog_event</pre>
  *
  * Configuration is entirely external (environment variables / -D system properties) — see {@link AppConfig}.
  * Exit codes: 0 ok, 2 usage, 3 config error, 4 HTTP/source error, 5 PostgreSQL error, 6 completed with row
- * failures, 7 scan not confirmed complete (import-syslog-event; or a swept table whose snapshot completeness could
- * not be proven, so its deletion sweep was skipped), 1 unexpected.
+ * failures, 7 scan not confirmed complete (import-syslog-event, only when a page reports a source count), 1 unexpected.
  */
 public final class Main {
 
@@ -277,19 +274,12 @@ public final class Main {
             case "import-certification-archive" -> runImport(CertificationArchiveRepository::new, options);
             case "import-policy-constraint" -> runImport(PolicyConstraintTable.SPEC, options);
             case "import-policy-violation" -> runImport(PolicyViolationTable.SPEC, options);
-            case "import-entitlement-assignment" -> runSqlReport("EntitlementAssignment",
-                    EntitlementAssignmentReport.RESOURCE, EntitlementAssignmentReport.TABLE,
-                    EntitlementAssignmentReport.COLUMNS, options);
+            case "import-entitlement-assignment" -> runSqlReport(EntitlementAssignmentReport.SPEC, options);
             case "import-workgroup-member" -> runImport(WorkgroupMemberRepository::new, options);
-            case "import-entitlement-certification" -> runSqlReport("EntitlementCertification",
-                    EntitlementCertificationReport.RESOURCE, EntitlementCertificationReport.TABLE,
-                    EntitlementCertificationReport.COLUMNS, options);
-            case "import-entitlement-certification-status" -> runSqlReport("EntitlementCertificationStatus",
-                    EntitlementCertificationStatusReport.RESOURCE, EntitlementCertificationStatusReport.TABLE,
-                    EntitlementCertificationStatusReport.COLUMNS, options);
-            case "import-workgroup-members" -> runSqlReport("WorkgroupMembers",
-                    WorkgroupMembersReport.RESOURCE, WorkgroupMembersReport.TABLE, WorkgroupMembersReport.COLUMNS,
-                    options);
+            case "import-entitlement-certification" -> runSqlReport(EntitlementCertificationReport.SPEC, options);
+            case "import-entitlement-certification-status" ->
+                    runSqlReport(EntitlementCertificationStatusReport.SPEC, options);
+            case "import-workgroup-members" -> runSqlReport(WorkgroupMembersReport.SPEC, options);
             case "import-audit-event" -> runImport(AuditEventRepository::new, options);
             case "import-task-result" -> runImport(TaskResultTable.SPEC, options);
             case "import-task-schedule" -> runImport(TaskScheduleTable.SPEC, options);
@@ -317,11 +307,6 @@ public final class Main {
 
     static boolean supportsCallerFetchOptions(String command) {
         return command != null && fetchResource(command) != null;
-    }
-
-    /** A configured snapshot sweep is safe only when the source request represents the complete population. */
-    static boolean shouldRunSnapshotSweep(FetchOptions options, boolean sweepConfigured) {
-        return sweepConfigured && (options == null || options.isEmpty());
     }
 
     /** Part 1 applies exact AND filters to response scalar fields; JSON/technical fields are excluded. */
@@ -371,6 +356,11 @@ public final class Main {
                     "qry_property4", "qry_property5", "qry_property6", "qry_property7", "qry_property8", "qry_property9", "qry_property10");
             case "import-syslog-event" -> Set.of("source_id", "quick_key", "event_level", "server", "username", "thread",
                     "classname", "line_number", "message", "stacktrace", "created_at");
+            // Part 1 filters a report on any of its SELECT columns (exact match)
+            case "import-entitlement-assignment" -> Set.copyOf(EntitlementAssignmentReport.COLUMNS);
+            case "import-entitlement-certification" -> Set.copyOf(EntitlementCertificationReport.COLUMNS);
+            case "import-entitlement-certification-status" -> Set.copyOf(EntitlementCertificationStatusReport.COLUMNS);
+            case "import-workgroup-members" -> Set.copyOf(WorkgroupMembersReport.COLUMNS);
             default -> Set.of();
         };
         return spec.allBusiness().stream().filter(c -> c.kind != ColumnSpec.Kind.JSONB
@@ -380,8 +370,13 @@ public final class Main {
     static boolean supportsCallerModifiedAfter(String command) {
         return INCREMENTAL_WRITERS.containsKey(command) || INCREMENTAL_FAMILIES.containsKey(command)
                 || INCREMENTAL_CHILD_OF.containsKey(command) || CHANGED_INCREMENTAL_WRITERS.containsKey(command)
-                || EVENT_INCREMENTAL_WRITERS.containsKey(command) || SYSLOG_COMMAND.equals(command);
+                || EVENT_INCREMENTAL_WRITERS.containsKey(command) || SYSLOG_COMMAND.equals(command)
+                || SQL_REPORT_COMMANDS.contains(command); // Part 1 binds modifiedAfter inside the report SQL
     }
+
+    /** The four SQL-report commands. */
+    static final Set<String> SQL_REPORT_COMMANDS = Set.of("import-entitlement-assignment",
+            "import-entitlement-certification", "import-entitlement-certification-status", "import-workgroup-members");
 
     static String fetchResource(String command) {
         EntitySpec spec = fetchSpec(command);
@@ -527,9 +522,14 @@ public final class Main {
         };
     }
 
+    /** One {@code modifiedAfter}-bounded {@code start}/{@code limit} page of a KF Agent resource. */
+    static IncrementalImportService.Fetcher pagedFetcher(KfAgentClient client) {
+        return (resource, start, limit, modifiedAfterIso) -> client.fetch(resource, start, limit, modifiedAfterIso).body();
+    }
+
     /**
-     * Incremental import (opt-in): rows modified after the stored watermark minus the overlap, one KF Agent request,
-     * the ordinary writer, and a watermark advance only when no row failed. Never sweeps.
+     * Incremental import (opt-in): rows modified after the stored watermark minus the overlap, read page by page, the
+     * ordinary writer, and a watermark advance only when no row failed. Never sweeps.
      */
     private static int runIncremental(Function<String, EntityWriter> writerForSchema, IncrementalCursor cursor) {
         try {
@@ -541,8 +541,9 @@ public final class Main {
             KfAgentClient client = new KfAgentClient(config);
             EntityWriter writer = writerForSchema.apply(config.pgSchema());
             Duration overlap = IncrementalConfig.overlapWindow();
-            IncrementalImportService service = new IncrementalImportService(client::fetchSnapshot, writer,
-                    new WatermarkService(config.pgSchema()), overlap, cursor);
+            IncrementalImportService service = new IncrementalImportService(pagedFetcher(client), writer,
+                    new WatermarkService(config.pgSchema()), overlap, cursor, config.pageSize(),
+                    java.time.Clock.systemUTC());
 
             try (Connection conn = PostgresConnection.open(config)) {
                 IncrementalImportService.Outcome o = service.run(conn, runId);
@@ -590,7 +591,7 @@ public final class Main {
      */
     private static int runReconcileWorkItems() {
         try {
-            AppConfig config = AppConfig.load();
+            AppConfig config = AppConfig.loadDatabaseOnly(); // reads loaded tables only; no KF Agent call
             String runId = RunLedger.runIdOrNew();
             System.out.println(config.describe());
             System.out.println("extraction_run_id: " + runId);
@@ -807,26 +808,23 @@ public final class Main {
 
             KfAgentClient client = new KfAgentClient(config);
             EntityWriter writer = writerForSchema.apply(config.pgSchema());
-            Optional<SweepPolicies.SweepConfig> sweep = SweepPolicies.configFor(writer.targetTable());
 
             try (Connection conn = PostgresConnection.open(config)) {
-                if (!shouldRunSnapshotSweep(options, sweep.isPresent())) {
-                    // Scoped requests and tables without sweep policies use the existing ordinary writer path.
-                    EntityImportService importer = new EntityImportService(client, writer, config.pageSize());
-                    ImportResult result = options.isEmpty() ? importer.run(conn, runId)
-                            : importer.run(conn, runId, options);
-                    RunLedger.record(counts(writer.targetTable(), result, null));
-                    System.out.println();
-                    System.out.println(result.summary());
-                    if (!options.isEmpty()) System.out.println("  fetch:     caller-scoped partial import; no deletion sweep");
-                    return result.failed() > 0 ? 6 : 0;
-                }
-                SnapshotSweepImportService.Outcome outcome = new SnapshotSweepImportService(client::fetchSnapshot,
-                        writer, sweep.get(), new SoftDeleteSweeper(config.pgSchema()), false, options).run(conn, runId);
-                RunLedger.record(counts(writer.targetTable(), outcome.result(), outcome.sweep()));
+                // Full runs page start/limit until a short page (Part 1 serves each window directly, no counted
+                // whole-entity read); caller-scoped runs fetch exactly the requested window or filter.
+                EntityImportService importer = new EntityImportService(client, writer, config.pageSize());
+                ImportResult result = options.isEmpty() ? importer.run(conn, runId)
+                        : importer.run(conn, runId, options);
+                RunLedger.record(counts(writer.targetTable(), result, null));
                 System.out.println();
-                System.out.println(outcome.result().summary());
-                return printSweep(outcome.sweep(), outcome.result().failed());
+                System.out.println(result.summary());
+                if (!options.isEmpty()) {
+                    System.out.println("  fetch:     caller-scoped partial import; no deletion sweep");
+                } else if (SweepPolicies.configFor(writer.targetTable()).isPresent()) {
+                    System.out.println("  sweep:     not run (paged import; deletion detection is not yet "
+                            + "implemented for paged reads)");
+                }
+                return result.failed() > 0 ? 6 : 0;
             }
         } catch (ConfigException e) {
             System.err.println("Configuration error: " + e.getMessage());
@@ -848,9 +846,9 @@ public final class Main {
     }
 
     /**
-     * Runs the syslog import: streams /kfagent/syslog-events page by page (append-only) and confirms the scan is
-     * complete against the agent's X-KF-Source-Count. A scan that cannot be confirmed complete exits 7 with the
-     * partial counts; rows already appended are kept (immutable, skipped on re-run).
+     * Runs the syslog import: streams /kfagent/syslog-events page by page (append-only) until a short page. Page reads
+     * carry no X-KF-Source-Count; when a page does report one, a scan that does not reach it (or a count that shrinks)
+     * exits 7 with the partial counts. Rows already appended are kept (immutable, skipped on re-run).
      */
     private static int runSyslogImport() {
         try {
@@ -908,25 +906,6 @@ public final class Main {
                 sweep == null ? null : sweep.marked(), sweep == null ? null : sweep.revived());
     }
 
-    /** Prints the sweep line; exit 7 when completeness could not be proven (the deletion state may be stale). */
-    private static int printSweep(SoftDeleteSweeper.Result sweep, int failedRows) {
-        if (sweep.swept()) {
-            System.out.println("  sweep:     marked deleted " + sweep.marked() + ", revived " + sweep.revived()
-                    + " (keep-set " + sweep.keepCount() + "; " + sweep.note() + ")");
-        } else {
-            System.out.println("  sweep:     " + sweep.status() + " — " + sweep.note()
-                    + " (no row was marked deleted or revived)");
-        }
-        boolean unproven = sweep.status() == SoftDeleteSweeper.Status.SKIPPED_COMPLETENESS_FAILED
-                || sweep.status() == SoftDeleteSweeper.Status.SKIPPED_NOT_VERIFIED;
-        if (unproven) {
-            System.err.println("Deletion sweep skipped: snapshot completeness not proven — " + sweep.note());
-            RunLedger.error("deletion sweep skipped: " + sweep.note());
-            return 7;
-        }
-        return failedRows > 0 ? 6 : 0;
-    }
-
     /**
      * Incremental parent + children (see {@link FamilyIncrementalImportService}): every dataset is fetched with the same
      * bound before anything is written, and the shared watermark advances only if no row failed in any of them.
@@ -945,8 +924,9 @@ public final class Main {
                 children.add(c.apply(config.pgSchema()));
             }
             Duration overlap = IncrementalConfig.overlapWindow();
-            FamilyIncrementalImportService service = new FamilyIncrementalImportService(client::fetchSnapshot,
-                    parent, children, new WatermarkService(config.pgSchema()), overlap);
+            FamilyIncrementalImportService service = new FamilyIncrementalImportService(pagedFetcher(client),
+                    parent, children, new WatermarkService(config.pgSchema()), overlap, config.pageSize(),
+                    java.time.Clock.systemUTC());
 
             try (Connection conn = PostgresConnection.open(config)) {
                 FamilyIncrementalImportService.Outcome o = service.run(conn, runId);
@@ -993,10 +973,10 @@ public final class Main {
     }
 
     /**
-     * Incremental syslog: the same paged, complete-scan-guarded import as {@link #runSyslogImport()}, with every
-     * page bounded to events created after the stored watermark minus the overlap window (no watermark = a full
-     * scan that sets the baseline). The watermark ({@code max(created_at)}) advances only after a scan confirmed
-     * complete with no row failures; an incomplete scan exits 7 and leaves it unchanged. Never sweeps.
+     * Incremental syslog: the same paged import as {@link #runSyslogImport()}, with every page bounded to events
+     * created after the stored watermark minus the overlap window (no watermark = a full paged read that sets the
+     * baseline). The watermark ({@code max(created_at)}, capped at the run's start) advances only when the run had no
+     * row failures; an incomplete scan exits 7 and leaves it unchanged. Never sweeps.
      */
     private static int runSyslogIncremental() {
         try {
@@ -1038,7 +1018,8 @@ public final class Main {
                     RunLedger.error("incomplete scan: " + e.getMessage());
                     return 7;
                 }
-                Instant newWatermark = watermarks.maxValue(conn, syslog.targetTable(), IncrementalCursor.CREATED);
+                Instant newWatermark = WatermarkService.capAtRunStart(
+                        watermarks.maxValue(conn, syslog.targetTable(), IncrementalCursor.CREATED), fetchedAt);
                 boolean advanced = watermarks.advanceIfSuccessful(conn, syslog.targetTable(), newWatermark,
                         result.failed(), runId, IncrementalCursor.CREATED);
                 RunLedger.record(counts(syslog.targetTable(), result, null));
@@ -1076,23 +1057,22 @@ public final class Main {
     }
 
     private static void printSyslogScan(SyslogEventImportService service, String status) {
-        System.out.println("  scan:      " + status + " (baseline source count " + service.baselineSourceCount()
-                + ", highest " + service.highWaterSourceCount() + ", distinct in-order rows "
+        String counts = service.baselineSourceCount() < 0
+                ? "no source count reported by the paged reads"
+                : "baseline source count " + service.baselineSourceCount() + ", highest "
+                + service.highWaterSourceCount();
+        System.out.println("  scan:      " + status + " (" + counts + ", distinct in-order rows "
                 + service.inOrderRows() + ", overlapping/out-of-order " + service.overlapRows() + ")");
     }
 
     /**
-     * Runs a SQL-report import: fetch the whole report, then replace the table in one transaction (Part 1's
-     * replace-all semantics). Same config, exit codes and summary as the entity imports.
+     * Runs a SQL-report import into the report's keyed table ({@link SqlReportImportService}): a full run pages through
+     * the report and then marks rows it no longer returns as deleted; a caller-scoped run ({@code start}/{@code limit},
+     * filters, {@code modifiedAfter}) writes exactly that one response. Every row is inserted, updated or skipped by its
+     * uuid. Same config, exit codes and summary as the entity imports.
      */
-    private static int runSqlReport(String entity, String resource, String table, List<String> columns,
-                                    FetchOptions options) {
+    private static int runSqlReport(SqlReportSpec spec, FetchOptions options) {
         FetchOptions fetchOptions = options == null ? FetchOptions.none() : options;
-        if (!fetchOptions.isEmpty() && (!fetchOptions.hasWindow() || fetchOptions.limit() == null
-                || fetchOptions.modifiedAfter() != null || !fetchOptions.filters().isEmpty())) {
-            RunLedger.discard();
-            return 2;
-        }
         try {
             AppConfig config = AppConfig.load();
             String runId = RunLedger.runIdOrNew();
@@ -1101,30 +1081,22 @@ public final class Main {
 
             KfAgentClient client = new KfAgentClient(config);
             try (Connection conn = PostgresConnection.open(config)) {
-                if (!fetchOptions.isEmpty()) {
-                    SqlReportPageSnapshotRepository snapshotRepository =
-                            new SqlReportPageSnapshotRepository(config.pgSchema());
-                    SqlReportPageSnapshotImportService snapshotService =
-                            new SqlReportPageSnapshotImportService(client::fetchPage, snapshotRepository);
-                    ImportResult result = snapshotService.run(conn, entity, resource, runId, fetchOptions);
-                    RunLedger.record(counts(snapshotRepository.rowTable(), result, null));
-                    System.out.println();
-                    System.out.println(result.summary());
-                    System.out.println("  snapshot:  " + snapshotService.lastSnapshotId()
-                            + " (append-only page observation; canonical report table unchanged)");
-                    return result.failed() > 0 ? 6 : 0;
-                }
-
-                SqlReportRepository repository = new SqlReportRepository(config.pgSchema(), table, columns);
+                SqlReportRepository repository = new SqlReportRepository(config.pgSchema(), spec);
                 SqlReportImportService service =
-                        new SqlReportImportService(client::fetchPage, resource, repository, config.pageSize());
-                ImportResult result = service.run(conn, entity, runId);
-                RunLedger.record(counts(repository.targetTable(), result, null));
+                        new SqlReportImportService(client::fetchPage, repository, config.reportPageSize());
+                SqlReportImportService.Outcome o = service.run(conn, runId, fetchOptions);
+                RunLedger.record(counts(repository.targetTable(), o.result(), o.sweep()));
                 System.out.println();
-                System.out.println(result.summary());
-                System.out.println("  replaced:  " + service.lastDeleted()
-                        + " previous row(s) (full snapshot, replace-all in one transaction)");
-                return result.failed() > 0 ? 6 : 0;
+                System.out.println(o.result().summary());
+                if (o.sweep() == null) {
+                    System.out.println("  fetch:     caller-scoped partial import; no row marked deleted");
+                } else if (o.sweep().swept()) {
+                    System.out.println("  deleted:   marked " + o.sweep().marked() + " row(s) the report no longer "
+                            + "returns (of " + o.sweep().keepCount() + " rows returned)");
+                } else {
+                    System.out.println("  deleted:   not marked — " + o.sweep().note());
+                }
+                return o.result().failed() > 0 ? 6 : 0;
             }
         } catch (ConfigException e) {
             System.err.println("Configuration error: " + e.getMessage());
@@ -1192,15 +1164,15 @@ public final class Main {
         System.out.println("  import-policy-violation");
         System.out.println("                       Fetch GET /kfagent/policy-violations and upsert into <PG_DEST_SCHEMA>.kf_violation");
         System.out.println("  import-entitlement-assignment");
-        System.out.println("                       Fetch GET /kfagent/entitlement-assignment (SQL report) and REPLACE <PG_DEST_SCHEMA>.kf_entitlement_assignment");
+        System.out.println("                       Fetch GET /kfagent/entitlement-assignment (SQL report) and upsert into <PG_DEST_SCHEMA>.kf_entitlement_assignment");
         System.out.println("  import-workgroup-member");
         System.out.println("                       Fetch GET /kfagent/workgroupmember and upsert into <PG_DEST_SCHEMA>.kf_workgroup_member");
         System.out.println("  import-entitlement-certification");
-        System.out.println("                       Fetch GET /kfagent/entitlement-certification (SQL report) and REPLACE <PG_DEST_SCHEMA>.kf_entitlement_certification");
+        System.out.println("                       Fetch GET /kfagent/entitlement-certification (SQL report) and upsert into <PG_DEST_SCHEMA>.kf_entitlement_certification");
         System.out.println("  import-entitlement-certification-status");
-        System.out.println("                       Fetch GET /kfagent/entitlement-certification-status (SQL report) and REPLACE <PG_DEST_SCHEMA>.kf_entitlement_certification_status");
+        System.out.println("                       Fetch GET /kfagent/entitlement-certification-status (SQL report) and upsert into <PG_DEST_SCHEMA>.kf_entitlement_certification_status");
         System.out.println("  import-workgroup-members");
-        System.out.println("                       Fetch GET /kfagent/workgroup-members (SQL report) and REPLACE <PG_DEST_SCHEMA>.kf_workgroup_members");
+        System.out.println("                       Fetch GET /kfagent/workgroup-members (SQL report) and upsert into <PG_DEST_SCHEMA>.kf_workgroup_members");
         System.out.println("  import-audit-event");
         System.out.println("                       Fetch GET /kfagent/audit-events and append into <PG_DEST_SCHEMA>.kf_audit_event");
         System.out.println("  import-task-result");
@@ -1220,7 +1192,7 @@ public final class Main {
         System.out.println("  import-access-history-role-event");
         System.out.println("                       Fetch GET /kfagent/access-history/role-events and append into <PG_DEST_SCHEMA>.kf_access_hist_role_event");
         System.out.println("  import-syslog-event");
-        System.out.println("                       Page GET /kfagent/syslog-events (complete-scan guarded) and append into <PG_DEST_SCHEMA>.kf_syslog_event");
+        System.out.println("                       Page GET /kfagent/syslog-events and append into <PG_DEST_SCHEMA>.kf_syslog_event");
         System.out.println();
         System.out.println("  reconcile-native-workitems");
         System.out.println("                       Reconcile loaded approval work_item_id references against kf_workitem +");
@@ -1250,8 +1222,9 @@ public final class Main {
         System.out.println("                       one at a time). REST_HOST (127.0.0.1), REST_PORT (8200); every request uses");
         System.out.println("                       HTTP Basic Auth with KFAGENT_USERNAME / KFAGENT_PASSWORD (both required)");
         System.out.println();
-        System.out.println("Required env: KFAGENT_BASE_URL, PG_HOST, PG_DATABASE, PG_USERNAME, PG_PASSWORD");
+        System.out.println("Required env: KFAGENT_BASE_URL, KFAGENT_USERNAME, KFAGENT_PASSWORD, PG_HOST, PG_DATABASE,");
+        System.out.println("              PG_USERNAME, PG_PASSWORD (derive-* and reconcile-* need only the PG_* settings)");
         System.out.println("Optional env: PG_PORT (5432), PG_DEST_SCHEMA (iiq_native_part2), KFAGENT_PAGE_SIZE (500),");
-        System.out.println("              HTTP_TIMEOUT_SECONDS (60), KFAGENT_USERNAME, KFAGENT_PASSWORD");
+        System.out.println("              KFAGENT_REPORT_PAGE_SIZE (200000), HTTP_TIMEOUT_SECONDS (60)");
     }
 }

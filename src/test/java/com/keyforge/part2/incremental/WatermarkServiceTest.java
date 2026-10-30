@@ -17,6 +17,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** Watermark rules ported from Part 1, the CLI mode flags, the overlap config, and Part 1's table DDL. */
 class WatermarkServiceTest {
 
+    @Test
+    void capAtRunStartKeepsTheEarlierOfTheTwo() {
+        Instant start = Instant.parse("2026-10-30T10:00:00Z");
+        assertEquals(start, WatermarkService.capAtRunStart(start.plusSeconds(540), start), "a change made mid-run");
+        Instant older = start.minusSeconds(3600);
+        assertEquals(older, WatermarkService.capAtRunStart(older, start));
+        assertNull(WatermarkService.capAtRunStart(null, start), "nothing loaded -> nothing to store");
+    }
+
     private static final Instant W = Instant.parse("2026-10-09T14:21:07.184Z");
 
     @Test

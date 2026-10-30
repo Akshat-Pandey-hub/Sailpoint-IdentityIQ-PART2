@@ -30,9 +30,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@link FamilyIncrementalImportService}: a parent and its children share ONE bound and ONE watermark; everything is
- * fetched before anything is written; the watermark advances only when the parent and every child loaded with no
- * failure, so a failed child can never be skipped by a later run.
+ * {@link FamilyIncrementalImportService}: a parent and its children share ONE bound and ONE watermark; each dataset is
+ * paged and written page by page; the watermark advances only when the parent and every child loaded with no failure,
+ * so a failed child can never be skipped by a later run.
  */
 class FamilyIncrementalImportServiceTest {
 
@@ -159,10 +159,10 @@ class FamilyIncrementalImportServiceTest {
         final List<String> calls = new ArrayList<>();
 
         @Override
-        public KfAgentClient.Snapshot fetch(String resource, String modifiedAfterIso) {
+        public String fetchPage(String resource, int start, int limit, String modifiedAfterIso) {
             calls.add(resource + "?" + modifiedAfterIso);
             if (failures.containsKey(resource)) throw failures.get(resource);
-            return new KfAgentClient.Snapshot(bodies.getOrDefault(resource, "[]"), null);
+            return start == 0 ? bodies.getOrDefault(resource, "[]") : "[]"; // test bodies fit in one short page
         }
     }
 
@@ -243,20 +243,20 @@ class FamilyIncrementalImportServiceTest {
     }
 
     @Test
-    void aFailedChildFetchWritesNothingAtAll() throws Exception {
+    void aFailedChildFetchNeverAdvancesTheWatermark() throws Exception {
         Agent a = agent(rows("r1", T1), rows("i1", T1), rows("a1", T1));
         a.failures.put("identity-request-approvals", new KfAgentClient.KfAgentHttpException("HTTP 500"));
         assertThrows(KfAgentClient.KfAgentHttpException.class, () -> service(a).run(db.connection(), "run-1"));
-        assertTrue(parent.written.isEmpty() && items.written.isEmpty() && approvals.written.isEmpty(),
-                "all datasets are fetched before any write");
-        assertNull(db.watermarks.get(KEY));
+        assertTrue(approvals.written.isEmpty(), "nothing of the failed dataset is written");
+        assertTrue(parent.written.contains("r1"), "pages already read stay written (idempotent upserts)");
+        assertNull(db.watermarks.get(KEY), "no watermark: the next run reads the same window again");
     }
 
     @Test
-    void aNonArrayChildResponseWritesNothingAtAll() {
+    void aNonArrayChildResponseNeverAdvancesTheWatermark() {
         Agent a = agent(rows("r1", T1), "{\"error\":\"Unauthorized\"}", "[]");
         assertThrows(KfAgentClient.KfAgentHttpException.class, () -> service(a).run(db.connection(), "run-1"));
-        assertTrue(parent.written.isEmpty());
+        assertTrue(items.written.isEmpty());
         assertNull(db.watermarks.get(KEY));
     }
 }
