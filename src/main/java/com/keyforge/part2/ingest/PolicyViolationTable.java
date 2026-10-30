@@ -66,7 +66,8 @@ public final class PolicyViolationTable {
             SOURCE_SYSTEM, SOURCE_INTERFACE, SOURCE_OBJECT_TYPE);
 
     public static String violationId(JsonNode row) {
-        return CanonicalIds.violationId(text(row, "source_id"), text(row, "name"));
+        // no IIQ id: a uuid from the full content, never a shared substitute or a refused row
+        return CanonicalIds.bySourceIdOrContent(row, "native-violation", () -> CanonicalIds.violationId(text(row, "source_id"), text(row, "name")));
     }
 
     /** Part 1 {@code NativeViolationRepository.recordHash}: every business column, lineage excluded. */

@@ -65,6 +65,9 @@ public final class TaskScheduleTable {
 
     /** Part 1 {@code NativeTaskScheduleRepository.canonicalTaskScheduleId}. */
     public static String taskScheduleId(JsonNode row) {
+        if (CanonicalIds.blank(text(row, "source_id")) && CanonicalIds.blank(text(row, "name"))) {
+            return CanonicalIds.contentUuid("native-task-schedule", row); // neither IIQ id nor name
+        }
         String sourceId = text(row, "source_id");
         String id = CanonicalIds.canonicalUuid(sourceId);
         if (id == null) {

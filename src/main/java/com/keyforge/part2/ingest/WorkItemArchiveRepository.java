@@ -178,13 +178,15 @@ public final class WorkItemArchiveRepository implements EntityWriter {
         }
     }
 
-    /** Part 1 {@code NativeWorkItemArchiveRepository.canonicalArchiveId}: canonical source_id, no fallback. */
+    /** The archive uuid: canonical source_id; a non-GUID id name-based on it; no id → the row's content. */
     public static String id(JsonNode row) {
-        String id = CanonicalIds.canonicalUuid(text(row, "source_id"));
-        if (id == null) {
-            throw new IllegalArgumentException("WorkItemArchive source id is required; archiveid must derive from getId()");
+        if (CanonicalIds.blank(text(row, "source_id"))) {
+            return CanonicalIds.contentUuid("native-workitem-archive", row); // no IIQ id: a uuid from the full content
         }
-        return id;
+        String sourceId = text(row, "source_id");
+        String id = CanonicalIds.canonicalUuid(sourceId);
+        // a non-GUID id: name-based on the id, never refused
+        return id != null ? id : CanonicalIds.deterministicUuid("native-workitem-archive|" + sourceId);
     }
 
     /** Part 1 {@code NativeWorkItemArchiveRepository.recordHash}: all 29 fields. */

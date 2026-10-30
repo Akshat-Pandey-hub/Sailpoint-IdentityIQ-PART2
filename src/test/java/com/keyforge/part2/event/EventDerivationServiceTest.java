@@ -113,6 +113,13 @@ class EventDerivationServiceTest {
                                 if (q.startsWith("SELECT EXISTS")) {
                                     return bool(sources.containsKey((String) bound.get(2)));
                                 }
+                                if (q.contains("kf_chunk_key")) { // one chunk of a source table (all rows: one chunk)
+                                    String chunkTable = q.substring(q.indexOf("FROM (SELECT * FROM " + S + ".") + ("FROM (SELECT * FROM " + S + ".").length());
+                                    chunkTable = chunkTable.substring(0, chunkTable.indexOf(' '));
+                                    List<Map<String, Object>> rows = sources.get(chunkTable);
+                                    if (rows == null) throw new SQLException("relation " + chunkTable + " does not exist");
+                                    return sourceRows(rows);
+                                }
                                 if (++insertAttempts == failOnInsertNumber) {
                                     throw new SQLException("simulated insert failure");
                                 }
@@ -190,7 +197,7 @@ class EventDerivationServiceTest {
     }
 
     @Test
-    void derivesFromEverySourceInOneCommittedTransaction() throws Exception {
+    void derivesFromEverySourceChunkByChunk() throws Exception {
         Db db = fullDb();
         EventDerivationService.Result r = new EventDerivationService(S).derive(db.connection(), "run-1");
 
@@ -205,7 +212,7 @@ class EventDerivationServiceTest {
         assertEquals(0, r.eventsAlreadyPresent());
         assertEquals(Map.of("APPROVAL_DECISION", 1, "TASK_COMPLETED", 1, "TASK_LAUNCHED", 1, "PROVISIONING_TXN", 1,
                 "WORKITEM_ARCHIVED", 1, "CERTIFICATION_DECISION", 1), r.eventsByType);
-        assertEquals(1, db.commits);
+        assertEquals(6, db.commits, "one for the table, then one per source chunk (5 sources, one chunk each)");
         assertEquals(0, db.rollbacks);
         assertTrue(db.autoCommit, "auto-commit restored");
         assertEquals(6, db.committed.size());
@@ -267,16 +274,30 @@ class EventDerivationServiceTest {
     }
 
     @Test
-    void aFailureRollsBackTheWholePass() {
+    void aFailingChunkIsRolledBackAndEarlierChunksStay() {
         Db db = fullDb();
-        db.failOnInsertNumber = 4;
+        db.failOnInsertNumber = 4; // approval (1 event) and tasks (2 events) are committed; provisioning fails
         SQLException e = assertThrows(SQLException.class,
                 () -> new EventDerivationService(S).derive(db.connection(), "run-1"));
         assertEquals("simulated insert failure", e.getMessage());
-        assertEquals(0, db.commits);
-        assertEquals(1, db.rollbacks);
-        assertTrue(db.committed.isEmpty(), "kf_event unchanged");
+        assertEquals(1, db.rollbacks, "the failing chunk is rolled back");
+        assertEquals(3, db.committed.size(), "earlier chunks stay (appends are idempotent: a re-run completes the rest)");
         assertTrue(db.autoCommit);
+    }
+
+    @Test
+    void theChunkQueryAppliesTheWindowAndTheIncrementalBound() {
+        EventDerivationService.Scope all = EventDerivationService.Scope.ALL;
+        String sql = EventDerivationService.chunkSql(S, EventDerivationService.TASK_SOURCE, all, 1000);
+        assertTrue(sql.contains("FROM (SELECT * FROM " + S + ".kf_task_result ORDER BY taskresultid OFFSET ?) w"), sql);
+        assertTrue(sql.endsWith("WHERE (?::uuid IS NULL OR taskresultid > ?::uuid) ORDER BY taskresultid LIMIT 1000"),
+                "keyset chunks after the last key read: " + sql);
+        assertFalse(sql.contains("extracted_at"), "a full pass reads every row");
+
+        String window = EventDerivationService.chunkSql(S, EventDerivationService.TASK_SOURCE,
+                new EventDerivationService.Scope(1000, 500, java.time.Instant.parse("2026-10-30T10:00:00Z")), 1000);
+        assertTrue(window.contains("WHERE extracted_at >= ? ORDER BY taskresultid OFFSET ? LIMIT ?) w"),
+                "incremental: only rows Part 2 wrote since the watermark; then the caller's start/limit: " + window);
     }
 
     @Test

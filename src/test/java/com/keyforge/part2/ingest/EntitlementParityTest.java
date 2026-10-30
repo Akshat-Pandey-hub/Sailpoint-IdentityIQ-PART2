@@ -1,5 +1,6 @@
 package com.keyforge.part2.ingest;
 
+import com.keyforge.part2.testsupport.ExpectedKey;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.keyforge.part2.hash.RecordHash;
@@ -58,7 +59,7 @@ class EntitlementParityTest {
         List<Golden> gs = golden();
         assertEquals("7f000101-9eb9-1d3c-819f-01f0c4127efb", gs.get(0).id(), "canonical form of source_id");
         for (Golden g : gs) {
-            assertEquals(g.id(), EntitlementTable.entitlementId(g.rest()));
+            assertEquals(ExpectedKey.of(g.id(), g.rest(), "native-managedattribute"), EntitlementTable.entitlementId(g.rest()));
         }
     }
 

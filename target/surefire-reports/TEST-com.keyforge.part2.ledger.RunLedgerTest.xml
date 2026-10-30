@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report-3.0.xsd" version="3.0" name="com.keyforge.part2.ledger.RunLedgerTest" time="0.008" tests="11" errors="0" skipped="0" failures="0">
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report-3.0.xsd" version="3.0" name="com.keyforge.part2.ledger.RunLedgerTest" time="0.015" tests="11" errors="0" skipped="0" failures="0">
   <properties>
     <property name="java.specification.version" value="17"/>
     <property name="sun.cpu.isalist" value="amd64"/>
@@ -15,7 +15,7 @@
     <property name="sun.java.launcher" value="SUN_STANDARD"/>
     <property name="user.country" value="IN"/>
     <property name="sun.boot.library.path" value="D:\Java\jdk-17\bin"/>
-    <property name="sun.java.command" value="C:\Users\AKSHAT PANDEY\AppData\Local\Temp\surefire8342259139906098681\surefirebooter-20261030221704702_3.jar C:\Users\AKSHAT PANDEY\AppData\Local\Temp\surefire8342259139906098681 2026-10-30T22-17-04_551-jvmRun1 surefire-20261030221704702_1tmp surefire_0-20261030221704702_2tmp"/>
+    <property name="sun.java.command" value="C:\Users\AKSHAT PANDEY\AppData\Local\Temp\surefire17166021663272929741\surefirebooter-20261031004824065_3.jar C:\Users\AKSHAT PANDEY\AppData\Local\Temp\surefire17166021663272929741 2026-10-31T00-48-23_758-jvmRun1 surefire-20261031004824065_1tmp surefire_0-20261031004824065_2tmp"/>
     <property name="jdk.debug" value="release"/>
     <property name="surefire.test.class.path" value="D:\Sailpoint-IdentityIQ-Part2\target\test-classes;D:\Sailpoint-IdentityIQ-Part2\target\classes;C:\Users\AKSHAT PANDEY\.m2\repository\com\fasterxml\jackson\core\jackson-databind\2.18.11\jackson-databind-2.18.11.jar;C:\Users\AKSHAT PANDEY\.m2\repository\com\fasterxml\jackson\core\jackson-annotations\2.18.11\jackson-annotations-2.18.11.jar;C:\Users\AKSHAT PANDEY\.m2\repository\com\fasterxml\jackson\core\jackson-core\2.18.11\jackson-core-2.18.11.jar;C:\Users\AKSHAT PANDEY\.m2\repository\org\postgresql\postgresql\42.7.12\postgresql-42.7.12.jar;C:\Users\AKSHAT PANDEY\.m2\repository\org\junit\jupiter\junit-jupiter\5.10.2\junit-jupiter-5.10.2.jar;C:\Users\AKSHAT PANDEY\.m2\repository\org\junit\jupiter\junit-jupiter-api\5.10.2\junit-jupiter-api-5.10.2.jar;C:\Users\AKSHAT PANDEY\.m2\repository\org\opentest4j\opentest4j\1.3.0\opentest4j-1.3.0.jar;C:\Users\AKSHAT PANDEY\.m2\repository\org\junit\platform\junit-platform-commons\1.10.2\junit-platform-commons-1.10.2.jar;C:\Users\AKSHAT PANDEY\.m2\repository\org\apiguardian\apiguardian-api\1.1.2\apiguardian-api-1.1.2.jar;C:\Users\AKSHAT PANDEY\.m2\repository\org\junit\jupiter\junit-jupiter-params\5.10.2\junit-jupiter-params-5.10.2.jar;C:\Users\AKSHAT PANDEY\.m2\repository\org\junit\jupiter\junit-jupiter-engine\5.10.2\junit-jupiter-engine-5.10.2.jar;C:\Users\AKSHAT PANDEY\.m2\repository\org\junit\platform\junit-platform-engine\1.10.2\junit-platform-engine-1.10.2.jar;"/>
     <property name="sun.cpu.endian" value="little"/>
@@ -30,7 +30,7 @@
     <property name="line.separator" value="&#10;"/>
     <property name="java.vm.specification.vendor" value="Oracle Corporation"/>
     <property name="java.specification.name" value="Java Platform API Specification"/>
-    <property name="surefire.real.class.path" value="C:\Users\AKSHAT PANDEY\AppData\Local\Temp\surefire8342259139906098681\surefirebooter-20261030221704702_3.jar"/>
+    <property name="surefire.real.class.path" value="C:\Users\AKSHAT PANDEY\AppData\Local\Temp\surefire17166021663272929741\surefirebooter-20261031004824065_3.jar"/>
     <property name="user.script" value=""/>
     <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
     <property name="jdk.net.unixdomain.tmpdir" value="D:\Sailpoint-IdentityIQ-Part2\target"/>
@@ -61,16 +61,16 @@
   </properties>
   <testcase name="discardedRunsAndCallsOutsideARunRecordNothing" classname="com.keyforge.part2.ledger.RunLedgerTest" time="0.0"/>
   <testcase name="aFailedRunIsRecordedWithItsError" classname="com.keyforge.part2.ledger.RunLedgerTest" time="0.0"/>
-  <testcase name="aLedgerWriteFailureNeverChangesTheExitCode" classname="com.keyforge.part2.ledger.RunLedgerTest" time="0.001">
-    <system-err><![CDATA[[run-ledger] could not record extraction run 2217ad8f-d2f8-420e-96f9-addf8e3d17d5 (import-work-item): PostgreSQL unreachable
+  <testcase name="aLedgerWriteFailureNeverChangesTheExitCode" classname="com.keyforge.part2.ledger.RunLedgerTest" time="0.0">
+    <system-err><![CDATA[[run-ledger] could not record extraction run fa215c3c-6f77-43ac-bddb-50b805b89b20 (import-work-item): PostgreSQL unreachable
 ]]></system-err>
   </testcase>
   <testcase name="oneRowPerRunWhoseIdIsTheExtractionRunIdStampedOnRows" classname="com.keyforge.part2.ledger.RunLedgerTest" time="0.0"/>
-  <testcase name="entityCountsCarrySkippedAndTheSweepOutcome" classname="com.keyforge.part2.ledger.RunLedgerTest" time="0.002"/>
-  <testcase name="buildRunSumsAllTables" classname="com.keyforge.part2.ledger.RunLedgerTest" time="0.001"/>
-  <testcase name="reconcileCommandsAreRecordedAsDerived" classname="com.keyforge.part2.ledger.RunLedgerTest" time="0.0"/>
+  <testcase name="entityCountsCarrySkippedAndTheSweepOutcome" classname="com.keyforge.part2.ledger.RunLedgerTest" time="0.005"/>
+  <testcase name="buildRunSumsAllTables" classname="com.keyforge.part2.ledger.RunLedgerTest" time="0.0"/>
+  <testcase name="reconcileCommandsAreRecordedAsDerived" classname="com.keyforge.part2.ledger.RunLedgerTest" time="0.003"/>
   <testcase name="aRunnerThatThrowsIsStillRecordedAndTheExceptionPropagates" classname="com.keyforge.part2.ledger.RunLedgerTest" time="0.0"/>
-  <testcase name="incompleteRunsAreRecordedAsIncomplete" classname="com.keyforge.part2.ledger.RunLedgerTest" time="0.001"/>
+  <testcase name="incompleteRunsAreRecordedAsIncomplete" classname="com.keyforge.part2.ledger.RunLedgerTest" time="0.0"/>
   <testcase name="statusesFollowPart1PlusIncomplete" classname="com.keyforge.part2.ledger.RunLedgerTest" time="0.0"/>
   <testcase name="repeatRunsGetDistinctIds" classname="com.keyforge.part2.ledger.RunLedgerTest" time="0.0"/>
 </testsuite>

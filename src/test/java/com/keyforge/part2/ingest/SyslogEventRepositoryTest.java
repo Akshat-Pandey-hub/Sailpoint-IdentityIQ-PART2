@@ -69,13 +69,13 @@ class SyslogEventRepositoryTest {
     }
 
     @Test
-    void fallbackKeysFollowPart1() throws Exception {
+    void fallbackKeys() throws Exception {
         ObjectNode r = golden().get(0).rest().deepCopy();
         r.put("source_id", "not-a-guid");
         assertEquals(CanonicalIds.deterministicUuid("native-syslog|not-a-guid"), SyslogEventRepository.id(r));
         r.putNull("source_id");
-        assertEquals(CanonicalIds.deterministicUuid("native-syslog|0000000001"), SyslogEventRepository.id(r),
-                "null source_id falls back to quick_key");
+        assertEquals(CanonicalIds.contentUuid("native-syslog", r), SyslogEventRepository.id(r),
+                "no IIQ id: a uuid from the row content, never quick_key alone");
     }
 
     @Test

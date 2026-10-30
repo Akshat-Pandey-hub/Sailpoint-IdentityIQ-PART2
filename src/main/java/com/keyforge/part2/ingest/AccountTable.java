@@ -74,8 +74,9 @@ public final class AccountTable {
             SOURCE_SYSTEM, SOURCE_INTERFACE, SOURCE_OBJECT_TYPE);
 
     public static String accountId(JsonNode row) {
-        return CanonicalIds.accountId(text(row, "source_id"), text(row, "application_name"),
-                text(row, "native_identity"));
+        return CanonicalIds.byIdNaturalKeyOrContent(row, "native-link", () -> CanonicalIds.accountId(
+                text(row, "source_id"), text(row, "application_name"), text(row, "native_identity")),
+                "application_name", "native_identity");
     }
 
     /** Part 1 {@code NativeLinkRepository.recordHash}: every business column, lineage excluded. */

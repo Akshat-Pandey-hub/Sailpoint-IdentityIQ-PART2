@@ -236,6 +236,9 @@ public final class AccessHistoryEntitlementRepository implements EntityWriter {
 
     /** Part 1 {@code NativeHistEntitlementCaptureRepository.canonicalId}. */
     public static String id(JsonNode row) {
+        if (CanonicalIds.blank(text(row, "source_id"))) {
+            return CanonicalIds.contentUuid("native-hist-ent", row); // no IIQ id: a uuid from the full content
+        }
         String sourceId = text(row, "source_id");
         String id = CanonicalIds.canonicalUuid(sourceId);
         if (id == null) {

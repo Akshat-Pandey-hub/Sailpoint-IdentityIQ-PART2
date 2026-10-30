@@ -72,14 +72,11 @@ class ProvisioningTxnTableTest {
         assertEquals("7f000101-9fa7-1124-819f-b3e125ab1777", gs.get(0).id(), "canonical IIQ id");
         assertEquals(CanonicalIds.deterministicUuid("native-provisioning-txn|txn-not-a-guid"), gs.get(1).id(),
                 "non-GUID id -> name-based on the id");
-        // null / blank ids are refused (Part 1's parser and repository both reject them)
-        assertThrows(IllegalArgumentException.class, () -> CanonicalIds.provisioningTxnId(null));
-        assertThrows(IllegalArgumentException.class, () -> CanonicalIds.provisioningTxnId("   "));
+        // a row without an IIQ id is stored under a uuid from its content, never refused
         ObjectNode noId = gs.get(0).rest().deepCopy();
         noId.putNull("source_id");
-        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                () -> repo.upsert(new RecordingJdbc().connection(), noId, "run-1"));
-        assertTrue(e.getMessage().contains("source id is required"), e.getMessage());
+        assertEquals(CanonicalIds.contentUuid("native-provisioning-txn", noId), ProvisioningTxnTable.provisioningTxnId(noId));
+        assertEquals(EntityRepository.Outcome.INSERTED, repo.upsert(new RecordingJdbc().connection(), noId, "run-1"));
         // unlike items, the txn key does not depend on content
         ObjectNode changed = gs.get(0).rest().deepCopy();
         changed.put("status", "Success").put("item_count", 9).put("name", "x");

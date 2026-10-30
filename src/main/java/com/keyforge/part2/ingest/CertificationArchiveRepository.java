@@ -172,6 +172,9 @@ public final class CertificationArchiveRepository implements EntityWriter {
 
     /** Part 1 {@code NativeCertificationArchiveRepository.canonicalArchiveId}. */
     public static String id(JsonNode row) {
+        if (CanonicalIds.blank(text(row, "source_id"))) {
+            return CanonicalIds.contentUuid("native-certification-archive", row); // no IIQ id: a uuid from the full content
+        }
         String sourceId = text(row, "source_id");
         String id = CanonicalIds.canonicalUuid(sourceId);
         if (id == null) {

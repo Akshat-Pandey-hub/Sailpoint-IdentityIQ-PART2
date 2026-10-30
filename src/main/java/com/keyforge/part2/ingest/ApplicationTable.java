@@ -100,7 +100,7 @@ public final class ApplicationTable {
             SOURCE_SYSTEM, SOURCE_INTERFACE, SOURCE_OBJECT_TYPE);
 
     public static String applicationId(JsonNode row) {
-        return CanonicalIds.applicationId(text(row, "source_id"), text(row, "name"));
+        return CanonicalIds.byIdNaturalKeyOrContent(row, "native-application", () -> CanonicalIds.applicationId(text(row, "source_id"), text(row, "name")), "name");
     }
 
     /**

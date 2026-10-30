@@ -285,14 +285,16 @@ class SqlReportImportServiceTest {
     }
 
     @Test
-    void aDuplicateKeyInOneRunFailsTheRowAndBlocksDeletionMarking() throws Exception {
+    void repeatedKeyColumnsInOneRunNeverLoseOrOverwriteARow() throws Exception {
         Db db = new Db();
-        Agent agent = new Agent("WG1|alice|Active", "WG1|alice|Disabled", "WG2|carol|Active");
+        // a different row with the same key columns, and an exact repeat of a row
+        Agent agent = new Agent("WG1|alice|Active", "WG1|alice|Disabled", "WG2|carol|Active", "WG2|carol|Active");
         SqlReportImportService.Outcome o = service(agent, 500).run(db.connection(), "run", FetchOptions.none());
-        assertEquals(1, o.result().failed(), "the second row with the same key is not written over the first");
-        assertEquals(2, o.result().inserted());
-        assertFalse(o.sweep().swept(), "no row is marked deleted after a failed row");
-        assertEquals(SoftDeleteSweeper.Status.SKIPPED_ROW_FAILURES, o.sweep().status());
+        assertEquals(0, o.result().failed(), "nothing is rejected");
+        assertEquals(3, o.result().inserted(), "both alice rows are kept: the second under its content uuid");
+        assertEquals(1, o.result().skipped(), "the exact repeat of carol's row is the same record");
+        assertEquals(3, db.rows.size());
+        assertTrue(o.sweep().swept());
     }
 
     @Test

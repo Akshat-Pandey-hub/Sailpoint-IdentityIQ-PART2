@@ -89,19 +89,25 @@ public final class WorkItemReconciliation {
         return "SELECT count(*) FROM " + qualified(schema, table);
     }
 
+    /** Work items still present in IIQ: a row marked deleted is gone from the source (completed / archived). */
+    static String liveWorkItemsSql(String schema) {
+        return countSql(schema, WORKITEM) + " WHERE NOT is_deleted";
+    }
+
     static String distinctRefsSql(String schema) {
         return "SELECT count(DISTINCT work_item_id) FROM " + qualified(schema, APPROVAL)
-                + " WHERE work_item_id IS NOT NULL AND work_item_id <> ''";
+                + " WHERE work_item_id IS NOT NULL AND work_item_id <> '' AND NOT is_deleted";
     }
 
     private static String refsCte(String schema) {
+        // only approvals still present in IIQ (rows marked deleted are gone from the source)
         return "SELECT DISTINCT work_item_id AS wid FROM " + qualified(schema, APPROVAL)
-                + " WHERE work_item_id IS NOT NULL AND work_item_id <> ''";
+                + " WHERE work_item_id IS NOT NULL AND work_item_id <> '' AND NOT is_deleted";
     }
 
     static String matchedLiveSql(String schema) {
         return "SELECT count(*) FROM (" + refsCte(schema) + ") r WHERE EXISTS ("
-                + "SELECT 1 FROM " + qualified(schema, WORKITEM) + " w WHERE w.source_id = r.wid)";
+                + "SELECT 1 FROM " + qualified(schema, WORKITEM) + " w WHERE w.source_id = r.wid AND NOT w.is_deleted)";
     }
 
     static String matchedArchiveSql(String schema) {
@@ -111,13 +117,13 @@ public final class WorkItemReconciliation {
 
     static String matchedEitherSql(String schema) {
         return "SELECT count(*) FROM (" + refsCte(schema) + ") r WHERE "
-                + "EXISTS (SELECT 1 FROM " + qualified(schema, WORKITEM) + " w WHERE w.source_id = r.wid) "
+                + "EXISTS (SELECT 1 FROM " + qualified(schema, WORKITEM) + " w WHERE w.source_id = r.wid AND NOT w.is_deleted) "
                 + "OR EXISTS (SELECT 1 FROM " + qualified(schema, ARCHIVE) + " a WHERE a.work_item_id = r.wid)";
     }
 
     static String unmatchedSamplesSql(String schema, int limit) {
         return "SELECT r.wid FROM (" + refsCte(schema) + ") r WHERE "
-                + "NOT EXISTS (SELECT 1 FROM " + qualified(schema, WORKITEM) + " w WHERE w.source_id = r.wid) "
+                + "NOT EXISTS (SELECT 1 FROM " + qualified(schema, WORKITEM) + " w WHERE w.source_id = r.wid AND NOT w.is_deleted) "
                 + "AND NOT EXISTS (SELECT 1 FROM " + qualified(schema, ARCHIVE) + " a WHERE a.work_item_id = r.wid) "
                 + "ORDER BY r.wid LIMIT " + limit;
     }
@@ -144,7 +150,7 @@ public final class WorkItemReconciliation {
             r.findingId = persist(conn, runId, r);
             return r;
         }
-        r.liveWorkItems = scalar(conn, countSql(schema, WORKITEM));
+        r.liveWorkItems = scalar(conn, liveWorkItemsSql(schema));
         r.workItemArchives = scalar(conn, countSql(schema, ARCHIVE));
         r.approvalRefs = scalar(conn, distinctRefsSql(schema));
         r.matchedLive = scalar(conn, matchedLiveSql(schema));

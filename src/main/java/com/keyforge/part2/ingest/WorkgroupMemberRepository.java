@@ -226,6 +226,6 @@ public final class WorkgroupMemberRepository implements EntityWriter {
 
     private static String text(JsonNode row, String field) {
         JsonNode n = row.get(field);
-        return (n == null || n.isNull()) ? null : n.asText();
+        return (n == null || n.isNull()) ? null : (n.isValueNode() ? n.asText() : n.toString());
     }
 }

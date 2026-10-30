@@ -76,7 +76,7 @@ public final class PolicyTable {
             TRAILING);
 
     public static String policyId(JsonNode row) {
-        return CanonicalIds.policyId(text(row, "source_id"), text(row, "name"));
+        return CanonicalIds.byIdNaturalKeyOrContent(row, "native-policy", () -> CanonicalIds.policyId(text(row, "source_id"), text(row, "name")), "name");
     }
 
     /** Part 1 {@code NativePolicyRepository.recordHash}: all 21 fields, lineage excluded. */

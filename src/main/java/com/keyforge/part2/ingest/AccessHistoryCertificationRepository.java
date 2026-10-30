@@ -150,6 +150,9 @@ public final class AccessHistoryCertificationRepository implements EntityWriter 
 
     /** Part 1 {@code NativeHistCertificationRepository.canonicalId}. */
     public static String id(JsonNode row) {
+        if (CanonicalIds.blank(text(row, "source_id"))) {
+            return CanonicalIds.contentUuid("native-hist-cert", row); // no IIQ id: a uuid from the full content
+        }
         String sourceId = text(row, "source_id");
         String id = CanonicalIds.canonicalUuid(sourceId);
         if (id == null) {

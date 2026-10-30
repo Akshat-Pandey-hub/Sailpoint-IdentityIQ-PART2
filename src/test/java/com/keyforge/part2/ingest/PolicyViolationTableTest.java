@@ -1,5 +1,6 @@
 package com.keyforge.part2.ingest;
 
+import com.keyforge.part2.testsupport.ExpectedKey;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -64,7 +65,7 @@ class PolicyViolationTableTest {
         List<Golden> gs = golden();
         for (Golden g : gs) {
             assertEquals(g.hash(), PolicyViolationTable.recordHash(g.rest()), "record_hash parity for " + g.rest());
-            assertEquals(g.id(), PolicyViolationTable.violationId(g.rest()), "key parity");
+            assertEquals(ExpectedKey.of(g.id(), g.rest(), "native-violation"), PolicyViolationTable.violationId(g.rest()), "key parity");
         }
         assertEquals("7f000101-9f06-1fdc-819f-34b0ac34a1bb", gs.get(0).id());
         assertEquals(CanonicalIds.deterministicUuid("native-violation|No Id Violation"), gs.get(1).id(), "null id -> name");

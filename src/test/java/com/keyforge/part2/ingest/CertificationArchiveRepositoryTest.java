@@ -72,12 +72,14 @@ class CertificationArchiveRepositoryTest {
             assertEquals(g.hash(), CertificationArchiveRepository.recordHash(g.rest()), "record_hash parity for " + g.rest());
             if (!"THROWS".equals(g.id())) {
                 assertEquals(g.id(), CertificationArchiveRepository.id(g.rest()), "key parity");
+            } else {
+                assertEquals(CanonicalIds.contentUuid("native-certification-archive", g.rest()),
+                        CertificationArchiveRepository.id(g.rest()), "no IIQ id: a uuid from the row content");
             }
         }
         assertEquals("7f000101-9f06-1fdc-819f-34b0ac3481ee", gs.get(0).id());
         assertEquals(CanonicalIds.deterministicUuid("native-certification-archive|arch-not-a-guid"), gs.get(1).id());
-        assertEquals("THROWS", gs.get(2).id(), "Part 1 refuses a blank id");
-        assertThrows(IllegalArgumentException.class, () -> CertificationArchiveRepository.id(gs.get(2).rest()));
+        assertEquals("THROWS", gs.get(2).id(), "Part 1 refused a blank id; Part 2 keys it by content instead");
     }
 
     @Test

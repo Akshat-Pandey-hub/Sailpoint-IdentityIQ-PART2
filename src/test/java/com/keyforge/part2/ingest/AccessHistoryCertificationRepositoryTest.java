@@ -1,5 +1,6 @@
 package com.keyforge.part2.ingest;
 
+import com.keyforge.part2.testsupport.ExpectedKey;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -73,7 +74,8 @@ class AccessHistoryCertificationRepositoryTest {
     void keyAndHashMatchPart1() throws Exception {
         List<Golden> gs = golden();
         for (Golden g : gs) {
-            assertEquals(g.id(), AccessHistoryCertificationRepository.id(g.rest()), "hist_cert_id parity");
+            assertEquals(ExpectedKey.of(g.id(), g.rest(), "native-hist-cert"), AccessHistoryCertificationRepository.id(g.rest()),
+                    "hist_cert_id: IIQ id, else the row content");
             assertEquals(g.hash(), AccessHistoryCertificationRepository.recordHash(g.rest()), "record_hash parity");
         }
         assertEquals("7f000101-9f06-1fdc-819f-34b0ac36c1d1", gs.get(0).id());
@@ -113,7 +115,7 @@ class AccessHistoryCertificationRepositoryTest {
             RecordingJdbc jdbc = new RecordingJdbc();
             assertEquals(EntityRepository.Outcome.INSERTED, repo.upsert(jdbc.connection(), g.rest(), "run-hc"));
             Map<Integer, Object> b = jdbc.executions.get(0);
-            assertEquals(g.id(), b.get(1));
+            assertEquals(ExpectedKey.of(g.id(), g.rest(), "native-hist-cert"), b.get(1));
             assertEquals(g.storedCertJson(), b.get(10), "cert_json text exactly as Part 1 stores it");
             assertEquals(g.hash(), b.get(13));
             assertEquals("IdentityIQ", b.get(14));

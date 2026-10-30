@@ -123,6 +123,9 @@ public final class AuditEventRepository implements EntityWriter {
 
     /** Part 1 {@code NativeAuditEventRepository.canonicalAuditId}. */
     public static String id(JsonNode row) {
+        if (CanonicalIds.blank(text(row, "source_id"))) {
+            return CanonicalIds.contentUuid("native-audit", row); // no IIQ id: a uuid from the full content
+        }
         String sourceId = text(row, "source_id");
         String id = CanonicalIds.canonicalUuid(sourceId);
         if (id == null) {

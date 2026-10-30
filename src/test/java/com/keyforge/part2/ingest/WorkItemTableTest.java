@@ -75,12 +75,15 @@ class WorkItemTableTest {
     }
 
     @Test
-    void workItemWithoutUsableIdIsRefusedLikePart1() throws Exception {
+    void aWorkItemWithoutAUsableIdIsStoredNotRefused() throws Exception {
         Golden g = golden().get(2);
-        assertEquals("THROWS", g.id());
-        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                () -> repo.upsert(new RecordingJdbc().connection(), g.rest(), "run-1"));
-        assertTrue(e.getMessage().contains("source id is required"), e.getMessage());
+        assertEquals("THROWS", g.id(), "Part 1 refused this row; Part 2 stores it");
+        String sid = g.rest().path("source_id").asText(null);
+        String expected = sid == null || sid.isBlank()
+                ? com.keyforge.part2.id.CanonicalIds.contentUuid("native-workitem", g.rest())
+                : com.keyforge.part2.id.CanonicalIds.deterministicUuid("native-workitem|" + sid);
+        assertEquals(expected, WorkItemTable.workItemId(g.rest()));
+        assertEquals(EntityRepository.Outcome.INSERTED, repo.upsert(new RecordingJdbc().connection(), g.rest(), "run-1"));
     }
 
     @Test

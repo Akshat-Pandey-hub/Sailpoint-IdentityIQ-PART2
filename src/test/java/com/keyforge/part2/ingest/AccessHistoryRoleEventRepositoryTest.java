@@ -101,7 +101,8 @@ class AccessHistoryRoleEventRepositoryTest {
         assertNotEquals(AccessHistoryIdentityEventRepository.id(r), AccessHistoryRoleEventRepository.id(r),
                 "role events are salted differently from identity events");
         r.putNull("source_id");
-        assertEquals(CanonicalIds.deterministicUuid("native-hist-role-event|null"), AccessHistoryRoleEventRepository.id(r));
+        assertEquals(CanonicalIds.contentUuid("native-hist-role-event", r), AccessHistoryRoleEventRepository.id(r),
+                "no IIQ id: a uuid from the row content");
     }
 
     @Test

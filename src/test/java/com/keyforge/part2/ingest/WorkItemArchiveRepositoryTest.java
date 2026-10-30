@@ -80,14 +80,15 @@ class WorkItemArchiveRepositoryTest {
     }
 
     @Test
-    void nonGuidOrNullIdIsRefusedLikePart1() throws Exception {
+    void nonGuidOrNullIdIsStoredNotRefused() throws Exception {
         List<Golden> gs = golden();
-        assertEquals("THROWS", gs.get(2).id(), "Part 1 refuses a non-GUID id (no fallback)");
-        assertEquals("THROWS", gs.get(3).id(), "Part 1 refuses a null id");
-        assertThrows(IllegalArgumentException.class, () -> WorkItemArchiveRepository.id(gs.get(2).rest()));
-        assertThrows(IllegalArgumentException.class, () -> WorkItemArchiveRepository.id(gs.get(3).rest()));
-        assertThrows(IllegalArgumentException.class,
-                () -> repo.upsert(new RecordingJdbc().connection(), gs.get(2).rest(), "run-x"), "row fails, nothing bound");
+        String nonGuid = gs.get(2).rest().path("source_id").asText();
+        assertEquals(com.keyforge.part2.id.CanonicalIds.deterministicUuid("native-workitem-archive|" + nonGuid),
+                WorkItemArchiveRepository.id(gs.get(2).rest()), "non-GUID id: name-based on the id");
+        assertEquals(com.keyforge.part2.id.CanonicalIds.contentUuid("native-workitem-archive", gs.get(3).rest()),
+                WorkItemArchiveRepository.id(gs.get(3).rest()), "no IIQ id: a uuid from the row content");
+        assertEquals(EntityRepository.Outcome.INSERTED,
+                repo.upsert(new RecordingJdbc().connection(), gs.get(2).rest(), "run-x"), "the row is stored");
     }
 
     @Test

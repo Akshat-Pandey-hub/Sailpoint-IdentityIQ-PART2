@@ -156,9 +156,20 @@ public final class SqlReportRepository implements EntityWriter {
 
     @Override
     public EntityRepository.Outcome upsert(Connection conn, JsonNode row, String extractionRunId) throws SQLException {
+        return upsert(conn, row, extractionRunId, key(row));
+    }
+
+    /** The row's uuid from its full content (for a row whose key columns repeat another, different row's). */
+    public String contentKey(JsonNode row) {
+        return CanonicalIds.contentUuid("native-sql-report|" + spec.reportId(), row);
+    }
+
+    /** Writes the row under {@code rowKey} (its {@link #key} or, for a repeated key, its {@link #contentKey}). */
+    public EntityRepository.Outcome upsert(Connection conn, JsonNode row, String extractionRunId, String rowKey)
+            throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(upsertSql)) {
             int i = 1;
-            ps.setString(i++, key(row)); // ?::uuid
+            ps.setString(i++, rowKey); // ?::uuid
             for (String c : spec.columns()) {
                 ps.setString(i++, text(row, c));
             }

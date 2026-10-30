@@ -91,7 +91,8 @@ public final class EntitlementTable {
             SOURCE_SYSTEM, SOURCE_INTERFACE, SOURCE_OBJECT_TYPE);
 
     public static String entitlementId(JsonNode row) {
-        return CanonicalIds.entitlementId(text(row, "source_id"), text(row, "name"));
+        // no IIQ id: a uuid from the full content, never a shared substitute or a refused row
+        return CanonicalIds.bySourceIdOrContent(row, "native-managedattribute", () -> CanonicalIds.entitlementId(text(row, "source_id"), text(row, "name")));
     }
 
     /**

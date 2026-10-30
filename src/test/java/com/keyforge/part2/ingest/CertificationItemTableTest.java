@@ -1,5 +1,6 @@
 package com.keyforge.part2.ingest;
 
+import com.keyforge.part2.testsupport.ExpectedKey;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -85,7 +86,7 @@ class CertificationItemTableTest {
         List<Golden> gs = golden();
         for (Golden g : gs) {
             assertEquals(g.hash(), CertificationItemTable.recordHash(g.rest()), "record_hash parity for " + g.rest());
-            assertEquals(g.id(), CertificationItemTable.certificationItemId(g.rest()), "key parity");
+            assertEquals(ExpectedKey.of(g.id(), g.rest(), "native-certification-item"), CertificationItemTable.certificationItemId(g.rest()), "key parity");
         }
         assertEquals(CanonicalIds.deterministicUuid("native-certification-item|null"), gs.get(2).id(), "no name/identity fallback");
         assertEquals(CanonicalIds.deterministicUuid("native-certification-item|not-a-guid"), gs.get(3).id());
@@ -156,7 +157,7 @@ class CertificationItemTableTest {
         RecordingJdbc jdbc = new RecordingJdbc();
         assertEquals(EntityRepository.Outcome.INSERTED, repo.upsert(jdbc.connection(), g.rest(), "run-71"));
         Map<Integer, Object> b = jdbc.executions.get(0);
-        assertEquals(g.id(), b.get(1));
+        assertEquals(ExpectedKey.of(g.id(), g.rest(), "native-certification-item"), b.get(1));
         assertEquals("c1", b.get(col("certification_id")));
         assertEquals("e1", b.get(col("entity_id")));
         assertEquals("[\"A\",\"B\"]", b.get(col("application_names")));

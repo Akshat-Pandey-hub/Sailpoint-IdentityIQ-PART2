@@ -19,7 +19,9 @@ public enum IncrementalCursor {
 
     MODIFIED("modified", "modified_at"),
     CREATED("created", "created_at"),
-    CHANGED("modified", "coalesce(modified_at, created_at)");
+    CHANGED("modified", "coalesce(modified_at, created_at)"),
+    /** Rows Part 2 wrote (its own {@code extracted_at}): the watermark of the derived event / link commands. */
+    EXTRACTED("extracted", "extracted_at");
 
     private final String sourceField;
     private final String column;

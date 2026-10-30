@@ -24,7 +24,9 @@ class CallerFetchPolicyTest {
         assertTrue(Main.supportsCallerFetchOptions("import-identity-request-approval"));
         assertTrue(Main.supportsCallerFetchOptions("import-provisioning-item"));
         assertTrue(Main.supportsCallerFetchOptions("import-access-history"));
-        assertFalse(Main.supportsCallerFetchOptions("derive-native-events"));
+        assertTrue(Main.supportsCallerFetchOptions("derive-native-events"), "start/limit over each source table");
+        assertTrue(Main.fetchFilterFields("derive-native-events").isEmpty(), "but no filters");
+        assertFalse(Main.supportsCallerModifiedAfter("derive-native-events"), "and no modifiedAfter (use incremental)");
         assertFalse(Main.supportsCallerFetchOptions("reconcile-native-workitems"));
         assertFalse(Main.supportsCallerFetchOptions("import-not-a-real-command"));
     }

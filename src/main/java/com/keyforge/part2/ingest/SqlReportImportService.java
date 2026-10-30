@@ -19,8 +19,9 @@ import java.util.Map;
  *   <li><b>Caller-scoped run</b> ({@code start}/{@code limit}, filters and/or {@code modifiedAfter}): exactly one Part 1
  *       request with those options, written the same way. Calling the same page again updates or skips its rows; it
  *       never adds them again.</li>
- *   <li><b>Duplicate key:</b> two rows of one run with the same key columns would overwrite each other, so the second
- *       is reported as a failed row instead of being written.</li>
+ *   <li><b>Same key columns twice in one run:</b> an identical row is the same record (skipped); a row that differs
+ *       is a different record and is kept under a uuid derived from its full content, so nothing is overwritten or
+ *       lost.</li>
  *   <li><b>Deletion:</b> only after a full run that read every page with no failed row, rows of this table that the
  *       report no longer returns are marked {@code is_deleted = true, deleted_at = now()} (never hard-deleted), within
  *       the {@code SWEEP_MAX_DELETE_PERCENT} safety limit ({@link SeenKeys}); a row that comes back is revived by its
@@ -95,13 +96,18 @@ public final class SqlReportImportService {
         for (JsonNode row : rows) {
             result.countFetched(1);
             try {
-                if (!SeenKeys.add(conn, repository.key(row))) {
-                    result.countFailure(repository.ref(row), "duplicate report row key: another row of this run has "
-                            + "the same " + repository.spec().keyColumns() + "; not written");
-                    continue;
+                String key = repository.key(row);
+                String contentKey = repository.contentKey(row);
+                boolean newContent = SeenKeys.add(conn, contentKey);
+                if (!SeenKeys.add(conn, key)) {
+                    if (!newContent) {
+                        result.countSkipped(); // the very same row came again in this run: one record, one row
+                        continue;
+                    }
+                    key = contentKey; // a different row sharing the key columns: kept under its content uuid
                 }
                 added++;
-                switch (repository.upsert(conn, row, runId)) {
+                switch (repository.upsert(conn, row, runId, key)) {
                     case INSERTED -> result.countInserted();
                     case UPDATED -> result.countUpdated();
                     case SKIPPED -> result.countSkipped();

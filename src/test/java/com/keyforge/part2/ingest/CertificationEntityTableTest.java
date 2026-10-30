@@ -1,5 +1,6 @@
 package com.keyforge.part2.ingest;
 
+import com.keyforge.part2.testsupport.ExpectedKey;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -79,7 +80,7 @@ class CertificationEntityTableTest {
         List<Golden> gs = golden();
         for (Golden g : gs) {
             assertEquals(g.hash(), CertificationEntityTable.recordHash(g.rest()), "record_hash parity for " + g.rest());
-            assertEquals(g.id(), CertificationEntityTable.certificationEntityId(g.rest()), "key parity");
+            assertEquals(ExpectedKey.of(g.id(), g.rest(), "native-certification-entity"), CertificationEntityTable.certificationEntityId(g.rest()), "key parity");
         }
         assertEquals(CanonicalIds.deterministicUuid("native-certification-entity|Jane Doe – café ✓"), gs.get(2).id(),
                 "null id -> the entity's identity (not a name)");

@@ -1,7 +1,12 @@
 package com.keyforge.part2.id;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 /**
  * EXACT reproduction of Part 1's {@code com.keyforge.iiq.parquet.ParquetIds} id rules, so Part 2 produces
@@ -42,6 +47,58 @@ public final class CanonicalIds {
         } catch (IllegalArgumentException e) {
             return null;
         }
+    }
+
+    private static final ObjectMapper SORTED = new ObjectMapper()
+            .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
+
+    /** {@code true} when the text is null or blank. */
+    public static boolean blank(String s) {
+        return s == null || s.isBlank();
+    }
+
+    /**
+     * The uuid of a record that arrived without the id that normally identifies it: derived from its FULL content
+     * (field names sorted, values exactly as received), so two different records never share a uuid and the same record
+     * always gets the same one (a re-run updates or skips it instead of adding it again).
+     */
+    public static String contentUuid(String prefix, JsonNode row) {
+        try {
+            Object plain = SORTED.treeToValue(row, Object.class);
+            return deterministicUuid(prefix + "|content|" + SORTED.writeValueAsString(plain));
+        } catch (Exception e) {
+            return deterministicUuid(prefix + "|content|" + row);
+        }
+    }
+
+    /**
+     * The row's uuid from its IIQ id ({@code source_id}) via {@code byId}, or {@link #contentUuid} when the row has no
+     * IIQ id (never a weak or shared substitute, and never a refused row).
+     */
+    public static String bySourceIdOrContent(JsonNode row, String prefix, Supplier<String> byId) {
+        return blank(text(row, "source_id")) ? contentUuid(prefix, row) : byId.get();
+    }
+
+    /**
+     * The row's uuid from its IIQ id or, without one, its natural key ({@code byIdOrNaturalKey}); only when the row has
+     * neither the IIQ id nor any of {@code naturalFields} does it fall back to {@link #contentUuid}.
+     */
+    public static String byIdNaturalKeyOrContent(JsonNode row, String prefix, Supplier<String> byIdOrNaturalKey,
+                                                 String... naturalFields) {
+        if (!blank(text(row, "source_id"))) {
+            return byIdOrNaturalKey.get();
+        }
+        for (String f : naturalFields) {
+            if (!blank(text(row, f))) {
+                return byIdOrNaturalKey.get();
+            }
+        }
+        return contentUuid(prefix, row);
+    }
+
+    private static String text(JsonNode row, String field) {
+        JsonNode n = row == null ? null : row.get(field);
+        return n == null || n.isNull() ? null : n.asText();
     }
 
     /** Deterministic name-based UUID over the seed (for records the source gives no id). */
@@ -191,8 +248,11 @@ public final class CanonicalIds {
     public static String identityRequestId(String sourceId) {
         String id = canonicalUuid(sourceId);
         if (id == null) {
-            throw new IllegalArgumentException("IdentityRequest source id is required for deterministic identity (got "
-                    + (sourceId == null ? "null" : "'" + sourceId + "'") + ")");
+            if (blank(sourceId)) {
+                throw new IllegalArgumentException("IdentityRequest source id is required here; a row without one is keyed by "
+                        + "its content (bySourceIdOrContent)");
+            }
+            id = deterministicUuid("native-identity-request|" + sourceId); // a non-GUID id: name-based on the id, never refused
         }
         return id;
     }
@@ -258,8 +318,11 @@ public final class CanonicalIds {
     public static String workItemId(String sourceId) {
         String id = canonicalUuid(sourceId);
         if (id == null) {
-            throw new IllegalArgumentException("WorkItem source id is required for deterministic identity (got "
-                    + (sourceId == null ? "null" : "'" + sourceId + "'") + ")");
+            if (blank(sourceId)) {
+                throw new IllegalArgumentException("WorkItem source id is required here; a row without one is keyed by "
+                        + "its content (bySourceIdOrContent)");
+            }
+            id = deterministicUuid("native-workitem|" + sourceId); // a non-GUID id: name-based on the id, never refused
         }
         return id;
     }

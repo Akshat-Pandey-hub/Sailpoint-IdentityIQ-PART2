@@ -30,8 +30,8 @@ import java.util.TreeMap;
  *   <li>{@code role_id uuid} = canonical(source_role_id), fallback {@code deterministicUuid("native-role|"+id)};</li>
  *   <li>{@code src_object_id} = source_role_id;</li>
  *   <li>{@code entitlement_id uuid} — linked ONLY for a {@code PROFILE_CONSTRAINT} with an {@code EQ} filter whose
- *       (application_name, attribute_name, attribute_value) matches exactly ONE row of {@code <schema>.kf_entitlement}
- *       (Part 1: "do not guess"); otherwise NULL. Requires kf_entitlement in the same destination schema, so run
+ *       (application_name, attribute_name, attribute_value) matches exactly ONE live (not deleted) row of
+ *       {@code <schema>.kf_entitlement} (Part 1: "do not guess"); otherwise NULL. Requires kf_entitlement in the same destination schema, so run
  *       {@code import-entitlement} first.</li>
  * </ul>
  * {@code record_hash} is Part 1's 17-field hash, which includes the resolved entitlement_id and renders
@@ -103,7 +103,8 @@ public final class RoleEntitlementRepository implements EntityWriter {
                         "permission_annotation", "src_object_id", "src_natural_key", "record_hash"),
                         List.of("source_system", "source_interface", "source_object_type", "extraction_run_id"), true);
         this.lookupSql = "SELECT entitlementid::text FROM " + this.schema + ".kf_entitlement "
-                + "WHERE application_name = ? AND attribute = ? AND value = ? ORDER BY entitlementid LIMIT 2";
+                + "WHERE application_name = ? AND attribute = ? AND value = ? AND NOT is_deleted "
+                + "ORDER BY entitlementid LIMIT 2";
     }
 
     @Override
@@ -237,7 +238,7 @@ public final class RoleEntitlementRepository implements EntityWriter {
 
     private static String text(JsonNode row, String field) {
         JsonNode n = row.get(field);
-        return (n == null || n.isNull()) ? null : n.asText();
+        return (n == null || n.isNull()) ? null : (n.isValueNode() ? n.asText() : n.toString());
     }
 
     /** One response row read with Part 1's parser semantics, plus Part 1's derivations. */

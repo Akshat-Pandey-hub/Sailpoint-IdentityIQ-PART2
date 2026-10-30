@@ -170,6 +170,9 @@ public final class AccessHistoryIdentityEventRepository implements EntityWriter 
 
     /** Part 1 {@code NativeHistIdentityEventRepository.canonicalId}. */
     public static String id(JsonNode row) {
+        if (CanonicalIds.blank(text(row, "source_id"))) {
+            return CanonicalIds.contentUuid("native-hist-event", row); // no IIQ id: a uuid from the full content
+        }
         String sourceId = text(row, "source_id");
         String id = CanonicalIds.canonicalUuid(sourceId);
         if (id == null) {

@@ -1,5 +1,6 @@
 package com.keyforge.part2.ingest;
 
+import com.keyforge.part2.testsupport.ExpectedKey;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -63,7 +64,7 @@ class IdentityRequestItemTableTest {
     void keyAndHashMatchPart1() throws Exception {
         for (Golden g : golden()) {
             assertEquals(g.hash(), IdentityRequestItemTable.recordHash(g.rest()), "record_hash parity for " + g.rest());
-            assertEquals(g.id(), IdentityRequestItemTable.identityRequestItemId(g.rest()), "key parity for " + g.rest());
+            assertEquals(ExpectedKey.of(g.id(), g.rest(), "native-identity-request-item"), IdentityRequestItemTable.identityRequestItemId(g.rest()), "key parity for " + g.rest());
         }
     }
 

@@ -85,7 +85,8 @@ public final class ProvisioningTxnTable {
             SOURCE_SYSTEM, SOURCE_INTERFACE, SOURCE_OBJECT_TYPE);
 
     public static String provisioningTxnId(JsonNode row) {
-        return CanonicalIds.provisioningTxnId(text(row, "source_id"));
+        // no IIQ id: a uuid from the full content, never a shared substitute or a refused row
+        return CanonicalIds.bySourceIdOrContent(row, "native-provisioning-txn", () -> CanonicalIds.provisioningTxnId(text(row, "source_id")));
     }
 
     /** Part 1 {@code NativeProvisioningTxnRepository.recordHash}: every business column, lineage excluded. */

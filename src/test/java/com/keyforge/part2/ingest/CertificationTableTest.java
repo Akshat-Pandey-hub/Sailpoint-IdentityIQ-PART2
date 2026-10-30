@@ -1,5 +1,6 @@
 package com.keyforge.part2.ingest;
 
+import com.keyforge.part2.testsupport.ExpectedKey;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -74,7 +75,7 @@ class CertificationTableTest {
         List<Golden> gs = golden();
         for (Golden g : gs) {
             assertEquals(g.hash(), CertificationTable.recordHash(g.rest()), "record_hash parity for " + g.rest());
-            assertEquals(g.id(), CertificationTable.certificationId(g.rest()), "certificationid parity");
+            assertEquals(ExpectedKey.of(g.id(), g.rest(), "native-certification"), CertificationTable.certificationId(g.rest()), "certificationid parity");
         }
         assertEquals("7f000101-9f06-1fdc-819f-34b0ac3471dd", gs.get(0).id());
         assertEquals(CanonicalIds.deterministicUuid("native-certification|No Id Cert"), gs.get(1).id());

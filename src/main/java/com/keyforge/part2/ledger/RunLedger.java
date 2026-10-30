@@ -16,9 +16,12 @@ import java.util.function.IntSupplier;
 /**
  * Thread-local extraction-run ledger for Part 2 import commands, reproducing Part 1's {@code iiq.runledger.RunLedger}.
  * {@link #run} wraps one command: it opens a run (fresh UUID), runs the command, and records ONE
- * {@code kf_extraction_run} row, also when the command fails (status FAILED with the error). The row is written on a
- * fresh connection after the command finished, best-effort: a ledger problem is reported on stderr but never changes
- * the command's exit code. {@link #currentRunId()} is the {@code extraction_run_id} the command stamps on its rows, so
+ * {@code kf_extraction_run} row, also when the command fails (status FAILED with the error). When the command really
+ * starts (its first {@link #runIdOrNew()}), the row is written with status {@code RUNNING}, so a run that is killed or
+ * crashes stays visible; when it finishes, the same row is updated with the final status and counts. A usage error
+ * never reaches that point and leaves no row. The caller's fetch scope ({@link #request}) is recorded with the run.
+ * Every write is on a fresh connection and best-effort: a ledger problem is reported on stderr but never changes the
+ * command's exit code. {@link #currentRunId()} is the {@code extraction_run_id} the command stamps on its rows, so
  * ledger rows join to the data they produced. Reporting methods are no-ops outside a run.
  *
  * <p>Ownership: this ledger is Part 2 state (a record of Part 2's own runs); it is not fetched from the KF Agent.
@@ -39,7 +42,8 @@ public final class RunLedger {
 
     private static final ThreadLocal<RunContext> CURRENT = new ThreadLocal<>();
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static volatile Sink sink = RunLedger::persistToPostgres;
+    private static final Sink POSTGRES = RunLedger::persistToPostgres;
+    private static volatile Sink sink = POSTGRES;
 
     private RunLedger() {
     }
@@ -138,10 +142,41 @@ public final class RunLedger {
         return ctx == null ? null : buildRun(ctx, exitCode, Instant.now());
     }
 
-    /** The current run's id, or a fresh UUID when no run is active (library / test callers). */
+    /**
+     * The current run's id, or a fresh UUID when no run is active (library / test callers). The first call inside a run
+     * marks the command as really started: its {@code RUNNING} row is written then (to PostgreSQL only).
+     */
     public static String runIdOrNew() {
-        String id = currentRunId();
-        return id != null ? id : UUID.randomUUID().toString();
+        RunContext ctx = CURRENT.get();
+        if (ctx == null) {
+            return UUID.randomUUID().toString();
+        }
+        if (!ctx.announced()) {
+            ctx.markAnnounced();
+            if (sink == POSTGRES) {
+                try {
+                    persistToPostgres(running(ctx));
+                } catch (Exception e) {
+                    System.err.println("[run-ledger] could not record the start of run " + ctx.runId() + " ("
+                            + ctx.command() + "): " + e.getMessage());
+                }
+            }
+        }
+        return ctx.runId();
+    }
+
+    /** Records the caller's fetch scope (as JSON) with the current run; a no-op outside a run. */
+    public static void request(String json) {
+        RunContext ctx = CURRENT.get();
+        if (ctx != null) {
+            ctx.setRequestJson(json);
+        }
+    }
+
+    /** The row written when a run starts: status RUNNING, no end, no counts yet. */
+    static ExtractionRun running(RunContext ctx) {
+        return new ExtractionRun(ctx.runId(), ctx.command(), ctx.sourceInterface(), "RUNNING", ctx.startedAt(), null,
+                null, ctx.windowStart(), ctx.windowEnd(), null, null, null, null, null, null, ctx.requestJson());
     }
 
     // --- helpers ------------------------------------------------------------
@@ -168,7 +203,7 @@ public final class RunLedger {
                 ctx.startedAt(), ended, ended.toEpochMilli() - ctx.startedAt().toEpochMilli(),
                 ctx.windowStart(), ctx.windowEnd(),
                 none ? null : extracted, none ? null : inserted, none ? null : updated, none ? null : failed,
-                entityCountsJson(ctx), error);
+                entityCountsJson(ctx), error, ctx.requestJson());
     }
 
     /**

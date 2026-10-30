@@ -8,26 +8,29 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * Derives the append-only native {@code kf_event_link} store for events that already exist in {@code kf_event}.
- * It reads the same five loaded native tables with Step 4's exact readers ({@link EventDerivationService}), derives
- * each row's event with the unchanged {@link EventDeriver} (to obtain its verified {@code event_id}) and that event's
+ * It reads the same five loaded native tables with the same readers as {@link EventDerivationService}, derives each
+ * row's event with the unchanged {@link EventDeriver} (to obtain its verified {@code event_id}) and that event's
  * explicit links with {@link EventLinkDeriver}. {@code kf_event} is only read, never written: a link whose event is
  * not stored yet (the source changed, or derive-native-events has not run) is counted and not written, so every
  * written link references a stored event.
  *
  * <p>Preconditions are checked before any write: a source table that exists must have every column the readers use,
- * and an existing {@code kf_event_link} must be the native shape. All link inserts run in ONE transaction; any failure
- * rolls the pass back, so a failed run leaves {@code kf_event_link} unchanged. Re-running is idempotent
- * ({@code ON CONFLICT (link_id) DO NOTHING}); stored links are never updated or deleted.
+ * and an existing {@code kf_event_link} must be the native shape. Each source table is then read in chunks (primary-key
+ * order, within the same {@link EventDerivationService.Scope} as event derivation); a chunk's links are checked against
+ * only that chunk's event ids in {@code kf_event}, appended and committed before the next chunk is read. Re-running is
+ * idempotent ({@code ON CONFLICT (link_id) DO NOTHING}); stored links are never updated or deleted.
  */
 public final class EventLinkDerivationService {
 
-    /** The columns Step 4's readers select from each source table (a present table must have all of them). */
+    /** The columns the readers select from each source table (a present table must have all of them). */
     static final Map<String, List<String>> REQUIRED_COLUMNS = new LinkedHashMap<>();
 
     static {
@@ -52,8 +55,12 @@ public final class EventLinkDerivationService {
     private final EventLinkRepository linkRepo;
 
     public EventLinkDerivationService(String schema) {
+        this(schema, EventDerivationService.CHUNK);
+    }
+
+    EventLinkDerivationService(String schema, int chunk) {
         this.schema = SchemaName.validate(schema);
-        this.sources = new EventDerivationService(this.schema);
+        this.sources = new EventDerivationService(this.schema, chunk);
         this.linkRepo = new EventLinkRepository(this.schema);
     }
 
@@ -81,12 +88,17 @@ public final class EventLinkDerivationService {
         public final Map<String, Integer> insertedByType = new LinkedHashMap<>();
     }
 
-    /** One link pass for {@code runId}; any SQL error rolls it back and propagates. */
+    /** One full link pass for {@code runId}. */
     public Result derive(Connection conn, String runId) throws SQLException {
+        return derive(conn, runId, EventDerivationService.Scope.ALL);
+    }
+
+    /** One link pass over {@code scope}: each chunk is committed; a failing chunk is rolled back and rethrown. */
+    public Result derive(Connection conn, String runId, EventDerivationService.Scope scope) throws SQLException {
         boolean autoCommit = conn.getAutoCommit();
         conn.setAutoCommit(false);
         try {
-            Result r = deriveInTransaction(conn, runId);
+            Result r = deriveChunks(conn, runId, scope);
             conn.commit();
             return r;
         } catch (SQLException | RuntimeException e) {
@@ -105,7 +117,7 @@ public final class EventLinkDerivationService {
         }
     }
 
-    private Result deriveInTransaction(Connection conn, String runId) throws SQLException {
+    private Result deriveChunks(Connection conn, String runId, EventDerivationService.Scope scope) throws SQLException {
         Result r = new Result();
 
         // --- preconditions, before any write ---
@@ -131,44 +143,62 @@ public final class EventLinkDerivationService {
         }
         linkRepo.checkCompatible(conn);
         r.eventTableMissing = !sources.tableExists(conn, EventRepository.TABLE);
-
-        // --- read sources (Step 4's readers, unchanged) ---
-        List<EventDeriver.ApprovalSrc> approvals = present.get(EventDerivationService.APPROVAL)
-                ? sources.readApprovals(conn) : List.of();
-        List<EventDeriver.TaskSrc> tasks = present.get(EventDerivationService.TASK_RESULT)
-                ? sources.readTasks(conn) : List.of();
-        List<EventDeriver.ProvSrc> provisioning = present.get(EventDerivationService.PROVISIONING_TXN)
-                ? sources.readProvisioning(conn) : List.of();
-        List<EventDeriver.ArchiveSrc> archives = present.get(EventDerivationService.WORKITEM_ARCHIVE)
-                ? sources.readArchives(conn) : List.of();
-        List<EventDeriver.CertItemSrc> certItems = present.get(EventDerivationService.CERTIFICATION_ITEM)
-                ? sources.readCertItems(conn) : List.of();
-        r.approvalRows = approvals.size();
-        r.taskRows = tasks.size();
-        r.provRows = provisioning.size();
-        r.archiveRows = archives.size();
-        r.certItemRows = certItems.size();
-
-        List<EventLinkRow> links = EventLinkDeriver.deriveAll(approvals, tasks, provisioning, archives, certItems,
-                runId);
-        r.linksDerived = links.size();
-        Set<String> storedEvents = r.eventTableMissing ? Set.of() : linkRepo.existingEventIds(conn);
-
         linkRepo.ensureTargetTable(conn);
-        for (EventLinkRow l : links) {
-            r.derivedByType.merge(l.linkType(), 1, Integer::sum);
-            if (!storedEvents.contains(l.eventId())) {
-                r.linksWithoutEvent++;
-                continue;
-            }
-            if (linkRepo.append(conn, l)) {
-                r.linksInserted++;
-                r.insertedByType.merge(l.linkType(), 1, Integer::sum);
-            } else {
-                r.linksAlreadyPresent++;
-            }
+        conn.commit();
+
+        // --- each source, chunk by chunk ---
+        if (present.get(EventDerivationService.APPROVAL)) {
+            r.approvalRows = linkSource(conn, EventDerivationService.APPROVAL_SOURCE, scope, r,
+                    EventDerivationService::approval,
+                    b -> EventLinkDeriver.deriveAll(b, List.of(), List.of(), List.of(), List.of(), runId));
+        }
+        if (present.get(EventDerivationService.TASK_RESULT)) {
+            r.taskRows = linkSource(conn, EventDerivationService.TASK_SOURCE, scope, r, EventDerivationService::task,
+                    b -> EventLinkDeriver.deriveAll(List.of(), b, List.of(), List.of(), List.of(), runId));
+        }
+        if (present.get(EventDerivationService.PROVISIONING_TXN)) {
+            r.provRows = linkSource(conn, EventDerivationService.PROVISIONING_SOURCE, scope, r,
+                    EventDerivationService::provisioning,
+                    b -> EventLinkDeriver.deriveAll(List.of(), List.of(), b, List.of(), List.of(), runId));
+        }
+        if (present.get(EventDerivationService.WORKITEM_ARCHIVE)) {
+            r.archiveRows = linkSource(conn, EventDerivationService.ARCHIVE_SOURCE, scope, r,
+                    EventDerivationService::archive,
+                    b -> EventLinkDeriver.deriveAll(List.of(), List.of(), List.of(), b, List.of(), runId));
+        }
+        if (present.get(EventDerivationService.CERTIFICATION_ITEM)) {
+            r.certItemRows = linkSource(conn, EventDerivationService.CERT_ITEM_SOURCE, scope, r,
+                    EventDerivationService::certItem,
+                    b -> EventLinkDeriver.deriveAll(List.of(), List.of(), List.of(), List.of(), b, runId));
         }
         return r;
+    }
+
+    /** Derives, checks and appends one source table's links chunk by chunk; returns the source rows read. */
+    private <T> int linkSource(Connection conn, EventDerivationService.Source source, EventDerivationService.Scope scope,
+                               Result r, EventDerivationService.RowMapper<T> mapper,
+                               Function<List<T>, List<EventLinkRow>> derive) throws SQLException {
+        return sources.scan(conn, source, scope, mapper, batch -> {
+            List<EventLinkRow> links = derive.apply(batch);
+            Set<String> eventIds = new LinkedHashSet<>();
+            links.forEach(l -> eventIds.add(l.eventId()));
+            Set<String> stored = r.eventTableMissing ? Set.of() : linkRepo.existingEventIds(conn, eventIds);
+            for (EventLinkRow l : links) {
+                r.linksDerived++;
+                r.derivedByType.merge(l.linkType(), 1, Integer::sum);
+                if (!stored.contains(l.eventId())) {
+                    r.linksWithoutEvent++;
+                    continue;
+                }
+                if (linkRepo.append(conn, l)) {
+                    r.linksInserted++;
+                    r.insertedByType.merge(l.linkType(), 1, Integer::sum);
+                } else {
+                    r.linksAlreadyPresent++;
+                }
+            }
+            conn.commit();
+        });
     }
 
     private Set<String> columnsOf(Connection conn, String table) throws SQLException {

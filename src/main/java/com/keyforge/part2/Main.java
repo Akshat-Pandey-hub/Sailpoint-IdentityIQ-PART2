@@ -209,6 +209,9 @@ public final class Main {
             RunLedger.discard();
             return 2;
         }
+        if (!options.isEmpty()) {
+            RunLedger.request(requestJson(options));
+        }
         if (mode.isIncremental()) {
             Function<String, EntityWriter> writer = INCREMENTAL_WRITERS.get(command);
             if (writer != null) {
@@ -238,6 +241,12 @@ public final class Main {
             }
             if (SYSLOG_COMMAND.equals(command)) {
                 return runSyslogIncremental();
+            }
+            if ("derive-native-events".equals(command)) {
+                return runDeriveNativeEvents(FetchOptions.none(), true);
+            }
+            if ("derive-native-event-links".equals(command)) {
+                return runDeriveNativeEventLinks(FetchOptions.none(), true);
             }
             RunLedger.discard(); // a usage error is not an import run
             System.err.println("--incremental is supported only for " + INCREMENTAL_WRITERS.keySet() + ", "
@@ -293,8 +302,8 @@ public final class Main {
             case "import-syslog-event" -> options.isEmpty() ? runSyslogImport()
                     : runImport(SyslogEventRepository::new, options);
             case "reconcile-native-workitems" -> runReconcileWorkItems();
-            case "derive-native-events" -> runDeriveNativeEvents();
-            case "derive-native-event-links" -> runDeriveNativeEventLinks();
+            case "derive-native-events" -> runDeriveNativeEvents(options, false);
+            case "derive-native-event-links" -> runDeriveNativeEventLinks(options, false);
             default -> {
                 RunLedger.discard(); // a usage error is not an import run
                 printUsage();
@@ -303,8 +312,49 @@ public final class Main {
         };
     }
 
+    /** The caller's fetch scope as recorded in the run ledger's {@code request} column. */
+    static String requestJson(FetchOptions options) {
+        java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("start", options.start());
+        m.put("limit", options.limit());
+        m.put("modifiedAfter", options.modifiedAfter());
+        m.put("filters", options.filters());
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(m);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            return null;
+        }
+    }
+
     static boolean supportsCallerFetchOptions(String command) {
-        return command != null && fetchResource(command) != null;
+        return command != null && (fetchResource(command) != null || DERIVE_COMMANDS.contains(command));
+    }
+
+    /** The commands that build Part 2's own event / link tables; they accept start/limit and incremental mode. */
+    static final Set<String> DERIVE_COMMANDS = Set.of("derive-native-events", "derive-native-event-links");
+
+    /**
+     * The database's current time. The derived tables' watermark is compared with {@code extracted_at}, which the
+     * database stamps, so it must come from the same clock (Part 2's host clock may differ from the database server's).
+     */
+    static Instant databaseNow(Connection conn) throws SQLException {
+        try (java.sql.Statement st = conn.createStatement();
+             java.sql.ResultSet rs = st.executeQuery("SELECT now()")) {
+            rs.next();
+            return rs.getObject(1, java.time.OffsetDateTime.class).toInstant();
+        }
+    }
+
+    /** Watermark keys of the derived tables: when the last successful pass started (the database's clock). */
+    static final String EVENTS_WATERMARK = "derived:kf_event";
+    static final String LINKS_WATERMARK = "derived:kf_event_link";
+
+    /**
+     * The derivation scope: the caller's start/limit window of each source table, and in incremental mode only the
+     * source rows Part 2 wrote since the stored watermark (none stored = everything, the baseline).
+     */
+    static EventDerivationService.Scope deriveScope(FetchOptions options, Instant changedSince) {
+        return new EventDerivationService.Scope(options.start(), options.limit(), changedSince);
     }
 
     /** Part 1 applies exact AND filters to response scalar fields; JSON/technical fields are excluded. */
@@ -521,8 +571,7 @@ public final class Main {
                 return "identity " + row.path("name").asText(null) + " (" + row.path("source_id").asText(null) + ")";
             }
             @Override public String key(JsonNode row) {
-                return com.keyforge.part2.id.CanonicalIds.identityUserid(row.path("source_id").asText(null),
-                        row.path("name").asText(null));
+                return IdentityRepository.userid(row);
             }
             @Override public String keyColumn() {
                 return IdentityTable.PK;
@@ -651,7 +700,7 @@ public final class Main {
      * provisioning-transaction / work-item-archive / certification-item tables and appends the derived events to
      * kf_event in one transaction. Needs PostgreSQL only (no KF Agent call, KFAGENT_BASE_URL not required).
      */
-    private static int runDeriveNativeEvents() {
+    private static int runDeriveNativeEvents(FetchOptions options, boolean incremental) {
         try {
             AppConfig config = AppConfig.loadDatabaseOnly();
             String runId = RunLedger.runIdOrNew();
@@ -661,8 +710,21 @@ public final class Main {
                     + "kf_identity_request_approval, kf_task_result, kf_provisioning_txn, kf_workitem_archive, "
                     + "kf_certification_item -> kf_event");
             try (Connection conn = PostgresConnection.open(config)) {
+                WatermarkService watermarks = new WatermarkService(config.pgSchema());
+                Instant since = incremental ? watermarks.readKey(conn, EVENTS_WATERMARK) : null;
+                Instant runStart = databaseNow(conn); // the clock that stamps extracted_at
+                if (incremental) {
+                    RunLedger.window(since, runStart);
+                }
                 EventDerivationService svc = new EventDerivationService(config.pgSchema());
-                EventDerivationService.Result r = svc.derive(conn, runId);
+                EventDerivationService.Result r = svc.derive(conn, runId, deriveScope(options, since));
+                if (incremental) {
+                    conn.setAutoCommit(true);
+                    watermarks.advanceKeyIfSuccessful(conn, EVENTS_WATERMARK, runStart, 0, runId,
+                            IncrementalCursor.EXTRACTED);
+                    System.out.println("  mode:      incremental: source rows written since "
+                            + (since == null ? "the beginning (baseline)" : since) + "; watermark now " + runStart);
+                }
                 RunLedger.record(new RunContext.EntityCount(EventRepository.TABLE, r.eventsDerived, r.eventsInserted,
                         0, 0, r.eventsAlreadyPresent(), null, null, null));
                 System.out.println();
@@ -685,7 +747,8 @@ public final class Main {
             RunLedger.error("configuration error: " + e.getMessage());
             return 3;
         } catch (SQLException e) {
-            System.err.println("PostgreSQL error (derivation rolled back, kf_event unchanged): " + e.getMessage());
+            System.err.println("PostgreSQL error (the failing chunk was rolled back; chunks already committed stay, "
+                    + "and a re-run completes the rest): " + e.getMessage());
             RunLedger.error("PostgreSQL error: " + e.getMessage());
             return 5;
         } catch (RuntimeException e) {
@@ -700,7 +763,7 @@ public final class Main {
      * and its explicit links, and appends to kf_event_link only the links whose event is already in kf_event, in one
      * transaction. Reads kf_event, never writes it. PostgreSQL only (no KF Agent call, KFAGENT_BASE_URL not required).
      */
-    private static int runDeriveNativeEventLinks() {
+    private static int runDeriveNativeEventLinks(FetchOptions options, boolean incremental) {
         try {
             AppConfig config = AppConfig.loadDatabaseOnly();
             String runId = RunLedger.runIdOrNew();
@@ -709,8 +772,24 @@ public final class Main {
             System.out.println("Native event-link derivation (append-only, EXPLICIT ids only; reads loaded tables and "
                     + "kf_event, no KF Agent call) -> kf_event_link");
             try (Connection conn = PostgresConnection.open(config)) {
+                WatermarkService watermarks = new WatermarkService(config.pgSchema());
+                Instant since = incremental ? watermarks.readKey(conn, LINKS_WATERMARK) : null;
+                Instant runStart = databaseNow(conn); // the clock that stamps extracted_at
+                if (incremental) {
+                    RunLedger.window(since, runStart);
+                }
                 EventLinkDerivationService svc = new EventLinkDerivationService(config.pgSchema());
-                EventLinkDerivationService.Result r = svc.derive(conn, runId);
+                EventLinkDerivationService.Result r = svc.derive(conn, runId, deriveScope(options, since));
+                if (incremental) {
+                    // a link whose event is not stored yet must be retried, so the watermark only moves when none is
+                    conn.setAutoCommit(true);
+                    boolean advanced = watermarks.advanceKeyIfSuccessful(conn, LINKS_WATERMARK, runStart,
+                            r.linksWithoutEvent, runId, IncrementalCursor.EXTRACTED);
+                    System.out.println("  mode:      incremental: source rows written since "
+                            + (since == null ? "the beginning (baseline)" : since) + "; watermark "
+                            + (advanced ? "now " + runStart : "NOT advanced (" + r.linksWithoutEvent
+                            + " link(s) wait for their event; the next run reads the same rows)"));
+                }
                 RunLedger.record(new RunContext.EntityCount(EventLinkRepository.TABLE, r.linksDerived,
                         r.linksInserted, 0, 0, r.linksAlreadyPresent + r.linksWithoutEvent, null, null, null));
                 System.out.println();
@@ -741,8 +820,8 @@ public final class Main {
             RunLedger.error("configuration error: " + e.getMessage());
             return 3;
         } catch (SQLException e) {
-            System.err.println("PostgreSQL error (link derivation rolled back, kf_event_link unchanged): "
-                    + e.getMessage());
+            System.err.println("PostgreSQL error (the failing chunk was rolled back; chunks already committed stay, "
+                    + "and a re-run completes the rest): " + e.getMessage());
             RunLedger.error("PostgreSQL error: " + e.getMessage());
             return 5;
         } catch (RuntimeException e) {
@@ -1183,10 +1262,12 @@ public final class Main {
         System.out.println("  derive-native-events");
         System.out.println("                       Derive append-only events from loaded approval / task-result / provisioning-txn /");
         System.out.println("                       workitem-archive / certification-item tables into <PG_DEST_SCHEMA>.kf_event");
-        System.out.println("                       (PostgreSQL only; KFAGENT_BASE_URL not required)");
+        System.out.println("                       (PostgreSQL only; KFAGENT_BASE_URL not required; start/limit per source table,");
+        System.out.println("                       or --incremental for the rows written since the last derivation)");
         System.out.println("  derive-native-event-links");
         System.out.println("                       Derive append-only EXPLICIT links for events already in kf_event into");
-        System.out.println("                       <PG_DEST_SCHEMA>.kf_event_link (PostgreSQL only; run after derive-native-events)");
+        System.out.println("                       <PG_DEST_SCHEMA>.kf_event_link (PostgreSQL only; run after derive-native-events;");
+        System.out.println("                       start/limit per source table, or --incremental)");
         System.out.println();
         System.out.println("Incremental (opt-in): add --incremental to fetch only what changed since the last successful run");
         System.out.println("                       (per-entity watermark lowered by INCREMENTAL_OVERLAP_MINUTES, default 5):");

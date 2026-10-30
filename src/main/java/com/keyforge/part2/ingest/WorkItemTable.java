@@ -101,7 +101,8 @@ public final class WorkItemTable {
             SOURCE_SYSTEM, SOURCE_INTERFACE, SOURCE_OBJECT_TYPE);
 
     public static String workItemId(JsonNode row) {
-        return CanonicalIds.workItemId(text(row, "source_id"));
+        // no IIQ id: a uuid from the full content, never a shared substitute or a refused row
+        return CanonicalIds.bySourceIdOrContent(row, "native-workitem", () -> CanonicalIds.workItemId(text(row, "source_id")));
     }
 
     /** Part 1 {@code NativeWorkItemRepository.recordHash}: 30 fields (see class doc for the 11 it leaves out). */

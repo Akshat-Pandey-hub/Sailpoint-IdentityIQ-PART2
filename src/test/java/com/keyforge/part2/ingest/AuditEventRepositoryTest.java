@@ -69,16 +69,17 @@ class AuditEventRepositoryTest {
     }
 
     @Test
-    void fallbackKeysFollowPart1() throws Exception {
+    void fallbackKeys() throws Exception {
         ObjectNode r = (ObjectNode) golden().get(0).rest().deepCopy();
         r.put("source_id", "not-a-guid");
         assertEquals(CanonicalIds.deterministicUuid("native-audit|not-a-guid"), AuditEventRepository.id(r));
         r.putNull("source_id");
-        assertEquals(CanonicalIds.deterministicUuid("native-audit|ServerUpDown"), AuditEventRepository.id(r),
-                "null source_id falls back to the action");
-        r.putNull("action");
-        assertEquals(CanonicalIds.deterministicUuid("native-audit|null"), AuditEventRepository.id(r),
-                "Java concatenation of a null action, as in Part 1");
+        assertEquals(CanonicalIds.contentUuid("native-audit", r), AuditEventRepository.id(r),
+                "no IIQ id: a uuid from the row content, never the action name");
+        ObjectNode other = r.deepCopy();
+        other.put("target", "another target");
+        assertNotEquals(AuditEventRepository.id(r), AuditEventRepository.id(other),
+                "two different events with the same action never share a uuid");
     }
 
     @Test

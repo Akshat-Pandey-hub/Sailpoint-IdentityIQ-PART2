@@ -22,7 +22,7 @@ class RunLedgerRepositoryTest {
     private static final List<String> PART1_COLUMNS = List.of(
             "extraction_run_id", "command", "source_interface", "status", "started_at", "ended_at", "duration_ms",
             "window_start", "window_end", "extracted", "inserted", "updated", "failed", "entity_counts",
-            "error_message", "recorded_at");
+            "error_message", "recorded_at", "request");
 
     private final RunLedgerRepository repo = new RunLedgerRepository("iiq_native_part2");
 
@@ -36,7 +36,8 @@ class RunLedgerRepositoryTest {
         assertEquals(PART1_COLUMNS, cols);
         assertTrue(ddl.startsWith("CREATE TABLE IF NOT EXISTS iiq_native_part2.kf_extraction_run ("));
         assertTrue(ddl.contains("extraction_run_id uuid PRIMARY KEY") && ddl.contains("entity_counts jsonb"));
-        assertTrue(repo.insertSql().endsWith("ON CONFLICT (extraction_run_id) DO NOTHING"), "a retried insert is a no-op");
+        assertTrue(repo.insertSql().contains("ON CONFLICT (extraction_run_id) DO UPDATE SET status = EXCLUDED.status"),
+                "the RUNNING row written at the start is updated in place when the run finishes");
     }
 
     @Test
@@ -78,6 +79,7 @@ class RunLedgerRepositoryTest {
         assertEquals(4, bound.get(12));
         assertEquals("[{\"entity\":\"kf_role\"}]", bound.get(14));
         assertEquals(null, bound.get(15), "no error");
-        assertEquals(15, bound.size());
+        assertEquals(null, bound.get(16), "no caller request: a full run");
+        assertEquals(16, bound.size());
     }
 }

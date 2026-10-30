@@ -108,7 +108,8 @@ public final class CertificationTable {
             TRAILING);
 
     public static String certificationId(JsonNode row) {
-        return CanonicalIds.certificationId(text(row, "source_id"), text(row, "name"));
+        // no IIQ id: a uuid from the full content, never a shared substitute or a refused row
+        return CanonicalIds.bySourceIdOrContent(row, "native-certification", () -> CanonicalIds.certificationId(text(row, "source_id"), text(row, "name")));
     }
 
     /**

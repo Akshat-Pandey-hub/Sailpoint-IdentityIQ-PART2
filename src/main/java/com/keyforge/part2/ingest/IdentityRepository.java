@@ -53,9 +53,7 @@ public final class IdentityRepository {
 
     /** Upsert one identity row; a no-row RETURNING result means the existing row was unchanged and is skipped. */
     public Outcome upsert(Connection conn, JsonNode row, String extractionRunId) throws SQLException {
-        String sourceId = text(row, "source_id");
-        String name = text(row, "name");
-        String userid = CanonicalIds.identityUserid(sourceId, name);
+        String userid = userid(row);
 
         try (PreparedStatement ps = conn.prepareStatement(upsertSql)) {
             int i = 1;
@@ -73,6 +71,12 @@ public final class IdentityRepository {
                 return rs.getBoolean(1) ? Outcome.INSERTED : Outcome.UPDATED;
             }
         }
+    }
+
+    /** The identity's uuid: its IIQ id, else its name, else (neither) its full content. */
+    public static String userid(JsonNode row) {
+        return CanonicalIds.byIdNaturalKeyOrContent(row, "native-identity",
+                () -> CanonicalIds.identityUserid(text(row, "source_id"), text(row, "name")), "name");
     }
 
     /** Bind one business value from its JSON node according to the column kind. Absent/null → SQL NULL. */
@@ -124,7 +128,7 @@ public final class IdentityRepository {
 
     private static String text(JsonNode row, String key) {
         JsonNode n = row == null ? null : row.get(key);
-        return (n == null || n.isNull()) ? null : n.asText();
+        return (n == null || n.isNull()) ? null : (n.isValueNode() ? n.asText() : n.toString());
     }
 
     // ── SQL builders (from the column spec, so later entities can reuse the pattern) ──

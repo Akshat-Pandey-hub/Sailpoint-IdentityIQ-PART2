@@ -133,13 +133,22 @@ public final class EventLinkRepository {
         }
     }
 
-    /** The event ids currently stored in {@code kf_event} (the caller checks that the table exists). */
-    public Set<String> existingEventIds(Connection conn) throws SQLException {
+    /**
+     * Which of {@code eventIds} are stored in {@code kf_event} (the caller checks that the table exists). Only the given
+     * ids are looked up, never the whole event table.
+     */
+    public Set<String> existingEventIds(Connection conn, java.util.Collection<String> eventIds) throws SQLException {
         Set<String> ids = new HashSet<>();
-        try (Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery("SELECT event_id::text FROM " + schema + "." + EventRepository.TABLE)) {
-            while (rs.next()) {
-                ids.add(rs.getString(1));
+        if (eventIds.isEmpty()) {
+            return ids;
+        }
+        try (PreparedStatement ps = conn.prepareStatement("SELECT event_id::text FROM " + schema + "."
+                + EventRepository.TABLE + " WHERE event_id = ANY (?::uuid[])")) {
+            ps.setArray(1, conn.createArrayOf("text", eventIds.toArray()));
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    ids.add(rs.getString(1));
+                }
             }
         }
         return ids;

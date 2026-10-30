@@ -55,6 +55,10 @@ class WorkItemReconciliationTest {
         assertTrue(either.contains(" OR EXISTS"), either);
         assertTrue(WorkItemReconciliation.matchedLiveSql(S).contains("w.source_id = r.wid"));
         assertTrue(!WorkItemReconciliation.matchedLiveSql(S).contains("kf_workitem_archive"));
+        // rows marked deleted are gone from IIQ: neither a live work item nor an approval to reconcile
+        assertTrue(WorkItemReconciliation.matchedLiveSql(S).contains("AND NOT w.is_deleted"));
+        assertTrue(WorkItemReconciliation.distinctRefsSql(S).contains("AND NOT is_deleted"));
+        assertTrue(WorkItemReconciliation.liveWorkItemsSql(S).endsWith("WHERE NOT is_deleted"));
         assertTrue(WorkItemReconciliation.matchedArchiveSql(S).contains("a.work_item_id = r.wid"));
         String samples = WorkItemReconciliation.unmatchedSamplesSql(S, 25);
         assertTrue(samples.contains("NOT EXISTS (SELECT 1 FROM iiq_native_part2.kf_workitem "), samples);
@@ -92,7 +96,7 @@ class WorkItemReconciliationTest {
         boolean failUpsert;
 
         Db counts(long live, long archives, long refs, long matchedLive, long matchedArchive, long matchedEither) {
-            scalars.put(WorkItemReconciliation.countSql(S, WorkItemReconciliation.WORKITEM), live);
+            scalars.put(WorkItemReconciliation.liveWorkItemsSql(S), live);
             scalars.put(WorkItemReconciliation.countSql(S, WorkItemReconciliation.ARCHIVE), archives);
             scalars.put(WorkItemReconciliation.distinctRefsSql(S), refs);
             scalars.put(WorkItemReconciliation.matchedLiveSql(S), matchedLive);

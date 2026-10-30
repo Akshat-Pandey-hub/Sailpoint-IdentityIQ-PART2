@@ -26,6 +26,8 @@ public final class RunContext {
     private Instant windowStart;
     private Instant windowEnd;
     private String errorMessage;
+    private String requestJson;
+    private boolean announced;
 
     public RunContext(String runId, String command, String sourceInterface, Instant startedAt) {
         this.runId = runId;
@@ -42,6 +44,12 @@ public final class RunContext {
     public Instant windowStart() { return windowStart; }
     public Instant windowEnd() { return windowEnd; }
     public String errorMessage() { return errorMessage; }
+    /** The caller's fetch scope as JSON ({@code start}, {@code limit}, filters, {@code modifiedAfter}), or null. */
+    public String requestJson() { return requestJson; }
+    public void setRequestJson(String json) { this.requestJson = json; }
+    /** Whether the RUNNING row was already written for this run. */
+    boolean announced() { return announced; }
+    void markAnnounced() { this.announced = true; }
 
     public void addEntity(EntityCount count) {
         entities.add(count);

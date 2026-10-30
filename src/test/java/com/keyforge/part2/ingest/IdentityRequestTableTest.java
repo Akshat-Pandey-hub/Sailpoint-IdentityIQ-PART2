@@ -1,5 +1,6 @@
 package com.keyforge.part2.ingest;
 
+import com.keyforge.part2.id.CanonicalIds;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -76,16 +77,19 @@ class IdentityRequestTableTest {
     }
 
     @Test
-    void requestWithoutUsableIdFailsLikePart1() throws Exception {
+    void aRequestWithoutAUsableIdIsStoredNotRefused() throws Exception {
         Golden g = golden().get(2);
-        assertEquals("THROWS", g.id(), "Part 1 refuses this row");
-        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                () -> repo.upsert(new RecordingJdbc().connection(), g.rest(), "run-1"));
-        assertTrue(e.getMessage().contains("source id is required"), e.getMessage());
+        String sid = g.rest().path("source_id").asText(null);
+        String expected = sid == null || sid.isBlank() ? CanonicalIds.contentUuid("native-identity-request", g.rest())
+                : CanonicalIds.deterministicUuid("native-identity-request|" + sid);
+        assertEquals(expected, IdentityRequestTable.identityRequestId(g.rest()), "non-GUID id: name-based on the id");
+        RecordingJdbc jdbc = new RecordingJdbc();
+        assertEquals(EntityRepository.Outcome.INSERTED, repo.upsert(jdbc.connection(), g.rest(), "run-1"));
 
         ObjectNode noId = g.rest().deepCopy();
         noId.putNull("source_id");
-        assertThrows(IllegalArgumentException.class, () -> IdentityRequestTable.identityRequestId(noId));
+        assertEquals(CanonicalIds.contentUuid("native-identity-request", noId),
+                IdentityRequestTable.identityRequestId(noId), "no IIQ id: a uuid from the row content");
     }
 
     @Test

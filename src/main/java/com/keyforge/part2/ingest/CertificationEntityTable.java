@@ -84,7 +84,8 @@ public final class CertificationEntityTable {
             SOURCE_SYSTEM, SOURCE_INTERFACE, SOURCE_OBJECT_TYPE);
 
     public static String certificationEntityId(JsonNode row) {
-        return CanonicalIds.certificationEntityId(text(row, "source_id"), text(row, "identity"));
+        // no IIQ id: a uuid from the full content, never a shared substitute or a refused row
+        return CanonicalIds.bySourceIdOrContent(row, "native-certification-entity", () -> CanonicalIds.certificationEntityId(text(row, "source_id"), text(row, "identity")));
     }
 
     /**

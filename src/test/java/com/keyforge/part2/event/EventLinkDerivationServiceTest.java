@@ -120,6 +120,18 @@ class EventLinkDerivationServiceTest {
                                     boolean exists = table.equals("kf_event") ? eventTable : sources.containsKey(table);
                                     return indexed(List.<Object[]>of(new Object[]{exists}));
                                 }
+                                if (q.contains("kf_chunk_key")) { // one chunk of a source table (all rows: one chunk)
+                                    String chunkTable = q.substring(q.indexOf("FROM (SELECT * FROM " + S + ".") + ("FROM (SELECT * FROM " + S + ".").length());
+                                    chunkTable = chunkTable.substring(0, chunkTable.indexOf(' '));
+                                    List<Map<String, Object>> rows = sources.get(chunkTable);
+                                    if (rows == null) throw new SQLException("relation " + chunkTable + " does not exist");
+                                    return named(rows);
+                                }
+                                if (q.startsWith("SELECT event_id::text FROM " + S + ".kf_event WHERE event_id = ANY")) {
+                                    List<Object[]> ids = new ArrayList<>(); // only the chunk's ids are asked for
+                                    storedEvents.forEach(id -> ids.add(new Object[]{id}));
+                                    return indexed(ids);
+                                }
                                 if (q.startsWith("SELECT column_name, (is_nullable")) {
                                     List<Object[]> cols = new ArrayList<>();
                                     linkTableColumns.forEach((c, req) -> cols.add(new Object[]{c, req}));
@@ -222,7 +234,7 @@ class EventLinkDerivationServiceTest {
     }
 
     @Test
-    void writesEveryExplicitLinkOfStoredEventsInOneTransaction() throws Exception {
+    void writesEveryExplicitLinkOfStoredEventsChunkByChunk() throws Exception {
         Db db = fullDb();
         EventLinkDerivationService.Result r = new EventLinkDerivationService(S).derive(db.connection(), "run-1");
 
@@ -235,7 +247,7 @@ class EventLinkDerivationServiceTest {
         assertEquals(Map.of("APPROVAL_OF_REQUEST", 1, "APPROVAL_WORKITEM", 1, "TASK_TARGET", 1,
                 "PROVISION_OF_REQUEST", 1, "PROVISION_OWNER", 1, "WORKITEM_OF_REQUEST", 1, "ARCHIVE_OF_WORKITEM", 1,
                 "CERT_OF_CERTIFICATION", 1, "CERT_ITEM_ENTITY", 1, "CERT_OWNER", 1), r.derivedByType);
-        assertEquals(1, db.commits);
+        assertEquals(7, db.commits, "one after the preconditions, one per source chunk, one at the end");
         assertEquals(0, db.rollbacks);
         assertTrue(db.autoCommit);
         assertEquals(10, db.committedLinks.size());
@@ -349,15 +361,14 @@ class EventLinkDerivationServiceTest {
     }
 
     @Test
-    void aFailureRollsBackTheWholePass() {
+    void aFailingChunkIsRolledBack() {
         Db db = fullDb();
         db.failOnInsertNumber = 5;
         SQLException e = assertThrows(SQLException.class,
                 () -> new EventLinkDerivationService(S).derive(db.connection(), "run-1"));
         assertEquals("simulated insert failure", e.getMessage());
-        assertEquals(0, db.commits);
         assertEquals(1, db.rollbacks);
-        assertTrue(db.committedLinks.isEmpty(), "kf_event_link unchanged");
+        assertTrue(db.committedLinks.size() < 10, "the failing chunk is not stored; a re-run completes the rest");
         assertTrue(db.autoCommit);
     }
 

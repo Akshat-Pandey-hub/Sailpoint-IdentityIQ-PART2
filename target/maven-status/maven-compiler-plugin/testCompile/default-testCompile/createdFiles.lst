@@ -82,6 +82,7 @@ com\keyforge\part2\http\KfAgentClientTlsTest$1.class
 com\keyforge\part2\ingest\SyslogEventRepositoryTest.class
 com\keyforge\part2\ingest\WorkItemTableTest.class
 com\keyforge\part2\ingest\IdentitySqlTest.class
+com\keyforge\part2\ledger\RunLedgerRunningTest.class
 com\keyforge\part2\RestServerTest.class
 com\keyforge\part2\ingest\ProvisioningTxnTableTest.class
 com\keyforge\part2\ingest\AccountEntitlementTableTest$Golden.class
@@ -102,6 +103,7 @@ com\keyforge\part2\incremental\EventIncrementalImportTest$AppendWriter.class
 com\keyforge\part2\ingest\IdentityRoleTableTest.class
 com\keyforge\part2\reconciliation\WorkItemReconciliationTest.class
 com\keyforge\part2\ingest\IdentityRepositoryPostgresTest.class
+com\keyforge\part2\testsupport\ExpectedKey.class
 com\keyforge\part2\incremental\FamilyIncrementalImportServiceTest$Agent.class
 com\keyforge\part2\ingest\SqlReportImportServiceTest$Db.class
 com\keyforge\part2\event\EventDerivationServiceTest$Db.class
@@ -125,6 +127,7 @@ com\keyforge\part2\incremental\WatermarkServiceTest.class
 com\keyforge\part2\incremental\FamilyIncrementalImportServiceTest$Writer.class
 com\keyforge\part2\ingest\AccessHistoryRoleEventRepositoryTest.class
 com\keyforge\part2\ingest\TaskScheduleTableTest.class
+com\keyforge\part2\ingest\KeysAndLookupsTest.class
 com\keyforge\part2\ingest\WorkgroupTableTest$1.class
 com\keyforge\part2\incremental\EventIncrementalImportTest.class
 com\keyforge\part2\ingest\PolicyConstraintTableTest$Golden.class

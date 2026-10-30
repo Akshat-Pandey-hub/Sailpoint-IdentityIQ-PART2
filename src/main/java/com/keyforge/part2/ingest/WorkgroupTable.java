@@ -59,7 +59,7 @@ public final class WorkgroupTable {
             SOURCE_SYSTEM, SOURCE_INTERFACE, SOURCE_OBJECT_TYPE);
 
     public static String workgroupId(JsonNode row) {
-        return CanonicalIds.workgroupId(text(row, "source_id"), text(row, "name"));
+        return CanonicalIds.byIdNaturalKeyOrContent(row, "native-workgroup", () -> CanonicalIds.workgroupId(text(row, "source_id"), text(row, "name")), "name");
     }
 
     /** Part 1 {@code NativeWorkgroupRepository.recordHash}: every business column, lineage excluded. */

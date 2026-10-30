@@ -22,5 +22,15 @@ public record ExtractionRun(
         Integer updated,
         Integer failed,
         String entityCountsJson,
-        String errorMessage) {
+        String errorMessage,
+        String requestJson) {
+
+    /** The same run without a recorded request (full runs, derived commands). */
+    public ExtractionRun(String extractionRunId, String command, String sourceInterface, String status,
+                         Instant startedAt, Instant endedAt, Long durationMs, Instant windowStart, Instant windowEnd,
+                         Integer extracted, Integer inserted, Integer updated, Integer failed, String entityCountsJson,
+                         String errorMessage) {
+        this(extractionRunId, command, sourceInterface, status, startedAt, endedAt, durationMs, windowStart, windowEnd,
+                extracted, inserted, updated, failed, entityCountsJson, errorMessage, null);
+    }
 }

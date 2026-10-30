@@ -11,9 +11,9 @@ import java.sql.Types;
 import java.time.Instant;
 
 /**
- * Plain-JDBC access for {@code <schema>.kf_extraction_run}: the exact DDL and insert of Part 1's
- * {@code iiq.runledger.RunLedgerRepository}. One insert per run; the id is a fresh UUID per run, and
- * {@code ON CONFLICT DO NOTHING} keeps a retried insert idempotent.
+ * Plain-JDBC access for {@code <schema>.kf_extraction_run}: one row per run (the id is a fresh UUID per run). The row
+ * is written when the run starts (status RUNNING) and written again when it finishes: the second write updates the
+ * same row ({@code ON CONFLICT DO UPDATE}). {@code request} holds the caller's fetch scope, or NULL for a full run.
  */
 public final class RunLedgerRepository {
 
@@ -48,21 +48,28 @@ public final class RunLedgerRepository {
                 + "failed integer, "
                 + "entity_counts jsonb, "
                 + "error_message text, "
-                + "recorded_at timestamptz NOT NULL DEFAULT now())";
+                + "recorded_at timestamptz NOT NULL DEFAULT now(), "
+                + "request jsonb)";
     }
 
     public String insertSql() {
         return "INSERT INTO " + table + " (extraction_run_id, command, source_interface, status, "
                 + "started_at, ended_at, duration_ms, window_start, window_end, extracted, inserted, updated, "
-                + "failed, entity_counts, error_message) "
-                + "VALUES (?::uuid,?,?,?,?,?,?,?,?,?,?,?,?,?::jsonb,?) "
-                + "ON CONFLICT (extraction_run_id) DO NOTHING";
+                + "failed, entity_counts, error_message, request) "
+                + "VALUES (?::uuid,?,?,?,?,?,?,?,?,?,?,?,?,?::jsonb,?,?::jsonb) "
+                + "ON CONFLICT (extraction_run_id) DO UPDATE SET status = EXCLUDED.status, "
+                + "ended_at = EXCLUDED.ended_at, duration_ms = EXCLUDED.duration_ms, "
+                + "window_start = EXCLUDED.window_start, window_end = EXCLUDED.window_end, "
+                + "extracted = EXCLUDED.extracted, inserted = EXCLUDED.inserted, updated = EXCLUDED.updated, "
+                + "failed = EXCLUDED.failed, entity_counts = EXCLUDED.entity_counts, "
+                + "error_message = EXCLUDED.error_message, request = EXCLUDED.request, recorded_at = now()";
     }
 
     public void ensureTargetTable(Connection conn) throws SQLException {
         try (Statement st = conn.createStatement()) {
             st.execute("CREATE SCHEMA IF NOT EXISTS " + schema);
             st.execute(createTableSql());
+            st.execute("ALTER TABLE " + table + " ADD COLUMN IF NOT EXISTS request jsonb");
         }
     }
 
@@ -83,7 +90,8 @@ public final class RunLedgerRepository {
             setInt(ps, i++, r.updated());
             setInt(ps, i++, r.failed());
             ps.setString(i++, r.entityCountsJson());
-            ps.setString(i, r.errorMessage());
+            ps.setString(i++, r.errorMessage());
+            ps.setString(i, r.requestJson());
             ps.executeUpdate();
         }
     }

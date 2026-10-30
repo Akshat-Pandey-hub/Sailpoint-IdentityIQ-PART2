@@ -146,6 +146,9 @@ public final class WorkflowDefinitionRepository implements EntityWriter {
 
     /** Part 1 {@code NativeWorkflowRepository.id}. */
     public static String id(JsonNode row) {
+        if (CanonicalIds.blank(text(row, "source_id"))) {
+            return CanonicalIds.contentUuid("native-workflow", row); // no IIQ id: a uuid from the full content
+        }
         String source = text(row, "source_id");
         String x = CanonicalIds.canonicalUuid(source);
         return x == null ? CanonicalIds.deterministicUuid("native-workflow|" + source) : x;
@@ -187,6 +190,6 @@ public final class WorkflowDefinitionRepository implements EntityWriter {
 
     private static String text(JsonNode row, String field) {
         JsonNode n = row.get(field);
-        return (n == null || n.isNull()) ? null : n.asText();
+        return (n == null || n.isNull()) ? null : (n.isValueNode() ? n.asText() : n.toString());
     }
 }

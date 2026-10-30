@@ -88,7 +88,10 @@ Authorization tab → Basic Auth → KFAGENT_USERNAME / KFAGENT_PASSWORD
 - Part 2 runs the `import-identity` command.
 - It fetches every page of `/kfagent/identities` from the KF Agent.
 - It processes the rows and upserts them into `kf_identity`.
-- It records the run in `kf_extraction_run`.
+- It records the run in `kf_extraction_run`: the row is written with status `RUNNING` as soon as the import starts
+  and updated with the final status and counts when it ends, so a run that was stopped or crashed stays visible. The
+  `request` column holds the `start` / `limit` / filters / `modifiedAfter` of a page request (NULL for a full run),
+  which shows which pages of an entity are already loaded.
 
 The request waits until the import finishes. Only one command runs at a time; a second request during a run gets
 `409`. `GET http://127.0.0.1:8200/kfagent-ingest` lists all routes.
@@ -142,7 +145,7 @@ resources (upserted independently for the selected response); these scoped reque
 parent-family orchestration paths. SQL-report commands accept `start`/`limit`, filters on any report column and
 `modifiedAfter` exactly like Part 1, and write the response into the report's own table (see **SQL reports** below).
 Derived and reconciliation commands do not
-fetch a Part 1 resource and reject fetch options. Omit all fetch options to run the full import, which pages through the
+fetch a Part 1 resource; reconciliation rejects fetch options, and the derive commands accept only `start`/`limit` (see below). Omit all fetch options to run the full import, which pages through the
 whole resource (see "How Part 2 reads from the KF Agent"). `mode=incremental` continues to use Part 2's
 stored watermark and overlap rules; it cannot be combined with explicit caller fetch options.
 
@@ -237,6 +240,19 @@ row always gets the same uuid. Report tables carry the same lineage columns as t
 | `reconcile-native-workitems` | Checks that the work items referenced by request approvals exist in `kf_workitem` or `kf_workitem_archive` | `kf_reconciliation_finding` |
 | `derive-native-events` | Derives events from approvals, task results, provisioning transactions, archived work items and certification items | `kf_event` |
 | `derive-native-event-links` | Links those events to the objects they involve (run after `derive-native-events`) | `kf_event_link` |
+
+The derive commands read their source tables in chunks of 1,000 rows (never a whole table at once) and commit each
+chunk. They accept:
+- `start` / `limit`: a window of each source table in primary-key order, e.g. `derive-native-events?start=0&limit=1000`,
+  then `start=1000&limit=1000`, and so on;
+- `mode=incremental`: only the source rows Part 2 wrote since the last successful derivation (unchanged rows already
+  have their events). For links, the watermark only moves when every link found its event, so a link whose event is
+  not derived yet is retried on the next run.
+
+Re-running is always safe: events and links are appended once and never duplicated.
+
+`reconcile-native-workitems` counts in the database (it never loads tables into memory) and ignores rows marked
+deleted: an approval or work item that is gone from IIQ is not reconciled as live.
 
 ## Incremental mode
 

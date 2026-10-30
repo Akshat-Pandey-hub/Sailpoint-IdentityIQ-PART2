@@ -1,5 +1,6 @@
 package com.keyforge.part2.ingest;
 
+import com.keyforge.part2.testsupport.ExpectedKey;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -56,7 +57,7 @@ class WorkflowDefinitionRepositoryTest {
     @Test
     void keyDefinitionTextAndHashMatchPart1() throws Exception {
         for (Golden g : golden()) {
-            assertEquals(g.id(), WorkflowDefinitionRepository.id(g.rest()), "workflowid for " + g.rest());
+            assertEquals(ExpectedKey.of(g.id(), g.rest(), "native-workflow"), WorkflowDefinitionRepository.id(g.rest()), "workflowid for " + g.rest());
             assertEquals(g.definition(), WorkflowDefinitionRepository.definition(g.rest()), "definition text");
             assertEquals(g.hash(), WorkflowDefinitionRepository.recordHash(g.rest()), "record_hash");
         }

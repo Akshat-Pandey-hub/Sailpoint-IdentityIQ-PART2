@@ -80,7 +80,8 @@ public final class IdentityRequestItemTable {
             SOURCE_SYSTEM, SOURCE_INTERFACE, SOURCE_OBJECT_TYPE);
 
     public static String identityRequestItemId(JsonNode row) {
-        return CanonicalIds.identityRequestItemId(text(row, "source_id"));
+        // no IIQ id: a uuid from the full content, never a shared substitute or a refused row
+        return CanonicalIds.bySourceIdOrContent(row, "native-identity-request-item", () -> CanonicalIds.identityRequestItemId(text(row, "source_id")));
     }
 
     /** Part 1 {@code NativeIdentityRequestItemRepository.recordHash}: every business column, lineage excluded. */

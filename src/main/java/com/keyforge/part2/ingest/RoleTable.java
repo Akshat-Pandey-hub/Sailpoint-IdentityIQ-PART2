@@ -84,7 +84,7 @@ public final class RoleTable {
             TRAILING);
 
     public static String roleId(JsonNode row) {
-        return CanonicalIds.roleId(text(row, "source_id"), text(row, "name"));
+        return CanonicalIds.byIdNaturalKeyOrContent(row, "native-role", () -> CanonicalIds.roleId(text(row, "source_id"), text(row, "name")), "name");
     }
 
     /** Part 1 {@code NativeRoleRepository.recordHash}: all 33 response fields, lineage excluded. */

@@ -86,13 +86,13 @@ class AccessHistoryEntitlementRepositoryTest {
     }
 
     @Test
-    void fallbackKeyFollowsPart1() throws Exception {
+    void fallbackKeys() throws Exception {
         ObjectNode r = golden().get(0).rest().deepCopy();
         r.put("source_id", "not-a-guid");
         assertEquals(CanonicalIds.deterministicUuid("native-hist-ent|not-a-guid"), AccessHistoryEntitlementRepository.id(r));
         r.putNull("source_id");
-        assertEquals(CanonicalIds.deterministicUuid("native-hist-ent|null"), AccessHistoryEntitlementRepository.id(r),
-                "Java concatenation of a null id, as in Part 1");
+        assertEquals(CanonicalIds.contentUuid("native-hist-ent", r), AccessHistoryEntitlementRepository.id(r),
+                "no IIQ id: a uuid from the row content, never a shared \"null\" key");
     }
 
     @Test
