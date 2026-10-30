@@ -1,4 +1,5 @@
 com\keyforge\part2\ingest\SoftDeleteSweeper$Target.class
+com\keyforge\part2\ingest\SeenKeys.class
 com\keyforge\part2\Main$2.class
 com\keyforge\part2\ingest\AccessHistoryCertificationRepository.class
 com\keyforge\part2\incremental\FamilyIncrementalImportService$1.class
@@ -20,7 +21,6 @@ com\keyforge\part2\ledger\RunLedger$Sink.class
 com\keyforge\part2\event\EventLinkRepository.class
 com\keyforge\part2\RestServer$Dispatcher.class
 com\keyforge\part2\event\EventType.class
-com\keyforge\part2\ingest\SnapshotSweepImportService$SnapshotFetcher.class
 com\keyforge\part2\ingest\AccountEntitlementTable.class
 com\keyforge\part2\ingest\EntitlementCertificationStatusReport.class
 com\keyforge\part2\incremental\FamilyIncrementalImportService$Outcome.class
@@ -35,11 +35,11 @@ com\keyforge\part2\ingest\RoleTable.class
 com\keyforge\part2\event\EventDeriver.class
 com\keyforge\part2\ingest\IdentityRepository.class
 com\keyforge\part2\ingest\SweepPolicy.class
-com\keyforge\part2\ingest\IdentityImportService.class
 com\keyforge\part2\ingest\JsonColumnBinder$1.class
 com\keyforge\part2\ingest\ApplicationTable.class
 com\keyforge\part2\config\ConfigException.class
 com\keyforge\part2\ingest\SoftDeleteSweeper$Result.class
+com\keyforge\part2\ingest\UpsertSql.class
 com\keyforge\part2\ingest\EntityImportService.class
 com\keyforge\part2\event\EventLinkDerivationService$MissingSourceColumnsException.class
 com\keyforge\part2\ingest\SqlReportImportService.class
@@ -47,7 +47,6 @@ com\keyforge\part2\incremental\IncrementalImportService$1.class
 com\keyforge\part2\ingest\SyslogEventImportService$IncompleteScanException.class
 com\keyforge\part2\ingest\EntityRepository.class
 com\keyforge\part2\ingest\CertificationTable.class
-com\keyforge\part2\ingest\SnapshotSweepImportService.class
 com\keyforge\part2\Main$IncrementalFamily.class
 com\keyforge\part2\hash\RecordHash.class
 com\keyforge\part2\ingest\EntitlementTable.class
@@ -86,7 +85,6 @@ com\keyforge\part2\ingest\WorkgroupMemberRepository.class
 com\keyforge\part2\ingest\SoftDeleteSweeper$Status.class
 com\keyforge\part2\ingest\IdentityTable.class
 com\keyforge\part2\ingest\ColumnSpec$Kind.class
-com\keyforge\part2\ingest\SnapshotSweepImportService$1.class
 com\keyforge\part2\ingest\SqlReportRepository.class
 com\keyforge\part2\hash\HashValues.class
 com\keyforge\part2\ingest\CertificationArchiveRepository.class
@@ -127,7 +125,6 @@ com\keyforge\part2\ingest\EntityRepository$Outcome.class
 com\keyforge\part2\event\EventDerivationService.class
 com\keyforge\part2\RestServer$FetchDispatcher.class
 com\keyforge\part2\ledger\RunLedgerRepository.class
-com\keyforge\part2\ingest\SnapshotSweepImportService$Outcome.class
 com\keyforge\part2\ingest\RoleEntitlementRepository$Edge.class
 com\keyforge\part2\ingest\SqlReportImportService$1.class
 com\keyforge\part2\ingest\WorkgroupTable.class
@@ -136,7 +133,6 @@ com\keyforge\part2\incremental\IncrementalImportService$Outcome.class
 com\keyforge\part2\ingest\PolicyConstraintTable.class
 com\keyforge\part2\config\AppConfig.class
 com\keyforge\part2\incremental\IncrementalImportService.class
-com\keyforge\part2\ingest\IdentityImportService$1.class
 com\keyforge\part2\ingest\WorkflowDefinitionRepository.class
 com\keyforge\part2\ledger\RunContext$EntityCount.class
 com\keyforge\part2\id\CanonicalIds.class

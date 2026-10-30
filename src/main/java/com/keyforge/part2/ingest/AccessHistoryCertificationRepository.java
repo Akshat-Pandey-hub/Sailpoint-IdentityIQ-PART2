@@ -11,6 +11,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.LinkedHashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -22,8 +23,10 @@ import static com.keyforge.part2.hash.HashValues.text;
  * certifications ({@code sailpoint.object.accesshistory.HistoricalCertification}). Reproduces Part 1's
  * {@code NativeHistCertificationRepository}:
  * <ul>
- *   <li><b>Append-only.</b> {@code INSERT … ON CONFLICT (hist_cert_id) DO NOTHING}: never updated, never deleted, no
- *       soft-delete sweep. Existing rows are {@link EntityRepository.Outcome#SKIPPED}.</li>
+ *   <li><b>Kept, updated only when IIQ changed it.</b> {@code INSERT … ON CONFLICT (hist_cert_id) DO UPDATE} only when a
+ *       data column differs ({@link UpsertSql}): never deleted, no soft-delete sweep. Existing rows that are
+ *       unchanged are {@link EntityRepository.Outcome#SKIPPED}; changed ones (e.g. a flag IIQ updates later) are
+ *       {@link EntityRepository.Outcome#UPDATED}.</li>
  *   <li>PK {@code hist_cert_id} = canonical source_id, else {@code deterministicUuid("native-hist-cert|"+source_id)}
  *       (Java concatenation, so a null id seeds "native-hist-cert|null").</li>
  *   <li>11 response fields: {@code finished}, {@code signed}, {@code created_at}, {@code modified_at} timestamps;
@@ -94,9 +97,12 @@ public final class AccessHistoryCertificationRepository implements EntityWriter 
                 .append(",\n    extraction_run_id text")
                 .append(",\n    extracted_at timestamp with time zone NOT NULL DEFAULT now()")
                 .append("\n)").toString();
-        this.appendSql = "INSERT INTO " + table + " (" + cols
+        List<String> compared = new ArrayList<>(COLUMNS);
+        compared.add("record_hash");
+        this.appendSql = "INSERT INTO " + table + " AS " + UpsertSql.ALIAS + " (" + cols
                 + ", record_hash, source_system, source_interface, source_object_type, extraction_run_id) VALUES ("
-                + vals + ", ?, ?, ?, ?, ?) ON CONFLICT (hist_cert_id) DO NOTHING RETURNING hist_cert_id";
+                + vals + ", ?, ?, ?, ?, ?) "
+                + UpsertSql.tail("hist_cert_id", compared, List.of("source_system", "source_interface", "source_object_type", "extraction_run_id"), false);
     }
 
     @Override
@@ -122,7 +128,7 @@ public final class AccessHistoryCertificationRepository implements EntityWriter 
         }
     }
 
-    /** Appends one row; a row that already exists is left untouched ({@code SKIPPED}). */
+    /** Inserts one row; an existing one is updated only when a data column changed, else {@code SKIPPED}. */
     @Override
     public EntityRepository.Outcome upsert(Connection conn, JsonNode row, String extractionRunId) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(appendSql)) {
@@ -137,7 +143,7 @@ public final class AccessHistoryCertificationRepository implements EntityWriter 
             ps.setString(i++, SRC_OBJECT_TYPE);
             ps.setString(i, extractionRunId);
             try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? EntityRepository.Outcome.INSERTED : EntityRepository.Outcome.SKIPPED;
+                return UpsertSql.outcome(rs);
             }
         }
     }

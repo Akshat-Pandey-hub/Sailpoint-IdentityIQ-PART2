@@ -12,6 +12,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
 import java.util.LinkedHashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -25,8 +26,10 @@ import static com.keyforge.part2.hash.HashValues.text;
  * record IIQ keeps when a work item is completed and archived. Reproduces Part 1's
  * {@code NativeWorkItemArchiveRepository} + {@code NativeWorkItemArchiveMapper}:
  * <ul>
- *   <li><b>Append-only (CEC).</b> {@code INSERT … ON CONFLICT (archiveid) DO NOTHING}: never updated, never deleted, no
- *       sweep. A re-run reports existing archives as {@link EntityRepository.Outcome#SKIPPED}.</li>
+ *   <li><b>Kept, updated only when IIQ changed it.</b> {@code INSERT … ON CONFLICT (archiveid) DO UPDATE} only when a
+ *       data column differs ({@link UpsertSql}): never deleted, no soft-delete sweep. Existing archives that are
+ *       unchanged are {@link EntityRepository.Outcome#SKIPPED}; changed ones (e.g. a flag IIQ updates later) are
+ *       {@link EntityRepository.Outcome#UPDATED}.</li>
  *   <li>PK {@code archiveid} = canonical source_id (the archive's own id, NOT {@code work_item_id}). There is NO
  *       fallback: a null or non-GUID id is refused (the row fails), exactly as Part 1.</li>
  *   <li>CEC lineage envelope: {@code src_system} IdentityIQ, {@code src_object_type} sailpoint.object.WorkItemArchive,
@@ -94,14 +97,19 @@ public final class WorkItemArchiveRepository implements EntityWriter {
                 .append(",\n    derived_at timestamp with time zone")
                 .append(",\n    extracted_at timestamp with time zone NOT NULL DEFAULT now()")
                 .append("\n)").toString();
-        this.appendSql = "INSERT INTO " + table + " (archiveid, " + String.join(", ", SCALARS) + ", "
+        List<String> compared = new ArrayList<>(SCALARS);
+        compared.addAll(JSONB);
+        compared.addAll(TIMESTAMPS);
+        compared.addAll(List.of("record_hash", "src_object_id", "src_natural_key", "src_created", "src_modified",
+                "src_event_ts"));
+        this.appendSql = "INSERT INTO " + table + " AS " + UpsertSql.ALIAS + " (archiveid, " + String.join(", ", SCALARS) + ", "
                 + String.join(", ", JSONB) + ", " + String.join(", ", TIMESTAMPS) + ", record_hash, src_system, "
                 + "src_object_type, src_object_id, src_natural_key, src_created, src_modified, src_event_ts, "
                 + "src_interface, extraction_run_id, raw_ref, derived_at) "
                 + "VALUES (?::uuid, " + "?, ".repeat(SCALARS.size()) + "?::jsonb, ".repeat(JSONB.size())
                 + "?::timestamptz, ".repeat(TIMESTAMPS.size())
                 + "?, ?, ?, ?, ?, ?::timestamptz, ?::timestamptz, ?::timestamptz, ?, ?, ?, ?::timestamptz) "
-                + "ON CONFLICT (archiveid) DO NOTHING RETURNING archiveid";
+                + UpsertSql.tail("archiveid", compared, List.of("src_system", "src_object_type", "src_interface", "extraction_run_id", "raw_ref", "derived_at"), false);
     }
 
     @Override
@@ -127,7 +135,7 @@ public final class WorkItemArchiveRepository implements EntityWriter {
         }
     }
 
-    /** Appends one archive; an archive that already exists is left untouched ({@code SKIPPED}). */
+    /** Inserts one archive; an existing one is updated only when a data column changed, else {@code SKIPPED}. */
     @Override
     public EntityRepository.Outcome upsert(Connection conn, JsonNode row, String extractionRunId) throws SQLException {
         String archiveId = id(row);
@@ -165,7 +173,7 @@ public final class WorkItemArchiveRepository implements EntityWriter {
             ps.setString(i++, null);                        // raw_ref: not wired, as in Part 1
             ps.setNull(i, Types.VARCHAR);                   // derived_at: extracted, not derived
             try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? EntityRepository.Outcome.INSERTED : EntityRepository.Outcome.SKIPPED;
+                return UpsertSql.outcome(rs);
             }
         }
     }

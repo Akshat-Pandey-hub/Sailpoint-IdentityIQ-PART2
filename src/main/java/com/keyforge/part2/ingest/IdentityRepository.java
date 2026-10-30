@@ -83,7 +83,8 @@ public final class IdentityRepository {
                 if (isNull) {
                     ps.setNull(index, Types.VARCHAR);
                 } else {
-                    ps.setString(index, node.asText());
+                    // a scalar as its text; a structured value as its JSON (asText() would lose it as "")
+                    ps.setString(index, node.isValueNode() ? node.asText() : node.toString());
                 }
             }
             case BOOLEAN -> {

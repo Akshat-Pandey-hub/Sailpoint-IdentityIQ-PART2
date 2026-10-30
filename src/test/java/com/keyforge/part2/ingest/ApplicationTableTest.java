@@ -120,7 +120,7 @@ class ApplicationTableTest {
     @Test
     void upsertConflictsOnApplicationid() {
         String sql = repo.upsertSql();
-        assertTrue(sql.startsWith("INSERT INTO iiq_native_part2_test.kf_application (applicationid, source_id,"));
+        assertTrue(sql.startsWith("INSERT INTO iiq_native_part2_test.kf_application AS cur (applicationid, source_id,"));
         assertTrue(sql.contains("ON CONFLICT (applicationid) DO UPDATE SET"));
         assertFalse(sql.contains("applicationid = EXCLUDED"), "pk is never rewritten");
         String vals = sql.substring(sql.indexOf("VALUES (") + 8, sql.indexOf(") ON CONFLICT"));

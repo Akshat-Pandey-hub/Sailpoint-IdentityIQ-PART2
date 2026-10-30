@@ -121,6 +121,11 @@ public final class SqlReportRepository implements EntityWriter {
         }
     }
 
+    @Override
+    public String keyColumn() {
+        return spec.pkColumn();
+    }
+
     /** The row's uuid: derived from the report id and the key columns, never random. */
     @Override
     public String key(JsonNode row) {

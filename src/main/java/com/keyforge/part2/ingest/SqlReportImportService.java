@@ -6,9 +6,7 @@ import com.keyforge.part2.http.FetchOptions;
 import com.keyforge.part2.http.KfAgentClient;
 
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.Map;
 
 /**
@@ -24,8 +22,9 @@ import java.util.Map;
  *   <li><b>Duplicate key:</b> two rows of one run with the same key columns would overwrite each other, so the second
  *       is reported as a failed row instead of being written.</li>
  *   <li><b>Deletion:</b> only after a full run that read every page with no failed row, rows of this table that the
- *       report no longer returns are marked {@code is_deleted = true, deleted_at = now()} (never hard-deleted); a row
- *       that comes back is revived by its next write. A caller-scoped run never marks anything deleted.</li>
+ *       report no longer returns are marked {@code is_deleted = true, deleted_at = now()} (never hard-deleted), within
+ *       the {@code SWEEP_MAX_DELETE_PERCENT} safety limit ({@link SeenKeys}); a row that comes back is revived by its
+ *       next write. A caller-scoped run never marks anything deleted.</li>
  * </ul>
  * The keys seen in the run are kept in a session temporary table, not in memory.
  */
@@ -40,27 +39,28 @@ public final class SqlReportImportService {
     /** The import counts plus what the deletion step did (or why it did not run). */
     public record Outcome(ImportResult result, SoftDeleteSweeper.Result sweep) { }
 
-    private static final String SEEN = "pg_temp.kf_sql_report_seen";
-
     private final Fetcher fetcher;
     private final SqlReportRepository repository;
     private final int pageSize;
+    private final int maxDeletePercent;
     private final ObjectMapper mapper = new ObjectMapper();
 
     public SqlReportImportService(Fetcher fetcher, SqlReportRepository repository, int pageSize) {
+        this(fetcher, repository, pageSize, EntityImportService.DEFAULT_MAX_DELETE_PERCENT);
+    }
+
+    public SqlReportImportService(Fetcher fetcher, SqlReportRepository repository, int pageSize, int maxDeletePercent) {
         this.fetcher = fetcher;
         this.repository = repository;
         this.pageSize = pageSize > 0 ? pageSize : 500;
+        this.maxDeletePercent = maxDeletePercent;
     }
 
     public Outcome run(Connection conn, String extractionRunId, FetchOptions options) throws SQLException {
         FetchOptions scope = options == null ? FetchOptions.none() : options;
         conn.setAutoCommit(true);
         repository.ensureSchemaAndTable(conn);
-        try (Statement st = conn.createStatement()) {
-            st.execute("CREATE TEMP TABLE IF NOT EXISTS kf_sql_report_seen (k uuid PRIMARY KEY)");
-            st.execute("TRUNCATE " + SEEN);
-        }
+        SeenKeys.reset(conn);
 
         ImportResult result = new ImportResult(repository.entity(), repository.targetTable());
         int seen = 0;
@@ -78,10 +78,9 @@ public final class SqlReportImportService {
             }
         }
 
-        SoftDeleteSweeper.Result sweep = scope.isEmpty() ? markMissing(conn, result, seen) : null;
-        try (Statement st = conn.createStatement()) {
-            st.execute("DROP TABLE IF EXISTS " + SEEN);
-        }
+        SoftDeleteSweeper.Result sweep = scope.isEmpty() ? SeenKeys.markMissing(conn, repository.targetTable(),
+                repository.spec().pkColumn(), result.failed(), 0, seen, maxDeletePercent) : null;
+        SeenKeys.drop(conn);
         return new Outcome(result, sweep);
     }
 
@@ -96,7 +95,7 @@ public final class SqlReportImportService {
         for (JsonNode row : rows) {
             result.countFetched(1);
             try {
-                if (!markSeen(conn, repository.key(row))) {
+                if (!SeenKeys.add(conn, repository.key(row))) {
                     result.countFailure(repository.ref(row), "duplicate report row key: another row of this run has "
                             + "the same " + repository.spec().keyColumns() + "; not written");
                     continue;
@@ -112,36 +111,6 @@ public final class SqlReportImportService {
             }
         }
         return added;
-    }
-
-    /** Records a key as seen in this run; {@code false} when it was already seen (a duplicate). */
-    private static boolean markSeen(Connection conn, String key) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(
-                "INSERT INTO " + SEEN + " (k) VALUES (?::uuid) ON CONFLICT DO NOTHING")) {
-            ps.setString(1, key);
-            return ps.executeUpdate() == 1;
-        }
-    }
-
-    /** After a complete full run with no failure: soft-delete this table's rows the report did not return. */
-    private SoftDeleteSweeper.Result markMissing(Connection conn, ImportResult result, int seen) throws SQLException {
-        String table = repository.spec().table();
-        if (result.failed() > 0) {
-            return new SoftDeleteSweeper.Result(table, SoftDeleteSweeper.Status.SKIPPED_ROW_FAILURES, seen, 0, 0,
-                    result.failed() + " row(s) failed; no row was marked deleted");
-        }
-        if (seen == 0) {
-            return new SoftDeleteSweeper.Result(table, SoftDeleteSweeper.Status.SKIPPED_EMPTY_KEEP, 0, 0, 0,
-                    "the report returned no rows; an empty result never marks every row deleted");
-        }
-        String pk = repository.spec().pkColumn();
-        try (Statement st = conn.createStatement()) {
-            int marked = st.executeUpdate("UPDATE " + repository.targetTable() + " AS t SET is_deleted = true, "
-                    + "deleted_at = now() WHERE t.is_deleted = false AND NOT EXISTS (SELECT 1 FROM " + SEEN
-                    + " s WHERE s.k = t." + pk + ")");
-            return new SoftDeleteSweeper.Result(table, SoftDeleteSweeper.Status.SWEPT, seen, marked, 0,
-                    "complete paged read of the report, every row written");
-        }
     }
 
     private JsonNode parseArray(String body) {

@@ -1,6 +1,5 @@
 package com.keyforge.part2.ingest;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.keyforge.part2.config.SchemaName;
@@ -36,8 +35,8 @@ import java.util.TreeMap;
  *       {@code import-entitlement} first.</li>
  * </ul>
  * {@code record_hash} is Part 1's 17-field hash, which includes the resolved entitlement_id and renders
- * filter_value / permission_rights_list with Java's {@code toString} of key-sorted maps/lists. Bindings follow
- * Part 1: a null filter_value is stored as JSON {@code null}, a missing permission_rights_list as {@code []}.
+ * filter_value / permission_rights_list with Java's {@code toString} of key-sorted maps/lists. Every response field
+ * is stored exactly as received (a null filter_value / permission_rights_list / profile_ordinal stays NULL).
  * Lineage: {@code IdentityIQ} / {@code native_iiq_java_api} / {@code sailpoint.object.Bundle}.
  */
 public final class RoleEntitlementRepository implements EntityWriter {
@@ -90,27 +89,19 @@ public final class RoleEntitlementRepository implements EntityWriter {
                 + "    is_deleted boolean NOT NULL DEFAULT false,\n"
                 + "    deleted_at timestamp with time zone\n"
                 + ")";
-        this.upsertSql = "INSERT INTO " + table + " (roleentitlementid, source_role_id, role_id, role_name, "
+        this.upsertSql = "INSERT INTO " + table + " AS " + UpsertSql.ALIAS + " (roleentitlementid, source_role_id, role_id, role_name, "
                 + "entitlement_id, entitlement_type, application_id, application_name, profile_ordinal, constraint_path, "
                 + "filter_expression, filter_value, filter_operation, attribute_name, attribute_value, permission_target, "
                 + "permission_rights, permission_rights_list, permission_annotation, source_system, source_interface, "
                 + "source_object_type, src_object_id, src_natural_key, extraction_run_id, record_hash) "
                 + "VALUES (?::uuid, ?, ?::uuid, ?, ?::uuid, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, "
                 + "?, ?, ?, ?) "
-                + "ON CONFLICT (roleentitlementid) DO UPDATE SET source_role_id = EXCLUDED.source_role_id, "
-                + "role_id = EXCLUDED.role_id, role_name = EXCLUDED.role_name, entitlement_id = EXCLUDED.entitlement_id, "
-                + "entitlement_type = EXCLUDED.entitlement_type, application_id = EXCLUDED.application_id, "
-                + "application_name = EXCLUDED.application_name, profile_ordinal = EXCLUDED.profile_ordinal, "
-                + "constraint_path = EXCLUDED.constraint_path, filter_expression = EXCLUDED.filter_expression, "
-                + "filter_value = EXCLUDED.filter_value, filter_operation = EXCLUDED.filter_operation, "
-                + "attribute_name = EXCLUDED.attribute_name, attribute_value = EXCLUDED.attribute_value, "
-                + "permission_target = EXCLUDED.permission_target, permission_rights = EXCLUDED.permission_rights, "
-                + "permission_rights_list = EXCLUDED.permission_rights_list, "
-                + "permission_annotation = EXCLUDED.permission_annotation, source_system = EXCLUDED.source_system, "
-                + "source_interface = EXCLUDED.source_interface, source_object_type = EXCLUDED.source_object_type, "
-                + "src_object_id = EXCLUDED.src_object_id, src_natural_key = EXCLUDED.src_natural_key, "
-                + "extraction_run_id = EXCLUDED.extraction_run_id, record_hash = EXCLUDED.record_hash, "
-                + "extracted_at = now(), is_deleted = false, deleted_at = null RETURNING (xmax = 0)";
+                + UpsertSql.tail("roleentitlementid", List.of("source_role_id", "role_id", "role_name",
+                        "entitlement_id", "entitlement_type", "application_id", "application_name", "profile_ordinal",
+                        "constraint_path", "filter_expression", "filter_value", "filter_operation", "attribute_name",
+                        "attribute_value", "permission_target", "permission_rights", "permission_rights_list",
+                        "permission_annotation", "src_object_id", "src_natural_key", "record_hash"),
+                        List.of("source_system", "source_interface", "source_object_type", "extraction_run_id"), true);
         this.lookupSql = "SELECT entitlementid::text FROM " + this.schema + ".kf_entitlement "
                 + "WHERE application_name = ? AND attribute = ? AND value = ? ORDER BY entitlementid LIMIT 2";
     }
@@ -166,16 +157,17 @@ public final class RoleEntitlementRepository implements EntityWriter {
             ps.setString(i++, e.entitlementType);
             ps.setString(i++, e.applicationId);
             ps.setString(i++, e.applicationName);
-            ps.setInt(i++, e.profileOrdinal);
+            // the response values are stored as received; Edge's normalised copies only feed the key and the hash
+            JsonColumnBinder.bind(ps, i++, ColumnSpec.integer("profile_ordinal"), row.get("profile_ordinal"));
             ps.setString(i++, e.constraintPath);
             ps.setString(i++, e.filterExpression);
-            ps.setString(i++, json(e.filterValue));
+            ps.setString(i++, rawJson(row, "filter_value"));
             ps.setString(i++, e.filterOperation);
             ps.setString(i++, e.attributeName);
             ps.setString(i++, e.attributeValue);
             ps.setString(i++, e.permissionTarget);
             ps.setString(i++, e.permissionRights);
-            ps.setString(i++, json(e.permissionRightsList));
+            ps.setString(i++, rawJson(row, "permission_rights_list"));
             ps.setString(i++, e.permissionAnnotation);
             ps.setString(i++, SOURCE_SYSTEM);
             ps.setString(i++, SOURCE_INTERFACE);
@@ -185,7 +177,7 @@ public final class RoleEntitlementRepository implements EntityWriter {
             ps.setString(i++, extractionRunId);
             ps.setString(i, e.recordHash(entitlementId));
             try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() && rs.getBoolean(1) ? EntityRepository.Outcome.INSERTED : EntityRepository.Outcome.UPDATED;
+                return UpsertSql.outcome(rs);
             }
         }
     }
@@ -217,6 +209,11 @@ public final class RoleEntitlementRepository implements EntityWriter {
     }
 
     @Override
+    public String keyColumn() {
+        return "roleentitlementid";
+    }
+
+    @Override
     public String ref(JsonNode row) {
         return "role " + text(row, "source_role_id") + " (" + text(row, "role_name") + ") "
                 + text(row, "entitlement_type") + " path " + text(row, "constraint_path");
@@ -232,12 +229,10 @@ public final class RoleEntitlementRepository implements EntityWriter {
         return upsertSql;
     }
 
-    private static String json(Object value) throws SQLException {
-        try {
-            return JSON.writeValueAsString(value);
-        } catch (JsonProcessingException ex) {
-            throw new SQLException("Could not serialize role-entitlement value", ex);
-        }
+    /** A structured response value as its compact JSON text, exactly as received; absent / JSON null → SQL NULL. */
+    private static String rawJson(JsonNode row, String field) {
+        JsonNode n = row.get(field);
+        return (n == null || n.isNull()) ? null : n.toString();
     }
 
     private static String text(JsonNode row, String field) {

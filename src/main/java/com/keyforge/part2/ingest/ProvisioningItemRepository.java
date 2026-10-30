@@ -98,21 +98,21 @@ public final class ProvisioningItemRepository implements EntityWriter {
 
         StringBuilder cols = new StringBuilder("provisioningitemid");
         StringBuilder vals = new StringBuilder("?::uuid");
-        StringBuilder set = new StringBuilder();
+        List<String> compared = new java.util.ArrayList<>();
         for (ColumnSpec c : BUSINESS) {
             cols.append(", ").append(c.name);
             vals.append(", ").append(c.kind.placeholder);
-            set.append(c.name).append(" = EXCLUDED.").append(c.name).append(", ");
+            compared.add(c.name);
         }
+        compared.addAll(List.of("record_hash", "src_object_id", "src_natural_key"));
+        List<String> lineage = List.of("source_system", "source_interface", "source_object_type", "extraction_run_id");
         for (String meta : List.of("record_hash", "source_system", "source_interface", "source_object_type",
                 "src_object_id", "src_natural_key", "extraction_run_id")) {
             cols.append(", ").append(meta);
             vals.append(", ?");
-            set.append(meta).append(" = EXCLUDED.").append(meta).append(", ");
         }
-        set.append("extracted_at = now(), is_deleted = false, deleted_at = null");
-        this.upsertSql = "INSERT INTO " + table + " (" + cols + ") VALUES (" + vals + ") "
-                + "ON CONFLICT (provisioningitemid) DO UPDATE SET " + set + " RETURNING (xmax = 0)";
+        this.upsertSql = "INSERT INTO " + table + " AS " + UpsertSql.ALIAS + " (" + cols + ") VALUES (" + vals + ") "
+                + UpsertSql.tail("provisioningitemid", compared, lineage, true);
     }
 
     @Override
@@ -154,7 +154,7 @@ public final class ProvisioningItemRepository implements EntityWriter {
             ps.setString(i++, naturalKey(row));
             ps.setString(i, extractionRunId);
             try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() && rs.getBoolean(1) ? EntityRepository.Outcome.INSERTED : EntityRepository.Outcome.UPDATED;
+                return UpsertSql.outcome(rs);
             }
         }
     }
@@ -164,6 +164,11 @@ public final class ProvisioningItemRepository implements EntityWriter {
     @Override
     public String key(JsonNode row) {
         return id(row);
+    }
+
+    @Override
+    public String keyColumn() {
+        return "provisioningitemid";
     }
 
     public static String id(JsonNode row) {

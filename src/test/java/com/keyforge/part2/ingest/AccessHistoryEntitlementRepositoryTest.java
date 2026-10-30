@@ -138,15 +138,15 @@ class AccessHistoryEntitlementRepositoryTest {
     }
 
     @Test
-    void bindsCaptureJsonVerbatimEmptyJsonbAsNullAndTrailingColumns() throws Exception {
+    void bindsCaptureJsonAndJsonbVerbatimAndTrailingColumns() throws Exception {
         for (Golden g : golden()) {
             RecordingJdbc jdbc = new RecordingJdbc();
             assertEquals(EntityRepository.Outcome.INSERTED, repo.upsert(jdbc.connection(), g.rest(), "run-ah"));
             Map<Integer, Object> b = jdbc.executions.get(0);
             assertEquals(g.id(), b.get(1));
             assertEquals(g.storedCaptureJson(), b.get(34), "capture_json text exactly as Part 1 stored it");
-            assertNull(b.get(35), "empty attributes {} -> NULL");
-            assertNull(b.get(36), "empty extended_attributes {} -> NULL");
+            assertEquals(jsonOrNull(g.rest(), "attributes"), b.get(35), "attributes exactly as received ({} stays {})");
+            assertEquals(jsonOrNull(g.rest(), "extended_attributes"), b.get(36), "extended_attributes exactly as received");
             assertEquals(g.hash(), b.get(39));
             assertEquals("IdentityIQ", b.get(40));
             assertEquals("native_iiq_java_api", b.get(41));
@@ -164,10 +164,13 @@ class AccessHistoryEntitlementRepositoryTest {
     }
 
     @Test
-    void appendOnlySqlNeverUpdatesAndReportsExistingRowsAsSkipped() throws Exception {
+    void existingRowsAreUpdatedOnlyWhenADataColumnChanged() throws Exception {
         String sql = repo.appendSql();
-        assertTrue(sql.contains("ON CONFLICT (hist_capture_id) DO NOTHING RETURNING hist_capture_id"));
-        assertFalse(sql.contains("DO UPDATE"), "captures are never updated");
+        assertTrue(sql.contains("ON CONFLICT (hist_capture_id) DO UPDATE SET"));
+        String where = sql.substring(sql.indexOf(" WHERE ROW("));
+        assertTrue(where.contains(") IS DISTINCT FROM ROW("), "written only when a data column differs");
+        assertFalse(where.contains("extraction_run_id"), "a new run alone never rewrites a row");
+        assertTrue(sql.endsWith("RETURNING (xmax = 0)"));
         assertEquals(47, sql.chars().filter(ch -> ch == '?').count());
         assertEquals(EntityRepository.Outcome.SKIPPED, repo.upsert(noRowsReturned(), golden().get(0).rest(), "run-ah2"));
     }
@@ -186,7 +189,7 @@ class AccessHistoryEntitlementRepositoryTest {
         assertEquals("access-history", repo.resource());
     }
 
-    /** A connection whose INSERT … RETURNING yields no row (what PostgreSQL does for ON CONFLICT DO NOTHING). */
+    /** A connection whose INSERT … RETURNING yields no row (what PostgreSQL does when the row exists and nothing changed). */
     private static Connection noRowsReturned() {
         ClassLoader cl = AccessHistoryEntitlementRepositoryTest.class.getClassLoader();
         ResultSet empty = (ResultSet) Proxy.newProxyInstance(cl, new Class<?>[]{ResultSet.class},
@@ -203,5 +206,11 @@ class AccessHistoryEntitlementRepositoryTest {
         if (r == int.class) return 0;
         if (r == long.class) return 0L;
         return null;
+    }
+
+    /** The value as Part 1 sent it, as compact JSON, or null. */
+    private static String jsonOrNull(com.fasterxml.jackson.databind.JsonNode row, String field) {
+        com.fasterxml.jackson.databind.JsonNode n = row.get(field);
+        return n == null || n.isNull() ? null : n.toString();
     }
 }

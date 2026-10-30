@@ -1,6 +1,7 @@
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\CallerFetchPolicyTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ChangedIncrementalDispatchTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\config\ClientCertificateConfigTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\DeletionExitCodeTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\event\DeriveCommandConfigTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\event\EventDerivationServiceTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\event\EventDeriverTest.java
@@ -27,6 +28,7 @@ D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\Certificat
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\CertificationEntityTableTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\CertificationItemTableTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\CertificationTableTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\DeletionMarkingTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\EntitlementParityTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\EntitlementRepositoryTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\EntityImportServiceTest.java
@@ -47,15 +49,16 @@ D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\Provisioni
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\RoleEntitlementRepositoryTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\RoleHierarchyRepositoryTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\RoleTableTest.java
-D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\SnapshotSweepImportServiceTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\SoftDeleteSweeperTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\SqlReportImportServiceTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\SqlReportTablesTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\StoredAsReceivedTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\SweepPoliciesTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\SyslogEventImportServiceTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\SyslogEventRepositoryTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\TaskResultTableTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\TaskScheduleTableTest.java
+D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\UpsertSqlTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\WorkflowDefinitionRepositoryTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\WorkgroupMemberRepositoryTest.java
 D:\Sailpoint-IdentityIQ-Part2\src\test\java\com\keyforge\part2\ingest\WorkgroupTableTest.java

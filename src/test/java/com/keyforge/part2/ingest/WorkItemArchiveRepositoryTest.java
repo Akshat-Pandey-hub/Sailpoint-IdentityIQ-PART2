@@ -152,10 +152,13 @@ class WorkItemArchiveRepositoryTest {
     }
 
     @Test
-    void appendOnlySqlNeverUpdatesAndReportsExistingRowsAsSkipped() throws Exception {
+    void existingRowsAreUpdatedOnlyWhenADataColumnChanged() throws Exception {
         String sql = repo.appendSql();
-        assertTrue(sql.contains("ON CONFLICT (archiveid) DO NOTHING RETURNING archiveid"));
-        assertFalse(sql.contains("DO UPDATE"), "archives are never updated");
+        assertTrue(sql.contains("ON CONFLICT (archiveid) DO UPDATE SET"));
+        String where = sql.substring(sql.indexOf(" WHERE ROW("));
+        assertTrue(where.contains(") IS DISTINCT FROM ROW("), "written only when a data column differs");
+        assertFalse(where.contains("extraction_run_id"), "a new run alone never rewrites a row");
+        assertTrue(sql.endsWith("RETURNING (xmax = 0)"));
         assertEquals(42, sql.chars().filter(ch -> ch == '?').count());
         assertEquals(EntityRepository.Outcome.SKIPPED, repo.upsert(noRowsReturned(), golden().get(0).rest(), "run-wia2"));
     }
@@ -174,7 +177,7 @@ class WorkItemArchiveRepositoryTest {
         assertEquals("workitem-archives", repo.resource());
     }
 
-    /** A connection whose INSERT … RETURNING yields no row (what PostgreSQL does for ON CONFLICT DO NOTHING). */
+    /** A connection whose INSERT … RETURNING yields no row (what PostgreSQL does when the row exists and nothing changed). */
     private static Connection noRowsReturned() {
         ClassLoader cl = WorkItemArchiveRepositoryTest.class.getClassLoader();
         ResultSet empty = (ResultSet) Proxy.newProxyInstance(cl, new Class<?>[]{ResultSet.class},

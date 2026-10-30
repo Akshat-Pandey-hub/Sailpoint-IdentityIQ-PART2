@@ -6,16 +6,13 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * The sweep policy registry. A table sweeps only if it is listed in {@link #CONFIGS}; every other table is
- * {@link SweepPolicy#NEVER}. Tables in {@link #NEVER_SWEEP_TABLES} can never be given another policy
- * ({@link SoftDeleteSweeper.Target} rejects it): append-only events / histories / archives are immutable, SQL-report
- * tables mark their own deleted rows ({@link SqlReportImportService}), and governance-owned tables are not source mirrors.
+ * Which tables may have rows marked deleted. Paged full runs mark deletions for every keyed current-state table
+ * ({@link EntityImportService#marksDeletions}); the tables in {@link #NEVER_SWEEP_TABLES} are excluded: append-only
+ * events / histories / archives are never marked deleted, SQL-report tables mark their own deleted rows
+ * ({@link SqlReportImportService}), and governance-owned tables are not source mirrors.
  *
- * <p>Enabled = exactly the tables Part 1 sweeps whose KF Agent endpoint reports a VERIFIED source count
- * ({@code X-KF-Verified-Source-Count}: the response came from one full internal scan whose complete-scan guard passed).
- * Tables Part 1 sweeps but whose source offers no count (identity, account, application, entitlement, role, policy,
- * task result/schedule, violation, workgroup, group definition, workflow definition, workgroup member) stay NEVER:
- * their completeness cannot be proven.
+ * <p>{@link #CONFIGS} is the earlier per-table policy for the verified-snapshot sweep (Part 1's counted whole-entity
+ * read, {@code X-KF-Verified-Source-Count}); the paged imports no longer use it.
  */
 public final class SweepPolicies {
 

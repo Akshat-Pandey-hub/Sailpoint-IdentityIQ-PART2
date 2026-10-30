@@ -11,6 +11,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -24,8 +25,10 @@ import static com.keyforge.part2.hash.HashValues.text;
  * {@code NativeCertificationArchiveRepository} + {@code NativeCertificationArchiveMapper}, which differ from every
  * current-state table:
  * <ul>
- *   <li><b>Append-only (CEC).</b> {@code INSERT … ON CONFLICT (certificationarchiveid) DO NOTHING}: never updated, never
- *       deleted. A re-run reports existing archives as {@link EntityRepository.Outcome#SKIPPED}.</li>
+ *   <li><b>Kept, updated only when IIQ changed it.</b> {@code INSERT … ON CONFLICT (certificationarchiveid) DO UPDATE} only when a
+ *       data column differs ({@link UpsertSql}): never deleted, no soft-delete sweep. Existing archives that are
+ *       unchanged are {@link EntityRepository.Outcome#SKIPPED}; changed ones (e.g. a flag IIQ updates later) are
+ *       {@link EntityRepository.Outcome#UPDATED}.</li>
  *   <li>PK {@code certificationarchiveid} = canonical source_id; a present but non-GUID id →
  *       {@code deterministicUuid("native-certification-archive|"+id)}; a null/blank id is refused (row fails).</li>
  *   <li>CEC lineage envelope instead of the source_system/is_deleted columns: {@code src_system}, {@code src_object_type},
@@ -87,7 +90,7 @@ public final class CertificationArchiveRepository implements EntityWriter {
                 + "    derived_at timestamp with time zone,\n"
                 + "    extracted_at timestamp with time zone NOT NULL DEFAULT now()\n"
                 + ")";
-        this.appendSql = "INSERT INTO " + table + " (certificationarchiveid, source_id, name, certification_id, "
+        this.appendSql = "INSERT INTO " + table + " AS " + UpsertSql.ALIAS + " (certificationarchiveid, source_id, name, certification_id, "
                 + "certification_group_id, creator_name, owner_name, comments, signed, expiration, child_certification_ids, "
                 + "archive_xml, created_at, modified_at, archived_ts, record_hash, src_system, src_object_type, "
                 + "src_object_id, src_natural_key, src_created, src_modified, src_event_ts, src_interface, "
@@ -95,7 +98,12 @@ public final class CertificationArchiveRepository implements EntityWriter {
                 + "VALUES (?::uuid, ?, ?, ?, ?, ?, ?, ?, ?::timestamptz, ?::timestamptz, ?::jsonb, ?, ?::timestamptz, "
                 + "?::timestamptz, ?::timestamptz, ?, ?, ?, ?, ?, ?::timestamptz, ?::timestamptz, ?::timestamptz, ?, ?, ?, "
                 + "?::timestamptz) "
-                + "ON CONFLICT (certificationarchiveid) DO NOTHING RETURNING certificationarchiveid";
+                + UpsertSql.tail("certificationarchiveid", List.of("source_id", "name", "certification_id",
+                        "certification_group_id", "creator_name", "owner_name", "comments", "signed", "expiration",
+                        "child_certification_ids", "archive_xml", "created_at", "modified_at", "archived_ts",
+                        "record_hash", "src_object_id", "src_natural_key", "src_created", "src_modified",
+                        "src_event_ts"),
+                        List.of("src_system", "src_object_type", "src_interface", "extraction_run_id", "raw_ref", "derived_at"), false);
     }
 
     @Override
@@ -121,7 +129,7 @@ public final class CertificationArchiveRepository implements EntityWriter {
         }
     }
 
-    /** Appends one archive; an archive that already exists is left untouched ({@code SKIPPED}). */
+    /** Inserts one archive; an existing one is updated only when a data column changed, else {@code SKIPPED}. */
     @Override
     public EntityRepository.Outcome upsert(Connection conn, JsonNode row, String extractionRunId) throws SQLException {
         String sourceId = text(row, "source_id");
@@ -157,7 +165,7 @@ public final class CertificationArchiveRepository implements EntityWriter {
             ps.setString(i++, null);                        // raw_ref: not wired, as in Part 1
             ps.setNull(i, Types.VARCHAR);                   // derived_at: extracted, not derived
             try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? EntityRepository.Outcome.INSERTED : EntityRepository.Outcome.SKIPPED;
+                return UpsertSql.outcome(rs);
             }
         }
     }

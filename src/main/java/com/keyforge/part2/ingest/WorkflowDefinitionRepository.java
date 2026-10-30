@@ -10,6 +10,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -71,18 +72,14 @@ public final class WorkflowDefinitionRepository implements EntityWriter {
                 + "    is_deleted boolean NOT NULL DEFAULT false,\n"
                 + "    deleted_at timestamp with time zone\n"
                 + ")";
-        this.upsertSql = "INSERT INTO " + table + " (workflowid, source_id, name, type, handler, description, task_type, "
+        this.upsertSql = "INSERT INTO " + table + " AS " + UpsertSql.ALIAS + " (workflowid, source_id, name, type, handler, description, task_type, "
                 + "definition, record_hash, source_system, source_interface, source_object_type, src_object_id, "
                 + "src_natural_key, extraction_run_id, created_at, modified_at) "
                 + "VALUES (?::uuid, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?, ?::timestamptz, ?::timestamptz) "
-                + "ON CONFLICT (workflowid) DO UPDATE SET source_id = EXCLUDED.source_id, name = EXCLUDED.name, "
-                + "type = EXCLUDED.type, handler = EXCLUDED.handler, description = EXCLUDED.description, "
-                + "task_type = EXCLUDED.task_type, definition = EXCLUDED.definition, record_hash = EXCLUDED.record_hash, "
-                + "source_system = EXCLUDED.source_system, source_interface = EXCLUDED.source_interface, "
-                + "source_object_type = EXCLUDED.source_object_type, src_object_id = EXCLUDED.src_object_id, "
-                + "src_natural_key = EXCLUDED.src_natural_key, extraction_run_id = EXCLUDED.extraction_run_id, "
-                + "created_at = EXCLUDED.created_at, modified_at = EXCLUDED.modified_at, extracted_at = now(), "
-                + "is_deleted = false, deleted_at = null RETURNING (xmax = 0)";
+                + UpsertSql.tail("workflowid", List.of("source_id", "name", "type", "handler", "description",
+                        "task_type", "definition", "record_hash", "src_object_id", "src_natural_key", "created_at",
+                        "modified_at"),
+                        List.of("source_system", "source_interface", "source_object_type", "extraction_run_id"), true);
     }
 
     @Override
@@ -131,9 +128,20 @@ public final class WorkflowDefinitionRepository implements EntityWriter {
             ps.setString(i++, text(row, "created_at"));
             ps.setString(i, text(row, "modified_at"));
             try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() && rs.getBoolean(1) ? EntityRepository.Outcome.INSERTED : EntityRepository.Outcome.UPDATED;
+                return UpsertSql.outcome(rs);
             }
         }
+    }
+
+    /** The PK {@link #upsert} writes. */
+    @Override
+    public String key(JsonNode row) {
+        return id(row);
+    }
+
+    @Override
+    public String keyColumn() {
+        return "workflowid";
     }
 
     /** Part 1 {@code NativeWorkflowRepository.id}. */

@@ -76,8 +76,8 @@ class IdentityRepositoryPostgresTest {
             System.setProperty("PG_DEST_SCHEMA", schema);
             System.setProperty("KFAGENT_PAGE_SIZE", "10");
 
-            IdentityImportService service = new IdentityImportService(new KfAgentClient(AppConfig.load()),
-                    new IdentityRepository(schema), 10);
+            EntityImportService service = new EntityImportService(new KfAgentClient(AppConfig.load()),
+                    com.keyforge.part2.Main.identityWriter(schema), 10);
             try (Connection conn = connection(url, username, password)) {
                 ImportResult first = service.run(conn, "first-run");
                 assertEquals(1, first.inserted());

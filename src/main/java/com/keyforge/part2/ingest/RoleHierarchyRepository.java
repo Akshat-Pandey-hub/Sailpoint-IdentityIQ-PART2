@@ -10,6 +10,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -67,19 +68,14 @@ public final class RoleHierarchyRepository implements EntityWriter {
                 + "    is_deleted boolean NOT NULL DEFAULT false,\n"
                 + "    deleted_at timestamp with time zone\n"
                 + ")";
-        this.upsertSql = "INSERT INTO " + table + " (rolehierarchyid, source_role_id, role_id, role_name, "
+        this.upsertSql = "INSERT INTO " + table + " AS " + UpsertSql.ALIAS + " (rolehierarchyid, source_role_id, role_id, role_name, "
                 + "related_role_source_id, related_role_id, related_role_name, relationship_type, source_system, "
                 + "source_interface, source_object_type, src_object_id, src_natural_key, extraction_run_id, record_hash) "
                 + "VALUES (?::uuid, ?, ?::uuid, ?, ?, ?::uuid, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
-                + "ON CONFLICT (rolehierarchyid) DO UPDATE SET source_role_id = EXCLUDED.source_role_id, "
-                + "role_id = EXCLUDED.role_id, role_name = EXCLUDED.role_name, "
-                + "related_role_source_id = EXCLUDED.related_role_source_id, related_role_id = EXCLUDED.related_role_id, "
-                + "related_role_name = EXCLUDED.related_role_name, relationship_type = EXCLUDED.relationship_type, "
-                + "source_system = EXCLUDED.source_system, source_interface = EXCLUDED.source_interface, "
-                + "source_object_type = EXCLUDED.source_object_type, src_object_id = EXCLUDED.src_object_id, "
-                + "src_natural_key = EXCLUDED.src_natural_key, extraction_run_id = EXCLUDED.extraction_run_id, "
-                + "record_hash = EXCLUDED.record_hash, extracted_at = now(), is_deleted = false, deleted_at = null "
-                + "RETURNING (xmax = 0)";
+                + UpsertSql.tail("rolehierarchyid", List.of("source_role_id", "role_id", "role_name",
+                        "related_role_source_id", "related_role_id", "related_role_name", "relationship_type",
+                        "src_object_id", "src_natural_key", "record_hash"),
+                        List.of("source_system", "source_interface", "source_object_type", "extraction_run_id"), true);
     }
 
     @Override
@@ -128,7 +124,7 @@ public final class RoleHierarchyRepository implements EntityWriter {
             ps.setString(i++, extractionRunId);
             ps.setString(i, recordHash(row));
             try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() && rs.getBoolean(1) ? EntityRepository.Outcome.INSERTED : EntityRepository.Outcome.UPDATED;
+                return UpsertSql.outcome(rs);
             }
         }
     }
@@ -144,6 +140,11 @@ public final class RoleHierarchyRepository implements EntityWriter {
     @Override
     public String key(JsonNode row) {
         return id(row);
+    }
+
+    @Override
+    public String keyColumn() {
+        return "rolehierarchyid";
     }
 
     public static String id(JsonNode row) {

@@ -12,6 +12,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -19,17 +20,18 @@ import java.util.Objects;
  * ({@code Identity.getWorkgroups()}), reproducing Part 1's {@code NativeWorkgroupMembershipRepository}. A dedicated
  * {@link EntityWriter} because its rules differ from every other table:
  * <ul>
- *   <li>The response carries the RAW IIQ ids ({@code workgroup_id}, {@code identity_id}); the table's
- *       {@code workgroup_id} / {@code identity_id} columns are their canonical UUIDs. Both MUST be GUID-shaped — Part 1
- *       refuses the edge otherwise (row fails), there is no fallback.</li>
- *   <li>PK {@code id} = {@code deterministicUuid("native-workgroup-member|" + canonical(workgroup_id) + "|" +
- *       canonical(identity_id))}: the (workgroup, member) pair, so a member of two workgroups is two rows.</li>
+ *   <li>Every response field is stored exactly as received, under its own name: {@code workgroup_id},
+ *       {@code workgroup_name}, {@code identity_id} (the RAW IIQ ids), {@code member_name}, {@code first_name},
+ *       {@code last_name}, {@code member_is_workgroup}.</li>
+ *   <li>PK {@code id} = {@code deterministicUuid("native-workgroup-member|" + part(workgroup_id) + "|" +
+ *       part(identity_id))}, where a GUID-shaped id is used in its canonical dashed form (so existing keys never change)
+ *       and any other id as received: the (workgroup, member) pair, so a member of two workgroups is two rows.</li>
  *   <li>Lineage: {@code src_system} IdentityIQ, {@code src_interface} native_iiq_java_api, {@code src_object_type}
  *       sailpoint.object.Identity.workgroups, {@code src_object_id} = the RAW member identity id,
  *       {@code src_natural_key} = RAW {@code workgroup_id|identity_id}; is_deleted=false / deleted_at=null on write.</li>
  *   <li>{@code record_hash} is NOT the shared SHA-256 of sorted key=value lines: it is SHA-256 (lowercase hex) of
  *       {@code workgroupId|identityId|workgroupName|identityName|firstName|lastName|memberIsWorkgroup} over the RAW
- *       values, nulls as "". It includes {@code workgroup_name}, which has no column of its own.</li>
+ *       values, nulls as "".</li>
  *   <li>{@code member_is_workgroup} is taken only from a real JSON boolean (Part 1's parser), otherwise NULL.</li>
  * </ul>
  */
@@ -51,8 +53,9 @@ public final class WorkgroupMemberRepository implements EntityWriter {
         this.table = this.schema + "." + TABLE;
         this.createTableSql = "CREATE TABLE IF NOT EXISTS " + table + " (\n"
                 + "    id uuid PRIMARY KEY,\n"
-                + "    workgroup_id uuid,\n"
-                + "    identity_id uuid,\n"
+                + "    workgroup_id text,\n"
+                + "    workgroup_name text,\n"
+                + "    identity_id text,\n"
                 + "    member_name text,\n"
                 + "    first_name text,\n"
                 + "    last_name text,\n"
@@ -68,17 +71,13 @@ public final class WorkgroupMemberRepository implements EntityWriter {
                 + "    deleted_at timestamp with time zone,\n"
                 + "    extracted_at timestamp with time zone NOT NULL DEFAULT now()\n"
                 + ")";
-        this.upsertSql = "INSERT INTO " + table + " (id, workgroup_id, identity_id, member_name, first_name, last_name, "
-                + "member_is_workgroup, src_system, src_interface, src_object_type, src_object_id, src_natural_key, "
-                + "extraction_run_id, record_hash, is_deleted, deleted_at) "
-                + "VALUES (?::uuid, ?::uuid, ?::uuid, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, false, null) "
-                + "ON CONFLICT (id) DO UPDATE SET workgroup_id = EXCLUDED.workgroup_id, identity_id = EXCLUDED.identity_id, "
-                + "member_name = EXCLUDED.member_name, first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name, "
-                + "member_is_workgroup = EXCLUDED.member_is_workgroup, src_system = EXCLUDED.src_system, "
-                + "src_interface = EXCLUDED.src_interface, src_object_type = EXCLUDED.src_object_type, "
-                + "src_object_id = EXCLUDED.src_object_id, src_natural_key = EXCLUDED.src_natural_key, "
-                + "extraction_run_id = EXCLUDED.extraction_run_id, record_hash = EXCLUDED.record_hash, "
-                + "is_deleted = false, deleted_at = null, extracted_at = now() RETURNING (xmax = 0)";
+        this.upsertSql = "INSERT INTO " + table + " AS " + UpsertSql.ALIAS + " (id, workgroup_id, workgroup_name, identity_id, member_name, first_name, "
+                + "last_name, member_is_workgroup, src_system, src_interface, src_object_type, src_object_id, "
+                + "src_natural_key, extraction_run_id, record_hash, is_deleted, deleted_at) "
+                + "VALUES (?::uuid, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, false, null) "
+                + UpsertSql.tail("id", List.of("workgroup_id", "workgroup_name", "identity_id", "member_name", "first_name",
+                        "last_name", "member_is_workgroup", "src_object_id", "src_natural_key", "record_hash"),
+                        List.of("src_system", "src_interface", "src_object_type", "extraction_run_id"), true);
     }
 
     @Override
@@ -101,6 +100,28 @@ public final class WorkgroupMemberRepository implements EntityWriter {
         try (Statement st = conn.createStatement()) {
             st.execute("CREATE SCHEMA IF NOT EXISTS " + schema);
             st.execute(createTableSql);
+            // a table from the earlier layout: add the response's workgroup_name, and keep the ids as received
+            st.execute("ALTER TABLE " + table + " ADD COLUMN IF NOT EXISTS workgroup_name text");
+        }
+        for (String column : List.of("workgroup_id", "identity_id")) {
+            if ("uuid".equals(columnType(conn, column))) {
+                try (Statement st = conn.createStatement()) {
+                    st.execute("ALTER TABLE " + table + " ALTER COLUMN " + column + " TYPE text USING replace("
+                            + column + "::text, '-', '')");
+                }
+            }
+        }
+    }
+
+    private String columnType(Connection conn, String column) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement("SELECT data_type FROM information_schema.columns "
+                + "WHERE table_schema = ? AND table_name = ? AND column_name = ?")) {
+            ps.setString(1, schema);
+            ps.setString(2, TABLE);
+            ps.setString(3, column);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getString(1) : null;
+            }
         }
     }
 
@@ -112,8 +133,9 @@ public final class WorkgroupMemberRepository implements EntityWriter {
         try (PreparedStatement ps = conn.prepareStatement(upsertSql)) {
             int i = 1;
             ps.setString(i++, id(row));
-            ps.setString(i++, uuid(workgroupId));
-            ps.setString(i++, uuid(identityId));
+            ps.setString(i++, workgroupId);
+            ps.setString(i++, text(row, "workgroup_name"));
+            ps.setString(i++, identityId);
             ps.setString(i++, text(row, "member_name"));
             ps.setString(i++, text(row, "first_name"));
             ps.setString(i++, text(row, "last_name"));
@@ -130,24 +152,32 @@ public final class WorkgroupMemberRepository implements EntityWriter {
             ps.setString(i++, extractionRunId);
             ps.setString(i, recordHash(row));
             try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() && rs.getBoolean(1) ? EntityRepository.Outcome.INSERTED : EntityRepository.Outcome.UPDATED;
+                return UpsertSql.outcome(rs);
             }
         }
     }
 
-    /** Part 1 {@code NativeWorkgroupMembershipRepository.uuid}: canonical UUID, or the edge is refused. */
-    public static String uuid(String rawId) {
+    /** An id's part of the row key: its canonical dashed UUID when GUID-shaped (as before), otherwise as received. */
+    static String keyPart(String rawId) {
         String x = CanonicalIds.canonicalUuid(rawId);
-        if (x == null) {
-            throw new IllegalArgumentException("Native identity/workgroup ID is not UUID-shaped: " + rawId);
-        }
-        return x;
+        return x != null ? x : String.valueOf(rawId);
     }
 
-    /** Part 1 {@code NativeWorkgroupMembershipRepository.edgeId}. */
+    /** The PK {@link #upsert} writes. */
+    @Override
+    public String key(JsonNode row) {
+        return id(row);
+    }
+
+    @Override
+    public String keyColumn() {
+        return "id";
+    }
+
+    /** The row uuid of the (workgroup, member) pair. */
     public static String id(JsonNode row) {
-        return CanonicalIds.deterministicUuid("native-workgroup-member|" + uuid(text(row, "workgroup_id")) + "|"
-                + uuid(text(row, "identity_id")));
+        return CanonicalIds.deterministicUuid("native-workgroup-member|" + keyPart(text(row, "workgroup_id")) + "|"
+                + keyPart(text(row, "identity_id")));
     }
 
     /** Part 1 {@code NativeWorkgroupMembershipRepository.hash}: SHA-256 hex of the pipe-joined raw values. */

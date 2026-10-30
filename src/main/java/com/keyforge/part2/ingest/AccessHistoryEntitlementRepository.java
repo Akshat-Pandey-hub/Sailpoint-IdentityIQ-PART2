@@ -12,6 +12,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
 import java.util.LinkedHashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -24,9 +25,10 @@ import static com.keyforge.part2.hash.HashValues.text;
  * ({@code sailpoint.object.accesshistory.HistoricalEntitlementCapture}). Reproduces Part 1's
  * {@code NativeHistEntitlementCaptureRepository}:
  * <ul>
- *   <li><b>Append-only.</b> {@code INSERT … ON CONFLICT (hist_capture_id) DO NOTHING}: never updated, never deleted, no
- *       soft-delete sweep (Part 1's {@code NativeAccessHistoryImportService} has none). Existing captures are
- *       {@link EntityRepository.Outcome#SKIPPED}.</li>
+ *   <li><b>Kept, updated only when IIQ changed it.</b> {@code INSERT … ON CONFLICT (hist_capture_id) DO UPDATE} only when a
+ *       data column differs ({@link UpsertSql}): never deleted, no soft-delete sweep. Existing captures that are
+ *       unchanged are {@link EntityRepository.Outcome#SKIPPED}; changed ones (e.g. a flag IIQ updates later) are
+ *       {@link EntityRepository.Outcome#UPDATED}.</li>
  *   <li>PK {@code hist_capture_id} = canonical source_id, else {@code deterministicUuid("native-hist-ent|"+source_id)}
  *       (Java concatenation, so a null id seeds "native-hist-ent|null").</li>
  *   <li>Column order = iiq_native: {@code name}, {@code compressed_property_flag}, {@code compressed_property_flag_value}
@@ -139,8 +141,12 @@ public final class AccessHistoryEntitlementRepository implements EntityWriter {
             cols.append(", ").append(c.name());
             vals.append(", ").append(placeholder(c.kind()));
         }
-        this.appendSql = "INSERT INTO " + table + " (" + cols + ") VALUES (" + vals + ") "
-                + "ON CONFLICT (hist_capture_id) DO NOTHING RETURNING hist_capture_id";
+        List<String> compared = new ArrayList<>();
+        LEADING.forEach(c -> compared.add(c.name()));
+        compared.add("record_hash");
+        TRAILING.forEach(c -> compared.add(c.name()));
+        this.appendSql = "INSERT INTO " + table + " AS " + UpsertSql.ALIAS + " (" + cols + ") VALUES (" + vals + ") "
+                + UpsertSql.tail("hist_capture_id", compared, List.of("source_system", "source_interface", "source_object_type", "extraction_run_id"), false);
     }
 
     private static String sqlType(Kind k) {
@@ -183,7 +189,7 @@ public final class AccessHistoryEntitlementRepository implements EntityWriter {
         }
     }
 
-    /** Appends one capture; a capture that already exists is left untouched ({@code SKIPPED}). */
+    /** Inserts one capture; an existing one is updated only when a data column changed, else {@code SKIPPED}. */
     @Override
     public EntityRepository.Outcome upsert(Connection conn, JsonNode row, String extractionRunId) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(appendSql)) {
@@ -201,7 +207,7 @@ public final class AccessHistoryEntitlementRepository implements EntityWriter {
                 bind(ps, i++, row, c);
             }
             try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? EntityRepository.Outcome.INSERTED : EntityRepository.Outcome.SKIPPED;
+                return UpsertSql.outcome(rs);
             }
         }
     }
@@ -216,22 +222,16 @@ public final class AccessHistoryEntitlementRepository implements EntityWriter {
                     ps.setBoolean(index, b);
                 }
             }
-            case JSONB -> ps.setString(index, jsonbOrNull(row, c.name()));
+            case JSONB -> ps.setString(index, jsonb(row, c.name()));
             case CAPTURE -> ps.setString(index, jsonText(row, c.name()));
             default -> ps.setString(index, text(row, c.name()));
         }
     }
 
-    /** Part 1 {@code NativeJsonRead.jsonString}: compact JSON, but an empty object/array (or null) is NULL. */
-    static String jsonbOrNull(JsonNode row, String field) {
+    /** The value as received, as compact JSON (an empty object / array stays {@code {}} / {@code []}); null → NULL. */
+    static String jsonb(JsonNode row, String field) {
         JsonNode n = row.get(field);
-        if (n == null || n.isNull()) {
-            return null;
-        }
-        if ((n.isObject() || n.isArray()) && n.size() == 0) {
-            return null;
-        }
-        return n.toString();
+        return (n == null || n.isNull()) ? null : n.toString();
     }
 
     /** Part 1 {@code NativeHistEntitlementCaptureRepository.canonicalId}. */

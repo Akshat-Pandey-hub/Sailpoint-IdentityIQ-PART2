@@ -37,4 +37,13 @@ public interface EntityWriter {
     default String key(JsonNode row) {
         return null;
     }
+
+    /**
+     * The primary-key column {@link #key} values belong to, or {@code null} when this writer does not expose its key or
+     * its table has no {@code is_deleted}: a full run then never marks rows deleted. Append-only tables return
+     * {@code null}.
+     */
+    default String keyColumn() {
+        return null;
+    }
 }

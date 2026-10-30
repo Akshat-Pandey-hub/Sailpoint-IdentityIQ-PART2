@@ -136,14 +136,17 @@ class CertificationArchiveRepositoryTest {
     }
 
     @Test
-    void appendOnlySqlNeverUpdatesAndReportsExistingRowsAsSkipped() throws Exception {
+    void existingRowsAreUpdatedOnlyWhenADataColumnChanged() throws Exception {
         String sql = repo.appendSql();
-        assertTrue(sql.contains("ON CONFLICT (certificationarchiveid) DO NOTHING RETURNING certificationarchiveid"));
-        assertFalse(sql.contains("DO UPDATE"), "archives are never updated");
+        assertTrue(sql.contains("ON CONFLICT (certificationarchiveid) DO UPDATE SET"));
+        String where = sql.substring(sql.indexOf(" WHERE ROW("));
+        assertTrue(where.contains(") IS DISTINCT FROM ROW("), "written only when a data column differs");
+        assertFalse(where.contains("extraction_run_id"), "a new run alone never rewrites a row");
+        assertTrue(sql.endsWith("RETURNING (xmax = 0)"));
         assertFalse(sql.contains("is_deleted"), "no soft-delete columns on this table");
         assertEquals(27, sql.chars().filter(ch -> ch == '?').count());
 
-        // DO NOTHING on an existing row -> RETURNING yields no row -> SKIPPED
+        // an unchanged existing row -> RETURNING yields no row -> SKIPPED
         assertEquals(EntityRepository.Outcome.SKIPPED, repo.upsert(noRowsReturned(), golden().get(0).rest(), "run-74"));
     }
 
@@ -171,7 +174,7 @@ class CertificationArchiveRepositoryTest {
         assertTrue(ddl.contains("archive_xml text"));
     }
 
-    /** A connection whose INSERT … RETURNING yields no row (what PostgreSQL does for ON CONFLICT DO NOTHING). */
+    /** A connection whose INSERT … RETURNING yields no row (what PostgreSQL does when the row exists and nothing changed). */
     private static Connection noRowsReturned() {
         ResultSet empty = (ResultSet) Proxy.newProxyInstance(CertificationArchiveRepositoryTest.class.getClassLoader(),
                 new Class<?>[]{ResultSet.class}, (p, m, a) -> m.getName().equals("next") ? Boolean.FALSE : defaultFor(m));

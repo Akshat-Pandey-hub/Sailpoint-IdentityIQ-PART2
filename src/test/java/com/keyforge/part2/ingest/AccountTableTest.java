@@ -114,7 +114,7 @@ class AccountTableTest {
     @Test
     void upsertConflictsOnAccountid() {
         String sql = repo.upsertSql();
-        assertTrue(sql.startsWith("INSERT INTO iiq_native_part2_test.kf_account (accountid, source_id,"));
+        assertTrue(sql.startsWith("INSERT INTO iiq_native_part2_test.kf_account AS cur (accountid, source_id,"));
         assertTrue(sql.contains("ON CONFLICT (accountid) DO UPDATE SET"));
         assertFalse(sql.contains("accountid = EXCLUDED"), "pk is never rewritten");
         String vals = sql.substring(sql.indexOf("VALUES (") + 8, sql.indexOf(") ON CONFLICT"));

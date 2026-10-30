@@ -39,7 +39,9 @@ public final class SoftDeleteSweeper {
         SKIPPED_ROW_FAILURES,
         SKIPPED_UNPROTECTABLE_FAILURE,
         SKIPPED_EMPTY_KEEP,
-        SKIPPED_INVALID_KEY
+        SKIPPED_INVALID_KEY,
+        /** A full run would mark more of the table deleted than SWEEP_MAX_DELETE_PERCENT allows. */
+        SKIPPED_SAFETY_LIMIT
     }
 
     /** One table to sweep: unqualified name, primary-key column, and its explicit policy. */
@@ -181,6 +183,7 @@ public final class SoftDeleteSweeper {
             case SKIPPED_UNPROTECTABLE_FAILURE -> evidence.unkeyedFailures() + " failed row(s) without a key";
             case SKIPPED_EMPTY_KEEP -> "empty keep-set (an empty response never proves every row was deleted)";
             case SKIPPED_INVALID_KEY -> "keep-set contains a key that is not a UUID";
+            case SKIPPED_SAFETY_LIMIT -> "more rows would be marked deleted than the safety limit allows";
             case SWEPT -> "";
         };
     }

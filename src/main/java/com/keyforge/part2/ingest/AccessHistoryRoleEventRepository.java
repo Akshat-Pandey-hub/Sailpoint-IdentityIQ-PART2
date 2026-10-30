@@ -9,6 +9,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
+import java.util.ArrayList;
 
 import static com.keyforge.part2.hash.HashValues.jsonText;
 import static com.keyforge.part2.hash.HashValues.text;
@@ -20,8 +22,10 @@ import static com.keyforge.part2.hash.HashValues.text;
  * fields, iiq_native column layout and 17-field {@code record_hash} as
  * {@link AccessHistoryIdentityEventRepository} (whose column list and hash this class reuses), plus:
  * <ul>
- *   <li><b>Append-only.</b> {@code INSERT … ON CONFLICT (hist_event_id) DO NOTHING}: never updated, never deleted, no
- *       soft-delete sweep. Existing events are {@link EntityRepository.Outcome#SKIPPED}.</li>
+ *   <li><b>Kept, updated only when IIQ changed it.</b> {@code INSERT … ON CONFLICT (hist_event_id) DO UPDATE} only when a
+ *       data column differs ({@link UpsertSql}): never deleted, no soft-delete sweep. Existing events that are
+ *       unchanged are {@link EntityRepository.Outcome#SKIPPED}; changed ones (e.g. a flag IIQ updates later) are
+ *       {@link EntityRepository.Outcome#UPDATED}.</li>
  *   <li>PK {@code hist_event_id} = canonical source_id, else
  *       {@code deterministicUuid("native-hist-role-event|"+source_id)} (a null id seeds "native-hist-role-event|null").</li>
  *   <li>Lineage: {@code IdentityIQ} / {@code native_iiq_java_api} /
@@ -65,9 +69,12 @@ public final class AccessHistoryRoleEventRepository implements EntityWriter {
                 .append(",\n    extraction_run_id text")
                 .append(",\n    extracted_at timestamp with time zone NOT NULL DEFAULT now()")
                 .append("\n)").toString();
-        this.appendSql = "INSERT INTO " + table + " (" + cols
+        List<String> compared = new ArrayList<>(AccessHistoryIdentityEventRepository.COLUMNS);
+        compared.add("record_hash");
+        this.appendSql = "INSERT INTO " + table + " AS " + UpsertSql.ALIAS + " (" + cols
                 + ", record_hash, source_system, source_interface, source_object_type, extraction_run_id) VALUES ("
-                + vals + ", ?, ?, ?, ?, ?) ON CONFLICT (hist_event_id) DO NOTHING RETURNING hist_event_id";
+                + vals + ", ?, ?, ?, ?, ?) "
+                + UpsertSql.tail("hist_event_id", compared, List.of("source_system", "source_interface", "source_object_type", "extraction_run_id"), false);
     }
 
     @Override
@@ -93,7 +100,7 @@ public final class AccessHistoryRoleEventRepository implements EntityWriter {
         }
     }
 
-    /** Appends one event; an event that already exists is left untouched ({@code SKIPPED}). */
+    /** Inserts one event; an existing one is updated only when a data column changed, else {@code SKIPPED}. */
     @Override
     public EntityRepository.Outcome upsert(Connection conn, JsonNode row, String extractionRunId) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(appendSql)) {
@@ -108,7 +115,7 @@ public final class AccessHistoryRoleEventRepository implements EntityWriter {
             ps.setString(i++, SRC_OBJECT_TYPE);
             ps.setString(i, extractionRunId);
             try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? EntityRepository.Outcome.INSERTED : EntityRepository.Outcome.SKIPPED;
+                return UpsertSql.outcome(rs);
             }
         }
     }

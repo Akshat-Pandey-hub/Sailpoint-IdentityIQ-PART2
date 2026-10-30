@@ -116,7 +116,7 @@ class RoleTableTest {
     @Test
     void upsertConflictsOnRoleidAndUpdatesTrailingColumns() {
         String sql = repo.upsertSql();
-        assertTrue(sql.startsWith("INSERT INTO iiq_native_part2_test.kf_role (roleid, source_id,"));
+        assertTrue(sql.startsWith("INSERT INTO iiq_native_part2_test.kf_role AS cur (roleid, source_id,"));
         assertTrue(sql.contains("ON CONFLICT (roleid) DO UPDATE SET"));
         assertTrue(sql.contains("selector = EXCLUDED.selector"), "trailing columns are updated too");
         assertTrue(sql.contains("selector_summary = EXCLUDED.selector_summary"));

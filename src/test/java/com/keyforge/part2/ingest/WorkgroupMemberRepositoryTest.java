@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class WorkgroupMemberRepositoryTest {
 
     private static final List<String> IIQ_NATIVE_COLUMNS = List.of(
-            "id", "workgroup_id", "identity_id", "member_name", "first_name", "last_name", "member_is_workgroup",
+            "id", "workgroup_id", "workgroup_name", "identity_id", "member_name", "first_name", "last_name", "member_is_workgroup",
             "src_system", "src_interface", "src_object_type", "src_object_id", "src_natural_key", "extraction_run_id",
             "record_hash", "is_deleted", "deleted_at", "extracted_at");
 
@@ -67,7 +67,7 @@ class WorkgroupMemberRepositoryTest {
     }
 
     @Test
-    void keyAndHashMatchPart1AndNonGuidIdsAreRefused() throws Exception {
+    void keyAndHashMatchPart1AndNonGuidIdsAreKeptAsReceived() throws Exception {
         List<Golden> gs = golden();
         for (Golden g : gs) {
             assertEquals(g.hash(), WorkgroupMemberRepository.recordHash(g.rest()), "record_hash parity for " + g.rest());
@@ -75,10 +75,10 @@ class WorkgroupMemberRepositoryTest {
                 assertEquals(g.id(), WorkgroupMemberRepository.id(g.rest()), "key parity");
             }
         }
-        assertEquals("THROWS", gs.get(3).id(), "Part 1 refuses a non-GUID workgroup id");
-        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                () -> repo.upsert(new RecordingJdbc().connection(), gs.get(3).rest(), "run-1"));
-        assertTrue(e.getMessage().contains("not UUID-shaped"), e.getMessage());
+        // a non-GUID id is stored as received and keyed by its raw text, never refused
+        RecordingJdbc jdbc = new RecordingJdbc();
+        assertEquals(EntityRepository.Outcome.INSERTED, repo.upsert(jdbc.connection(), gs.get(3).rest(), "run-1"));
+        assertEquals(gs.get(3).rest().get("workgroup_id").asText(), jdbc.executions.get(0).get(2));
     }
 
     @Test
@@ -91,7 +91,7 @@ class WorkgroupMemberRepositoryTest {
         // same identity in the other workgroup -> a different edge
         assertNotEquals(golden().get(0).id(), golden().get(1).id());
         assertEquals(golden().get(0).rest().get("identity_id"), golden().get(1).rest().get("identity_id"));
-        // names do not move the key, but they are in the hash (incl. workgroup_name, which has no column)
+        // names do not move the key, but they are in the hash
         ObjectNode renamed = m.deepCopy();
         renamed.put("workgroup_name", "Renamed");
         assertEquals(WorkgroupMemberRepository.id(m), WorkgroupMemberRepository.id(renamed));
@@ -99,7 +99,7 @@ class WorkgroupMemberRepositoryTest {
     }
 
     @Test
-    void bindsCanonicalUuidColumnsRawLineageAndHash() throws Exception {
+    void bindsEveryResponseFieldAsReceivedRawLineageAndHash() throws Exception {
         Golden g = golden().get(0);
         String wgRaw = g.rest().get("workgroup_id").asText();
         String idRaw = g.rest().get("identity_id").asText();
@@ -108,23 +108,24 @@ class WorkgroupMemberRepositoryTest {
         Map<Integer, Object> b = jdbc.executions.get(0);
 
         assertEquals(g.id(), b.get(1));
-        assertEquals(CanonicalIds.canonicalUuid(wgRaw), b.get(2), "workgroup_id column = canonical uuid (kf_workgroup.workgroupid)");
-        assertEquals(CanonicalIds.canonicalUuid(idRaw), b.get(3), "identity_id column = canonical uuid (kf_identity.userid)");
-        assertEquals("spadmin", b.get(4));
-        assertEquals(Boolean.FALSE, b.get(7));
-        assertEquals("IdentityIQ", b.get(8));
-        assertEquals("native_iiq_java_api", b.get(9));
-        assertEquals("sailpoint.object.Identity.workgroups", b.get(10));
-        assertEquals(idRaw, b.get(11), "src_object_id = raw member id");
-        assertEquals(wgRaw + "|" + idRaw, b.get(12), "src_natural_key = raw workgroup|identity");
-        assertEquals("run-97", b.get(13));
-        assertEquals(g.hash(), b.get(14));
-        assertEquals(14, b.size());
+        assertEquals(wgRaw, b.get(2), "workgroup_id exactly as received");
+        assertEquals(g.rest().get("workgroup_name").asText(), b.get(3), "workgroup_name stored (D7)");
+        assertEquals(idRaw, b.get(4), "identity_id exactly as received");
+        assertEquals("spadmin", b.get(5));
+        assertEquals(Boolean.FALSE, b.get(8));
+        assertEquals("IdentityIQ", b.get(9));
+        assertEquals("native_iiq_java_api", b.get(10));
+        assertEquals("sailpoint.object.Identity.workgroups", b.get(11));
+        assertEquals(idRaw, b.get(12), "src_object_id = raw member id");
+        assertEquals(wgRaw + "|" + idRaw, b.get(13), "src_natural_key = raw workgroup|identity");
+        assertEquals("run-97", b.get(14));
+        assertEquals(g.hash(), b.get(15));
+        assertEquals(15, b.size());
 
         RecordingJdbc sparse = new RecordingJdbc();
         repo.upsert(sparse.connection(), golden().get(2).rest(), "run-97");
-        assertSame(NULL, sparse.executions.get(0).get(7), "non-boolean member_is_workgroup -> SQL NULL");
-        assertNull(sparse.executions.get(0).get(4), "null member_name");
+        assertSame(NULL, sparse.executions.get(0).get(8), "non-boolean member_is_workgroup -> SQL NULL");
+        assertNull(sparse.executions.get(0).get(5), "null member_name");
     }
 
     @Test
@@ -135,11 +136,11 @@ class WorkgroupMemberRepositoryTest {
             cols.add(line.trim().split("\\s+")[0]);
         }
         assertEquals(IIQ_NATIVE_COLUMNS, cols);
-        assertTrue(ddl.contains("workgroup_id uuid") && ddl.contains("identity_id uuid"));
+        assertTrue(ddl.contains("workgroup_id text") && ddl.contains("identity_id text") && ddl.contains("workgroup_name text"));
         String sql = repo.upsertSql();
         assertTrue(sql.contains("ON CONFLICT (id) DO UPDATE SET"));
         assertTrue(sql.contains("is_deleted = false") && sql.contains("deleted_at = null"));
-        assertEquals(14, sql.chars().filter(ch -> ch == '?').count());
+        assertEquals(15, sql.chars().filter(ch -> ch == '?').count());
         assertEquals("workgroupmember", repo.resource());
     }
 }

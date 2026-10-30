@@ -61,6 +61,18 @@ class SqlReportImportServiceTest {
                             if (sql.contains("RENAME TO")) legacyLayout = false;
                             return false;
                         }
+                        if (m.getName().equals("executeQuery")) { // how many live rows would be marked, of how many
+                            assertTrue(sql.startsWith("SELECT count(*) FILTER"), sql);
+                            int toMark = 0;
+                            int live = 0;
+                            for (Map.Entry<String, Object[]> r : rows.entrySet()) {
+                                if (!(Boolean) r.getValue()[1]) {
+                                    live++;
+                                    if (!seen.contains(r.getKey())) toMark++;
+                                }
+                            }
+                            return counts(toMark, live);
+                        }
                         if (m.getName().equals("executeUpdate")) { // the soft-delete step
                             assertTrue(sql.startsWith("UPDATE ") && sql.contains("NOT EXISTS"), sql);
                             int marked = 0;
@@ -86,7 +98,7 @@ class SqlReportImportServiceTest {
                                 return null;
                             }
                             case "executeUpdate" -> { // INSERT INTO the seen-key temp table … ON CONFLICT DO NOTHING
-                                assertTrue(sql.contains("kf_sql_report_seen"), sql);
+                                assertTrue(sql.contains("kf_run_seen_keys"), sql);
                                 return seen.add((String) bound.get(1)) ? 1 : 0;
                             }
                             case "executeQuery" -> {
@@ -125,6 +137,20 @@ class SqlReportImportServiceTest {
                     (p, m, a) -> switch (m.getName()) {
                         case "next" -> pos[0]++ < count;
                         case "getBoolean" -> inserted;
+                        default -> defaultFor(m);
+                    });
+        }
+
+        private static ResultSet counts(int first, int second) {
+            boolean[] read = {false};
+            return (ResultSet) Proxy.newProxyInstance(Db.class.getClassLoader(), new Class<?>[]{ResultSet.class},
+                    (p, m, a) -> switch (m.getName()) {
+                        case "next" -> {
+                            boolean has = !read[0];
+                            read[0] = true;
+                            yield has;
+                        }
+                        case "getInt" -> (Integer) a[0] == 1 ? first : second;
                         default -> defaultFor(m);
                     });
         }

@@ -140,7 +140,7 @@ class IdentityRoleTableTest {
         assertTrue(ddl.contains("targets jsonb"));
 
         String sql = repo.upsertSql();
-        assertTrue(sql.startsWith("INSERT INTO iiq_native_part2_test.kf_identity_role (identityroleid, identity_id,"));
+        assertTrue(sql.startsWith("INSERT INTO iiq_native_part2_test.kf_identity_role AS cur (identityroleid, identity_id,"));
         assertTrue(sql.contains("ON CONFLICT (identityroleid) DO UPDATE SET"));
         String vals = sql.substring(sql.indexOf("VALUES (") + 8, sql.indexOf(") ON CONFLICT"));
         assertEquals(25, vals.chars().filter(ch -> ch == '?').count(), "pk + 19 + record_hash + 4 lineage");

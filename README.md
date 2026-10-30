@@ -43,6 +43,8 @@ tables that are already loaded and never call the KF Agent.
 Optional settings and their defaults:
 - `REST_HOST` (`127.0.0.1`) and `REST_PORT` (`8200`): where the REST service listens.
 - `KFAGENT_PAGE_SIZE` (`500`) and `HTTP_TIMEOUT_SECONDS` (`60`): page size and timeout for KF Agent calls.
+- `SWEEP_MAX_DELETE_PERCENT` (`50`): the largest share of a table's live rows one full run may mark deleted (see
+  "How rows are written").
 - `KFAGENT_REPORT_PAGE_SIZE` (`200000`, also the maximum): rows per request for the SQL reports. The KF Agent re-runs a
   report's query for every page, so reports are read in large pages.
 
@@ -53,9 +55,21 @@ reading or counting the whole entity. The next `start` is the previous `start` p
 than the page size (or empty) is the end. This is the same for full imports, incremental runs (each page also carries
 `modifiedAfter`) and syslog. No import asks Part 1 for a whole entity in one response.
 
-Deleted IIQ objects are not marked `is_deleted` by these paged imports yet: Part 1 never reports a deletion (a deleted
-object simply stops appearing), and the earlier deletion sweep depended on a counted whole-entity read. Marking deletions
-from paged reads is a separate, pending change.
+### How rows are written
+
+- **Unchanged rows are skipped.** A row is written only when one of its data columns differs from the stored row (or
+  the stored row is marked deleted). The response shows `inserted`, `updated` and `skipped`; a second run with no
+  changes reports everything as skipped. The comparison uses the columns themselves, never a partial hash.
+- **Deleted IIQ objects are marked `is_deleted = true`.** Part 1 never reports a deletion: a deleted object simply
+  stops appearing. So a full run (no `start`/`limit`, filters or `modifiedAfter`) records the key of every row it
+  receives, and afterwards marks the table's live rows that did not come back as `is_deleted = true, deleted_at =
+  now()`. Rows are never removed, and a marked row that appears again is revived. Nothing is marked when the run had a
+  failed row, received no rows, or would mark more than `SWEEP_MAX_DELETE_PERCENT` (default `50`) of the table's live
+  rows; the last case exits 7 (`INCOMPLETE`) so it is noticed. Raise the setting for a real mass deletion; `100`
+  removes the limit, `0` never marks. Page requests, filtered requests and incremental runs never mark anything.
+- **History rows follow IIQ.** Access history and the work-item / certification archives keep every row, and update a
+  stored row when IIQ changed it (for example an older capture's `latest` flag). Audit and syslog events never change
+  and are only inserted.
 
 **2. Start the REST service:**
 
@@ -135,7 +149,7 @@ stored watermark and overlap rules; it cannot be combined with explicit caller f
 Identity upserts store a SHA-256 `record_hash` of the mapped business values. A new identity is inserted, a changed or
 reappearing soft-deleted identity is updated, and an unchanged live identity is skipped without refreshing its extraction
 metadata. Existing identity tables are migrated with `ADD COLUMN IF NOT EXISTS`; rows with a null hash are updated once
-to initialize it. Hash-based skip behavior is limited to identities in this change.
+to initialize it. Every other table skips unchanged rows too (see "How rows are written").
 
 **Identity and access**
 
@@ -180,7 +194,7 @@ to initialize it. Hash-based skip behavior is limited to identities in this chan
 | `import-policy-constraint` | Rules/constraints within policies | `kf_policy_constraint` |
 | `import-policy-violation` | Policy violations | `kf_violation` |
 
-**History and operations** (append-only: existing rows are kept, new ones added)
+**History and operations** (rows are kept, never marked deleted; history and archive rows update when IIQ changes them)
 
 | Command | Fetches | Writes |
 |---|---|---|

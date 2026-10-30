@@ -10,7 +10,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.StringJoiner;
 
 /**
  * Generic plain-JDBC persistence for a current-state {@code iiq_native} table described by an
@@ -21,14 +20,16 @@ import java.util.StringJoiner;
  * source_interface, source_object_type, extraction_run_id, extracted_at, is_deleted, deleted_at}, then any
  * {@link EntitySpec#trailing() trailing} columns iiq_native appends after them.
  *
- * <p>Write: {@code INSERT … ON CONFLICT (<pk>) DO UPDATE}; the pk comes from the spec's deterministic key
- * function, so a re-run updates in place. A row present in the source is by definition not deleted, so
- * every write sets {@code is_deleted=false, deleted_at=null} (same as Identity; there is no sweep yet).
- * All values are bound parameters; the schema identifier is validated, table/column names come from code.
+ * <p>Write: {@code INSERT … ON CONFLICT (<pk>) DO UPDATE … WHERE} a business column differs or the row is marked
+ * deleted ({@link UpsertSql}); the pk comes from the spec's deterministic key function, so a re-run updates in place.
+ * A new row is INSERTED, a changed (or soft-deleted, then revived) row UPDATED, and an unchanged live row SKIPPED
+ * without rewriting it. The comparison uses the business columns themselves, not {@code record_hash}: some Part 1
+ * hashes cover only a subset of the columns. All values are bound parameters; the schema identifier is validated,
+ * table/column names come from code.
  */
 public final class EntityRepository implements EntityWriter {
 
-    /** INSERTED = new row; UPDATED = existing row rewritten; SKIPPED = existing row left untouched (append-only tables). */
+    /** INSERTED = new row; UPDATED = existing row rewritten; SKIPPED = existing row left untouched (unchanged). */
     public enum Outcome { INSERTED, UPDATED, SKIPPED }
 
     private static final List<String> LINEAGE_PARAMS =
@@ -52,6 +53,11 @@ public final class EntityRepository implements EntityWriter {
     @Override
     public String key(JsonNode row) {
         return spec.keyFn().apply(row);
+    }
+
+    @Override
+    public String keyColumn() {
+        return spec.pkColumn();
     }
 
     public EntitySpec spec() {
@@ -108,7 +114,7 @@ public final class EntityRepository implements EntityWriter {
             ps.setString(i++, spec.sourceObjectTypeFor(row));
             ps.setString(i, extractionRunId);
             try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() && rs.getBoolean(1) ? Outcome.INSERTED : Outcome.UPDATED;
+                return UpsertSql.outcome(rs);
             }
         }
     }
@@ -141,31 +147,29 @@ public final class EntityRepository implements EntityWriter {
     private String buildUpsert() {
         List<String> cols = new ArrayList<>();
         List<String> vals = new ArrayList<>();
-        StringJoiner set = new StringJoiner(", ");
+        List<String> compared = new ArrayList<>();
+        List<String> alsoSet = new ArrayList<>(LINEAGE_PARAMS);
 
         cols.add(spec.pkColumn());
         vals.add("?::uuid");
         for (ColumnSpec c : spec.allBusiness()) {
             cols.add(c.name);
             vals.add(c.kind.placeholder);
-            set.add(c.name + " = EXCLUDED." + c.name);
+            compared.add(c.name);
         }
         if (spec.hasRecordHash()) {
             cols.add("record_hash");
             vals.add("?");
-            set.add("record_hash = EXCLUDED.record_hash");
+            alsoSet.add(0, "record_hash");
         }
-        for (String meta : LINEAGE_PARAMS) {
-            cols.add(meta);
-            vals.add("?");
-            set.add(meta + " = EXCLUDED." + meta);
-        }
-        cols.add("extracted_at"); vals.add("now()");  set.add("extracted_at = now()");
-        cols.add("is_deleted");   vals.add("false");  set.add("is_deleted = false");
-        cols.add("deleted_at");   vals.add("null");   set.add("deleted_at = null");
+        cols.addAll(LINEAGE_PARAMS);
+        LINEAGE_PARAMS.forEach(m -> vals.add("?"));
+        cols.add("extracted_at"); vals.add("now()");
+        cols.add("is_deleted");   vals.add("false");
+        cols.add("deleted_at");   vals.add("null");
 
-        return "INSERT INTO " + table + " (" + String.join(", ", cols) + ") VALUES (" + String.join(", ", vals) + ") "
-                + "ON CONFLICT (" + spec.pkColumn() + ") DO UPDATE SET " + set + " RETURNING (xmax = 0)";
+        return "INSERT INTO " + table + " AS " + UpsertSql.ALIAS + " (" + String.join(", ", cols) + ") VALUES ("
+                + String.join(", ", vals) + ") " + UpsertSql.tail(spec.pkColumn(), compared, alsoSet, true);
     }
 
     /** Exposed for tests. */

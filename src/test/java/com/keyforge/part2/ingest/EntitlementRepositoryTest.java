@@ -54,7 +54,7 @@ class EntitlementRepositoryTest {
     @Test
     void upsertConflictsOnEntitlementidAndPlaceholdersLineUp() {
         String sql = repo.upsertSql();
-        assertTrue(sql.startsWith("INSERT INTO iiq_native_part2_test.kf_entitlement (entitlementid, source_id,"));
+        assertTrue(sql.startsWith("INSERT INTO iiq_native_part2_test.kf_entitlement AS cur (entitlementid, source_id,"));
         assertTrue(sql.contains("ON CONFLICT (entitlementid) DO UPDATE SET"));
         assertTrue(sql.contains("record_hash = EXCLUDED.record_hash"));
         assertTrue(sql.contains("is_deleted = false") && sql.contains("deleted_at = null")

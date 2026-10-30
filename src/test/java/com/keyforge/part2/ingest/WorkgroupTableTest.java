@@ -109,7 +109,7 @@ class WorkgroupTableTest {
     @Test
     void upsertConflictsOnWorkgroupid() {
         String sql = repo.upsertSql();
-        assertTrue(sql.startsWith("INSERT INTO iiq_native_part2_test.kf_workgroup (workgroupid, source_id,"));
+        assertTrue(sql.startsWith("INSERT INTO iiq_native_part2_test.kf_workgroup AS cur (workgroupid, source_id,"));
         assertTrue(sql.contains("ON CONFLICT (workgroupid) DO UPDATE SET"));
         assertFalse(sql.contains("workgroupid = EXCLUDED"), "pk is never rewritten");
         String vals = sql.substring(sql.indexOf("VALUES (") + 8, sql.indexOf(") ON CONFLICT"));

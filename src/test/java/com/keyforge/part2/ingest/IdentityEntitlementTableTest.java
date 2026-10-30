@@ -129,7 +129,7 @@ class IdentityEntitlementTableTest {
         assertTrue(ddl.contains("source_assignable_roles text"));
 
         String sql = repo.upsertSql();
-        assertTrue(sql.startsWith("INSERT INTO iiq_native_part2_test.kf_identity_entitlement (entitlementid, source_id,"));
+        assertTrue(sql.startsWith("INSERT INTO iiq_native_part2_test.kf_identity_entitlement AS cur (entitlementid, source_id,"));
         assertTrue(sql.contains("ON CONFLICT (entitlementid) DO UPDATE SET"));
         String vals = sql.substring(sql.indexOf("VALUES (") + 8, sql.indexOf(") ON CONFLICT"));
         assertEquals(39, vals.chars().filter(ch -> ch == '?').count(), "pk + 33 + record_hash + 4 lineage");

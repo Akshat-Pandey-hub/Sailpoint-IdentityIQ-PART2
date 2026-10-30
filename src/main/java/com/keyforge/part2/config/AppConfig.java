@@ -12,7 +12,9 @@ import java.util.List;
  *       {@code KFAGENT_USERNAME}/{@code KFAGENT_PASSWORD} (required: the KF Agent answers every request without HTTP
  *       Basic Auth with 401), {@code KFAGENT_PAGE_SIZE} (default 500), {@code KFAGENT_REPORT_PAGE_SIZE} (default and
  *       maximum {@value #MAX_REPORT_PAGE_SIZE}: rows per SQL-report request, since the KF Agent re-runs the report
- *       query for every page), {@code HTTP_TIMEOUT_SECONDS} (default 60). Optional client certificate (mutual TLS),
+ *       query for every page), {@code HTTP_TIMEOUT_SECONDS} (default 60), {@code SWEEP_MAX_DELETE_PERCENT} (default
+ *       50, 0–100: the largest share of a table's live rows one full run may mark deleted; 100 = no limit, 0 = never
+ *       mark). Optional client certificate (mutual TLS),
  *       for an agent reached
  *       through a gateway that demands one (e.g. an ngrok edge): {@code KFAGENT_CLIENT_KEYSTORE} (path to a PKCS12
  *       {@code .p12} file holding the certificate and its private key) + {@code KFAGENT_CLIENT_KEYSTORE_PASSWORD};
@@ -33,6 +35,7 @@ public final class AppConfig {
     private final int pageSize;
     private final int reportPageSize;
     private final int httpTimeoutSeconds;
+    private final int sweepMaxDeletePercent;
     private final String kfAgentClientKeystore;         // nullable: no client certificate
     private final String kfAgentClientKeystorePassword; // nullable together with the keystore
 
@@ -44,14 +47,15 @@ public final class AppConfig {
     private final String pgPassword;
 
     private AppConfig(String kfAgentBaseUrl, String kfAgentUsername, String kfAgentPassword, int pageSize,
-                      int reportPageSize, int httpTimeoutSeconds, String kfAgentClientKeystore,
-                      String kfAgentClientKeystorePassword, String pgHost, String pgPort, String pgDatabase,
-                      String pgSchema, String pgUsername, String pgPassword) {
+                      int reportPageSize, int httpTimeoutSeconds, int sweepMaxDeletePercent,
+                      String kfAgentClientKeystore, String kfAgentClientKeystorePassword, String pgHost,
+                      String pgPort, String pgDatabase, String pgSchema, String pgUsername, String pgPassword) {
         this.kfAgentBaseUrl = kfAgentBaseUrl;
         this.kfAgentUsername = kfAgentUsername;
         this.kfAgentPassword = kfAgentPassword;
         this.pageSize = pageSize;
         this.reportPageSize = reportPageSize;
+        this.sweepMaxDeletePercent = sweepMaxDeletePercent;
         this.httpTimeoutSeconds = httpTimeoutSeconds;
         this.kfAgentClientKeystore = kfAgentClientKeystore;
         this.kfAgentClientKeystorePassword = kfAgentClientKeystorePassword;
@@ -114,6 +118,11 @@ public final class AppConfig {
                     + " (the KF Agent's SQL-report maximum) but was: " + reportPageSize);
         }
         int httpTimeout = intOrDefault("HTTP_TIMEOUT_SECONDS", 60);
+        int sweepMaxDeletePercent = intOrDefault("SWEEP_MAX_DELETE_PERCENT", 50);
+        if (sweepMaxDeletePercent < 0 || sweepMaxDeletePercent > 100) {
+            throw new ConfigException("SWEEP_MAX_DELETE_PERCENT must be between 0 and 100 but was: "
+                    + sweepMaxDeletePercent);
+        }
 
         String keystore = nullable("KFAGENT_CLIENT_KEYSTORE");
         String keystorePassword = nullable("KFAGENT_CLIENT_KEYSTORE_PASSWORD");
@@ -126,8 +135,9 @@ public final class AppConfig {
             keystore = keystore == null ? null : keystore.trim();
         }
 
-        return new AppConfig(url, username, password, pageSize, reportPageSize, httpTimeout, keystore,
-                keystorePassword, pgHost.trim(), pgPort, pgDatabase.trim(), pgSchema, pgUsername.trim(), pgPassword);
+        return new AppConfig(url, username, password, pageSize, reportPageSize, httpTimeout, sweepMaxDeletePercent,
+                keystore, keystorePassword, pgHost.trim(), pgPort, pgDatabase.trim(), pgSchema, pgUsername.trim(),
+                pgPassword);
     }
 
     /** Both or neither; the file must be readable; a certificate is only ever presented over https. */
@@ -156,6 +166,7 @@ public final class AppConfig {
     public boolean hasBasicAuth() { return kfAgentUsername != null && kfAgentPassword != null; }
     public int pageSize() { return pageSize; }
     public int reportPageSize() { return reportPageSize; }
+    public int sweepMaxDeletePercent() { return sweepMaxDeletePercent; }
     public int httpTimeoutSeconds() { return httpTimeoutSeconds; }
     public String kfAgentClientKeystore() { return kfAgentClientKeystore; }
     public String kfAgentClientKeystorePassword() { return kfAgentClientKeystorePassword; }
@@ -173,7 +184,7 @@ public final class AppConfig {
                 + (hasClientCertificate() ? " (client-cert)" : "")
                 + " | PostgreSQL: " + jdbcUrl() + " (user '" + pgUsername + "', dest schema '" + pgSchema + "')"
                 + " | pageSize=" + pageSize + ", reportPageSize=" + reportPageSize
-                + ", httpTimeout=" + httpTimeoutSeconds + "s";
+                + ", httpTimeout=" + httpTimeoutSeconds + "s, sweepMaxDeletePercent=" + sweepMaxDeletePercent;
     }
 
     // ── resolution helpers (env → system property) ──

@@ -138,7 +138,7 @@ class RoleEntitlementRepositoryTest {
     // ── binding ──
 
     @Test
-    void bindsDerivedColumnsAndPart1NullConventions() throws Exception {
+    void bindsDerivedColumnsAndResponseValuesAsReceived() throws Exception {
         Golden g = golden().get(4); // non-GUID role id, null filter value, ordinal 3
         RecordingJdbc jdbc = new RecordingJdbc();
         assertEquals(EntityRepository.Outcome.INSERTED, repo.upsert(jdbc.connection(), g.rest(), "run-21"));
@@ -148,8 +148,11 @@ class RoleEntitlementRepositoryTest {
         assertEquals("not-a-guid", b.get(2), "source_role_id verbatim");
         assertEquals(RoleEntitlementRepository.Edge.of(g.rest()).roleId(), b.get(3), "role_id derived");
         assertEquals(3, b.get(9), "profile_ordinal int");
-        assertEquals("null", b.get(12), "null filter_value stored as JSON null, as Part 1 does");
-        assertEquals("[]", b.get(18), "permission_rights_list never NULL");
+        assertEquals(g.rest().path("filter_value").isNull() || g.rest().get("filter_value") == null ? RecordingJdbc.NULL : g.rest().get("filter_value").toString(),
+                b.get(12) == null ? RecordingJdbc.NULL : b.get(12), "filter_value exactly as received (null stays NULL)");
+        Object rights = g.rest().get("permission_rights_list");
+        assertEquals(rights == null || g.rest().get("permission_rights_list").isNull() ? null : rights.toString(), b.get(18),
+                "permission_rights_list exactly as received");
         assertEquals("IdentityIQ", b.get(20));
         assertEquals("native_iiq_java_api", b.get(21));
         assertEquals("sailpoint.object.Bundle", b.get(22));

@@ -131,10 +131,13 @@ class AccessHistoryCertificationRepositoryTest {
     }
 
     @Test
-    void appendOnlySqlNeverUpdatesAndReportsExistingRowsAsSkipped() throws Exception {
+    void existingRowsAreUpdatedOnlyWhenADataColumnChanged() throws Exception {
         String sql = repo.appendSql();
-        assertTrue(sql.contains("ON CONFLICT (hist_cert_id) DO NOTHING RETURNING hist_cert_id"));
-        assertFalse(sql.contains("DO UPDATE"), "rows are never updated");
+        assertTrue(sql.contains("ON CONFLICT (hist_cert_id) DO UPDATE SET"));
+        String where = sql.substring(sql.indexOf(" WHERE ROW("));
+        assertTrue(where.contains(") IS DISTINCT FROM ROW("), "written only when a data column differs");
+        assertFalse(where.contains("extraction_run_id"), "a new run alone never rewrites a row");
+        assertTrue(sql.endsWith("RETURNING (xmax = 0)"));
         assertEquals(17, sql.chars().filter(ch -> ch == '?').count());
         assertEquals(EntityRepository.Outcome.SKIPPED, repo.upsert(noRowsReturned(), golden().get(0).rest(), "run-hc2"));
     }
@@ -152,7 +155,7 @@ class AccessHistoryCertificationRepositoryTest {
         assertEquals("access-history/certifications", repo.resource());
     }
 
-    /** A connection whose INSERT … RETURNING yields no row (what PostgreSQL does for ON CONFLICT DO NOTHING). */
+    /** A connection whose INSERT … RETURNING yields no row (what PostgreSQL does when the row exists and nothing changed). */
     private static Connection noRowsReturned() {
         ClassLoader cl = AccessHistoryCertificationRepositoryTest.class.getClassLoader();
         ResultSet empty = (ResultSet) Proxy.newProxyInstance(cl, new Class<?>[]{ResultSet.class},

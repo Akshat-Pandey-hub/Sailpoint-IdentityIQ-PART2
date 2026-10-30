@@ -23,8 +23,10 @@ import static com.keyforge.part2.hash.HashValues.text;
  * identity events ({@code sailpoint.object.accesshistory.HistoricalIdentityEvent}). Reproduces Part 1's
  * {@code NativeHistIdentityEventRepository}:
  * <ul>
- *   <li><b>Append-only.</b> {@code INSERT … ON CONFLICT (hist_event_id) DO NOTHING}: never updated, never deleted, no
- *       soft-delete sweep. Existing events are {@link EntityRepository.Outcome#SKIPPED}.</li>
+ *   <li><b>Kept, updated only when IIQ changed it.</b> {@code INSERT … ON CONFLICT (hist_event_id) DO UPDATE} only when a
+ *       data column differs ({@link UpsertSql}): never deleted, no soft-delete sweep. Existing events that are
+ *       unchanged are {@link EntityRepository.Outcome#SKIPPED}; changed ones (e.g. a flag IIQ updates later) are
+ *       {@link EntityRepository.Outcome#UPDATED}.</li>
  *   <li>PK {@code hist_event_id} = canonical source_id, else {@code deterministicUuid("native-hist-event|"+source_id)}
  *       (Java concatenation, so a null id seeds "native-hist-event|null").</li>
  *   <li>38 response fields, all TEXT except {@code event_date}, {@code created_at}, {@code modified_at} (timestamps).
@@ -115,9 +117,12 @@ public final class AccessHistoryIdentityEventRepository implements EntityWriter 
                 .append(",\n    extraction_run_id text")
                 .append(",\n    extracted_at timestamp with time zone NOT NULL DEFAULT now()")
                 .append("\n)").toString();
-        this.appendSql = "INSERT INTO " + table + " (" + cols
+        List<String> compared = new ArrayList<>(COLUMNS);
+        compared.add("record_hash");
+        this.appendSql = "INSERT INTO " + table + " AS " + UpsertSql.ALIAS + " (" + cols
                 + ", record_hash, source_system, source_interface, source_object_type, extraction_run_id) VALUES ("
-                + vals + ", ?, ?, ?, ?, ?) ON CONFLICT (hist_event_id) DO NOTHING RETURNING hist_event_id";
+                + vals + ", ?, ?, ?, ?, ?) "
+                + UpsertSql.tail("hist_event_id", compared, List.of("source_system", "source_interface", "source_object_type", "extraction_run_id"), false);
     }
 
     @Override
@@ -143,7 +148,7 @@ public final class AccessHistoryIdentityEventRepository implements EntityWriter 
         }
     }
 
-    /** Appends one event; an event that already exists is left untouched ({@code SKIPPED}). */
+    /** Inserts one event; an existing one is updated only when a data column changed, else {@code SKIPPED}. */
     @Override
     public EntityRepository.Outcome upsert(Connection conn, JsonNode row, String extractionRunId) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(appendSql)) {
@@ -158,7 +163,7 @@ public final class AccessHistoryIdentityEventRepository implements EntityWriter 
             ps.setString(i++, SRC_OBJECT_TYPE);
             ps.setString(i, extractionRunId);
             try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? EntityRepository.Outcome.INSERTED : EntityRepository.Outcome.SKIPPED;
+                return UpsertSql.outcome(rs);
             }
         }
     }

@@ -30,7 +30,6 @@ import com.keyforge.part2.ingest.EntityRepository;
 import com.keyforge.part2.ingest.EntitySpec;
 import com.keyforge.part2.ingest.ColumnSpec;
 import com.keyforge.part2.ingest.IdentityTable;
-import com.keyforge.part2.ingest.IdentityImportService;
 import com.keyforge.part2.ingest.IdentityRequestApprovalTable;
 import com.keyforge.part2.ingest.IdentityRequestItemTable;
 import com.keyforge.part2.ingest.IdentityRequestTable;
@@ -50,7 +49,6 @@ import com.keyforge.part2.ingest.RoleTable;
 import com.keyforge.part2.ingest.SoftDeleteSweeper;
 import com.keyforge.part2.ingest.SqlReportImportService;
 import com.keyforge.part2.ingest.SqlReportSpec;
-import com.keyforge.part2.ingest.SweepPolicies;
 import com.keyforge.part2.ingest.SqlReportRepository;
 import com.keyforge.part2.ingest.SyslogEventImportService;
 import com.keyforge.part2.ingest.SyslogEventRepository;
@@ -249,7 +247,7 @@ public final class Main {
             return 2;
         }
         return switch (command) {
-            case "import-identity" -> runImportIdentity(options);
+            case "import-identity" -> runImport(Main::identityWriter, options);
             case "import-entitlement" -> runImport(EntitlementTable.SPEC, options);
             case "import-application" -> runImport(ApplicationTable.SPEC, options);
             case "import-account" -> runImport(AccountTable.SPEC, options);
@@ -330,7 +328,7 @@ public final class Main {
             case "import-certification-archive" -> Set.of("source_id", "name", "certification_id",
                     "certification_group_id", "creator_name", "owner_name", "comments", "signed", "expiration",
                     "created_at", "modified_at", "archived_ts");
-            case "import-workgroup-member" -> Set.of("workgroup_id", "workgroup_name", "identity_id", "identity_name",
+            case "import-workgroup-member" -> Set.of("workgroup_id", "workgroup_name", "identity_id", "member_name",
                     "first_name", "last_name", "member_is_workgroup");
             case "import-audit-event" -> Set.of("source_id", "action", "audit_source", "target", "application",
                     "account_name", "instance", "attribute_name", "attribute_value", "interface_name", "server_host",
@@ -498,8 +496,11 @@ public final class Main {
     /** Syslog keeps its own paged, complete-scan-guarded import; its incremental mode reuses that scan. */
     static final String SYSLOG_COMMAND = "import-syslog-event";
 
-    /** The Identity table's dedicated repository as an {@link EntityWriter} (incremental path only). */
-    static EntityWriter identityWriter(String schema) {
+    /**
+     * The Identity table's dedicated repository as an {@link EntityWriter}: PK {@code userid} =
+     * {@link com.keyforge.part2.id.CanonicalIds#identityUserid}; unchanged identities are skipped by their record hash.
+     */
+    public static EntityWriter identityWriter(String schema) {
         IdentityRepository repository = new IdentityRepository(schema);
         return new EntityWriter() {
             @Override public String entity() { return "Identity"; }
@@ -518,6 +519,13 @@ public final class Main {
             }
             @Override public String ref(JsonNode row) {
                 return "identity " + row.path("name").asText(null) + " (" + row.path("source_id").asText(null) + ")";
+            }
+            @Override public String key(JsonNode row) {
+                return com.keyforge.part2.id.CanonicalIds.identityUserid(row.path("source_id").asText(null),
+                        row.path("name").asText(null));
+            }
+            @Override public String keyColumn() {
+                return IdentityTable.PK;
             }
         };
     }
@@ -744,47 +752,6 @@ public final class Main {
         }
     }
 
-    private static int runImportIdentity() {
-        return runImportIdentity(FetchOptions.none());
-    }
-
-    private static int runImportIdentity(FetchOptions options) {
-        try {
-            AppConfig config = AppConfig.load();
-            String runId = RunLedger.runIdOrNew();
-            System.out.println(config.describe());
-            System.out.println("extraction_run_id: " + runId);
-
-            KfAgentClient client = new KfAgentClient(config);
-            IdentityRepository repository = new IdentityRepository(config.pgSchema());
-            IdentityImportService service = new IdentityImportService(client, repository, config.pageSize());
-
-            try (Connection conn = PostgresConnection.open(config)) {
-                ImportResult result = service.run(conn, runId, options);
-                RunLedger.record(counts(repository.targetTable(), result, null));
-                System.out.println();
-                System.out.println(result.summary());
-                return result.failed() > 0 ? 6 : 0;
-            }
-        } catch (ConfigException e) {
-            System.err.println("Configuration error: " + e.getMessage());
-            RunLedger.error("configuration error: " + e.getMessage());
-            return 3;
-        } catch (KfAgentClient.KfAgentHttpException e) {
-            System.err.println("KF Agent HTTP/source error: " + e.getMessage());
-            RunLedger.error("KF Agent HTTP/source error: " + e.getMessage());
-            return 4;
-        } catch (SQLException e) {
-            System.err.println("PostgreSQL error: " + e.getMessage());
-            RunLedger.error("PostgreSQL error: " + e.getMessage());
-            return 5;
-        } catch (RuntimeException e) {
-            System.err.println("Unexpected error: " + e.getMessage());
-            RunLedger.error("unexpected error: " + e.getMessage());
-            return 1;
-        }
-    }
-
     /** Runs a generic {@link EntitySpec} import with the same config, summary and exit codes as Identity. */
     private static int runImport(EntitySpec spec) {
         return runImport(schema -> new EntityRepository(schema, spec));
@@ -812,17 +779,18 @@ public final class Main {
             try (Connection conn = PostgresConnection.open(config)) {
                 // Full runs page start/limit until a short page (Part 1 serves each window directly, no counted
                 // whole-entity read); caller-scoped runs fetch exactly the requested window or filter.
-                EntityImportService importer = new EntityImportService(client, writer, config.pageSize());
+                EntityImportService importer = new EntityImportService(client, writer, config.pageSize(),
+                        config.sweepMaxDeletePercent());
                 ImportResult result = options.isEmpty() ? importer.run(conn, runId)
                         : importer.run(conn, runId, options);
-                RunLedger.record(counts(writer.targetTable(), result, null));
+                SoftDeleteSweeper.Result sweep = importer.lastSweep();
+                RunLedger.record(counts(writer.targetTable(), result, sweep));
                 System.out.println();
                 System.out.println(result.summary());
                 if (!options.isEmpty()) {
-                    System.out.println("  fetch:     caller-scoped partial import; no deletion sweep");
-                } else if (SweepPolicies.configFor(writer.targetTable()).isPresent()) {
-                    System.out.println("  sweep:     not run (paged import; deletion detection is not yet "
-                            + "implemented for paged reads)");
+                    System.out.println("  fetch:     caller-scoped partial import; no row marked deleted");
+                } else if (sweep != null) {
+                    return printDeletions(sweep, result.failed());
                 }
                 return result.failed() > 0 ? 6 : 0;
             }
@@ -896,6 +864,25 @@ public final class Main {
             RunLedger.error("unexpected error: " + e.getMessage());
             return 1;
         }
+    }
+
+    /**
+     * Prints what a full run's deletion marking did. Exit 7 when the safety limit stopped it (the deletion state may be
+     * stale and the source should be checked); otherwise the row-failure exit code.
+     */
+    static int printDeletions(SoftDeleteSweeper.Result sweep, int failedRows) {
+        if (sweep.swept()) {
+            System.out.println("  deleted:   marked " + sweep.marked() + " row(s) the source no longer returns (of "
+                    + sweep.keepCount() + " rows returned)");
+        } else {
+            System.out.println("  deleted:   not marked — " + sweep.note());
+        }
+        if (sweep.status() == SoftDeleteSweeper.Status.SKIPPED_SAFETY_LIMIT) {
+            System.err.println("Deletion marking skipped: " + sweep.note());
+            RunLedger.error("deletion marking skipped: " + sweep.note());
+            return 7;
+        }
+        return failedRows > 0 ? 6 : 0;
     }
 
     /** One table's ledger counts (unqualified table name), with the sweep outcome when the table is swept. */
@@ -1082,21 +1069,17 @@ public final class Main {
             KfAgentClient client = new KfAgentClient(config);
             try (Connection conn = PostgresConnection.open(config)) {
                 SqlReportRepository repository = new SqlReportRepository(config.pgSchema(), spec);
-                SqlReportImportService service =
-                        new SqlReportImportService(client::fetchPage, repository, config.reportPageSize());
+                SqlReportImportService service = new SqlReportImportService(client::fetchPage, repository,
+                        config.reportPageSize(), config.sweepMaxDeletePercent());
                 SqlReportImportService.Outcome o = service.run(conn, runId, fetchOptions);
                 RunLedger.record(counts(repository.targetTable(), o.result(), o.sweep()));
                 System.out.println();
                 System.out.println(o.result().summary());
                 if (o.sweep() == null) {
                     System.out.println("  fetch:     caller-scoped partial import; no row marked deleted");
-                } else if (o.sweep().swept()) {
-                    System.out.println("  deleted:   marked " + o.sweep().marked() + " row(s) the report no longer "
-                            + "returns (of " + o.sweep().keepCount() + " rows returned)");
-                } else {
-                    System.out.println("  deleted:   not marked — " + o.sweep().note());
+                    return o.result().failed() > 0 ? 6 : 0;
                 }
-                return o.result().failed() > 0 ? 6 : 0;
+                return printDeletions(o.sweep(), o.result().failed());
             }
         } catch (ConfigException e) {
             System.err.println("Configuration error: " + e.getMessage());
